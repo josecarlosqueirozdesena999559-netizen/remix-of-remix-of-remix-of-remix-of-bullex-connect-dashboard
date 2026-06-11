@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useBullexAccount, useBullexBalance } from "@/lib/useBullex";
+import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -10,20 +10,20 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const account = useBullexAccount();
+  const account = useBullExAccount();
   const acc = account.data;
-  const connected = acc?.connected === true || acc?.status === "connected";
-  const balance = useBullexBalance(connected);
-
-  const isLoading = account.isLoading || balance.isLoading;
+  const connected = acc?.connected === true;
+  const isLoading = account.isLoading;
   const hasBackend = !!apiConfig.BASE_URL;
-  const disconnected = account.error instanceof ApiError && account.error.code === "SESSION_NOT_FOUND";
-  const apiError = disconnected ? null : account.error || balance.error;
+  const disconnected =
+    acc?.connected === false ||
+    (account.error instanceof ApiError &&
+      (account.error.code === "SESSION_NOT_FOUND" || account.error.code === "SESSION_DISCONNECTED"));
+  const apiError = disconnected ? null : account.error;
   const isNoBackend = apiError instanceof Error && apiError.message.includes("VITE_API_BASE_URL");
 
-  const bal = balance.data;
-  const currency = bal?.currency ?? acc?.currency ?? "USD";
-  const realBalance = bal?.balance ?? acc?.balance ?? null;
+  const currency = acc?.currency ?? "USD";
+  const realBalance = acc?.balance ?? null;
 
   return (
     <div className="space-y-6">
@@ -34,7 +34,8 @@ function Dashboard() {
 
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          <strong>Backend não configurado.</strong> Defina <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_API_BASE_URL</code> e <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_PANEL_API_KEY</code> no ambiente para conectar à API BullEx.
+          <strong>Backend nao configurado.</strong> Defina <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code> e{" "}
+          <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_PANEL_API_KEY</code> no ambiente para conectar a API BullEx.
         </div>
       )}
 
@@ -50,7 +51,7 @@ function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <LiveCard
           label="Status da conta"
           value={connected ? "Conectado" : "Desconectado"}
@@ -64,48 +65,53 @@ function Dashboard() {
           Icon={Wallet}
           accent
         />
-        <LiveCard
-          label="Moeda"
-          value={currency}
-          Icon={Coins}
-          accent
-        />
+        <LiveCard label="Moeda" value={currency} Icon={Coins} accent />
         <LiveCard
           label="Modo"
           value={acc?.mode ?? "-"}
           Icon={Gamepad2}
           tone={acc?.mode === "REAL" ? "negative" : "positive"}
         />
-        <LiveCard
-          label="Email BullEx"
-          value={acc?.email ?? "-"}
-          Icon={Mail}
-        />
-      </div>
-
-      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        Esta tela exibe somente dados retornados pelo BullEx Gateway para o usuário autenticado.
+        <LiveCard label="Email BullEx" value={acc?.email ?? "-"} Icon={Mail} />
       </div>
     </div>
   );
 }
 
 function LiveCard({
-  label, value, Icon, accent, tone, badge,
+  label,
+  value,
+  Icon,
+  accent,
+  tone,
+  badge,
 }: {
-  label: string; value: string; Icon: React.ComponentType<{ className?: string }>;
-  accent?: boolean; tone?: "positive" | "negative"; badge?: string;
+  label: string;
+  value: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent?: boolean;
+  tone?: "positive" | "negative";
+  badge?: string;
 }) {
-  const valueClass = tone === "positive" ? "text-success"
-    : tone === "negative" ? "text-destructive"
-    : accent ? "text-primary" : "text-foreground";
+  const isLongValue = value.includes("@") || value.length > 20;
+  const valueClass =
+    tone === "positive"
+      ? "text-success"
+      : tone === "negative"
+        ? "text-destructive"
+        : accent
+          ? "text-primary"
+          : "text-foreground";
+
   return (
-    <div className="p-5 rounded-2xl bg-card border border-border">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="mb-3 flex items-center justify-between">
         <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-        <Icon className={`w-4 h-4 ${valueClass}`} />
+        <Icon className={`h-4 w-4 ${valueClass}`} />
       </div>
-      <div className={`text-2xl font-semibold ${valueClass}`}>{value}</div>
+      <div className={`${isLongValue ? "break-all text-base leading-snug" : "text-2xl"} font-semibold ${valueClass}`}>
+        {value}
+      </div>
       {badge && (
         <Badge variant="secondary" className="mt-2">
           {badge}

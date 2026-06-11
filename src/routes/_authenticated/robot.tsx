@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Power, Bot, Plug, Loader2 } from "lucide-react";
-import { useBullexAccount, useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
+import { useBullExAccount } from "@/hooks/useBullExAccount";
+import { useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
 import { apiConfig } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/robot")({
-  head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Robo - BullEx AutoBot" }] }),
   component: RobotPage,
 });
 
@@ -43,12 +44,12 @@ function RobotPage() {
 
   const update = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
 
-  const account = useBullexAccount();
+  const account = useBullExAccount();
   const connect = useConnectBullex();
   const disconnect = useDisconnectBullex();
   const reconnect = useReconnectBullex();
 
-  const connected = account.data?.connected === true || account.data?.status === "connected";
+  const connected = account.data?.connected === true;
   const isToggling = connect.isPending || disconnect.isPending || reconnect.isPending;
   const hasBackend = !!apiConfig.BASE_URL;
 
@@ -63,19 +64,21 @@ function RobotPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between flex-wrap gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><Bot className="w-6 h-6" /> Robô</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <Bot className="h-6 w-6" /> Robo
+          </h1>
           <p className="text-sm text-muted-foreground">Controle da sua conta BullEx conectada.</p>
         </div>
         <button
           onClick={handleToggle}
           disabled={!hasBackend || isToggling}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
             connected ? "bg-destructive text-destructive-foreground" : "bg-success text-success-foreground"
           }`}
         >
-          {isToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
+          {isToggling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
           {connected ? "Desconectar" : "Reconectar"}
         </button>
       </header>
@@ -83,41 +86,47 @@ function RobotPage() {
       {(disconnect.isError || reconnect.isError) && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
           <strong>Erro:</strong>{" "}
-          {disconnect.error instanceof Error ? disconnect.error.message : reconnect.error instanceof Error ? reconnect.error.message : "Falha ao alternar a conta"}
+          {disconnect.error instanceof Error
+            ? disconnect.error.message
+            : reconnect.error instanceof Error
+              ? reconnect.error.message
+              : "Falha ao alternar a conta"}
         </div>
       )}
 
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          <strong>Backend não configurado.</strong> Defina <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_API_BASE_URL</code> e <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_PANEL_API_KEY</code> no ambiente para controlar o robô.
+          <strong>Backend nao configurado.</strong> Defina <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code> e{" "}
+          <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_PANEL_API_KEY</code> no ambiente para controlar o robo.
         </div>
       )}
 
-      <div className="p-5 rounded-2xl bg-card border border-border">
+      <div className="rounded-2xl border border-border bg-card p-5">
         <div className="flex items-center gap-3">
-          <span className={`w-3 h-3 rounded-full ${connected ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
+          <span className={`h-3 w-3 rounded-full ${connected ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
           <span className="font-medium">{connected ? "Conta BullEx conectada" : "Conta BullEx desconectada"}</span>
-          <span className="ml-auto text-sm px-3 py-1 rounded-md bg-muted">
+          <span className="ml-auto rounded-md bg-muted px-3 py-1 text-sm">
             Conta: <strong>{cfg.accountType}</strong>
           </span>
         </div>
       </div>
 
-      <ConnectSection />
+      <ConnectSection connected={connected} />
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Tipo de conta</h2>
           <div className="grid grid-cols-2 gap-2">
             {(["DEMO", "REAL"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => update("accountType", t)}
-                className={`py-3 rounded-lg border font-medium transition ${
+                className={`rounded-lg border py-3 font-medium transition ${
                   cfg.accountType === t
-                    ? t === "REAL" ? "bg-destructive text-destructive-foreground border-destructive"
-                      : "bg-primary text-primary-foreground border-primary"
-                    : "bg-card border-border hover:bg-accent"
+                    ? t === "REAL"
+                      ? "border-destructive bg-destructive text-destructive-foreground"
+                      : "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card hover:bg-accent"
                 }`}
               >
                 {t}
@@ -126,37 +135,47 @@ function RobotPage() {
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Gerenciamento</h2>
           <NumField label="Stop Win (USD)" value={cfg.stopWin} onChange={(v) => update("stopWin", v)} />
           <NumField label="Stop Loss (USD)" value={cfg.stopLoss} onChange={(v) => update("stopLoss", v)} />
           <NumField label="Entrada inicial (USD)" value={cfg.entry} onChange={(v) => update("entry", v)} step={0.5} />
           <div>
-            <label className="block text-sm font-medium mb-1.5">Martingale (Gales)</label>
+            <label className="mb-1.5 block text-sm font-medium">Martingale (Gales)</label>
             <select
               value={cfg.martingale}
               onChange={(e) => update("martingale", Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg bg-input border border-border"
+              className="w-full rounded-lg border border-border bg-input px-3 py-2"
             >
-              {[0, 1, 2, 3].map((g) => <option key={g} value={g}>{g === 0 ? "Sem gale" : `G${g}`}</option>)}
+              {[0, 1, 2, 3].map((g) => (
+                <option key={g} value={g}>
+                  {g === 0 ? "Sem gale" : `G${g}`}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        Dados de mercado ficam disponíveis na tela Mercado.
+        Dados de mercado ficam disponiveis na tela Grafico.
       </div>
     </div>
   );
 }
 
-function ConnectSection() {
+function ConnectSection({ connected }: { connected: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const connect = useConnectBullex();
   const hasBackend = !!apiConfig.BASE_URL;
+
+  useEffect(() => {
+    if (!connected) return;
+    setPassword("");
+    setSmsCode("");
+  }, [connected]);
 
   async function handleConnect(e: React.FormEvent) {
     e.preventDefault();
@@ -171,78 +190,99 @@ function ConnectSection() {
   }
 
   return (
-    <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+    <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
       <div className="flex items-center gap-2">
-        <Plug className="w-4 h-4 text-primary" />
+        <Plug className="h-4 w-4 text-primary" />
         <h2 className="font-semibold">Conectar conta BullEx</h2>
       </div>
+
+      {connected && (
+        <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-sm text-success-foreground">
+          Conta BullEx conectada. Se quiser sair, use o botao desconectar acima.
+        </div>
+      )}
+
       {connect.isSuccess && (
-        <div className="rounded-lg bg-success/10 border border-success/20 px-4 py-2 text-sm text-success-foreground">
+        <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-2 text-sm text-success-foreground">
           Conta conectada com sucesso!
         </div>
       )}
+
       {connect.isError && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2 text-sm text-destructive-foreground">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive-foreground">
           {connect.error instanceof Error ? connect.error.message : "Erro ao conectar"}
         </div>
       )}
-      <form onSubmit={handleConnect} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Email BullEx</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            disabled={!hasBackend || connect.isPending}
-            className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Senha</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="******"
-            disabled={!hasBackend || connect.isPending}
-            className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">SMS (opcional)</label>
-          <input
-            type="text"
-            value={smsCode}
-            onChange={(e) => setSmsCode(e.target.value)}
-            placeholder="123456"
-            disabled={!hasBackend || connect.isPending}
-            className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={!hasBackend || connect.isPending || !email || !password}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {connect.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          Conectar
-        </button>
-      </form>
+
+      {!connected && (
+        <form onSubmit={handleConnect} className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Email BullEx</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              disabled={!hasBackend || connect.isPending}
+              className="w-full rounded-lg border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Senha</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="******"
+              disabled={!hasBackend || connect.isPending}
+              className="w-full rounded-lg border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">SMS (opcional)</label>
+            <input
+              type="text"
+              value={smsCode}
+              onChange={(e) => setSmsCode(e.target.value)}
+              placeholder="123456"
+              disabled={!hasBackend || connect.isPending}
+              className="w-full rounded-lg border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!hasBackend || connect.isPending || !email || !password}
+            className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {connect.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Conectar
+          </button>
+        </form>
+      )}
     </div>
   );
 }
 
-function NumField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) {
+function NumField({
+  label,
+  value,
+  onChange,
+  step = 1,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+}) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1.5">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium">{label}</label>
       <input
         type="number"
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20"
+        className="w-full rounded-lg border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring/20"
       />
     </div>
   );
