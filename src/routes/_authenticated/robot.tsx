@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Power, Bot } from "lucide-react";
+import { Power, Bot, Plug, Loader2 } from "lucide-react";
+import { useBullexAccount, useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
+import { apiConfig } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robô — BullEx AutoBot" }] }),
@@ -45,6 +47,24 @@ function RobotPage() {
 
   const update = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
 
+  const account = useBullexAccount();
+  const connect = useConnectBullex();
+  const disconnect = useDisconnectBullex();
+  const reconnect = useReconnectBullex();
+
+  const connected = account.data?.status === "connected";
+  const isToggling = connect.isPending || disconnect.isPending || reconnect.isPending;
+  const hasBackend = !!apiConfig.BASE_URL;
+
+  async function handleToggle() {
+    if (!hasBackend) return;
+    if (connected) {
+      await disconnect.mutateAsync();
+    } else {
+      await reconnect.mutateAsync();
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between flex-wrap gap-3">
@@ -53,25 +73,34 @@ function RobotPage() {
           <p className="text-sm text-muted-foreground">Configuração e controle do AutoBot.</p>
         </div>
         <button
-          onClick={() => update("on", !cfg.on)}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold shadow-sm transition ${
-            cfg.on ? "bg-destructive text-destructive-foreground" : "bg-success text-success-foreground"
+          onClick={handleToggle}
+          disabled={!hasBackend || isToggling}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
+            connected ? "bg-destructive text-destructive-foreground" : "bg-success text-success-foreground"
           }`}
         >
-          <Power className="w-4 h-4" />
-          {cfg.on ? "Desligar robô" : "Ligar robô"}
+          {isToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
+          {connected ? "Desligar robô" : "Ligar robô"}
         </button>
       </header>
 
+      {!hasBackend && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+          <strong>Backend não configurado.</strong> Defina <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_API_BASE_URL</code> e <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_PANEL_API_KEY</code> no ambiente para controlar o robô.
+        </div>
+      )}
+
       <div className="p-5 rounded-2xl bg-card border border-border">
         <div className="flex items-center gap-3">
-          <span className={`w-3 h-3 rounded-full ${cfg.on ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
-          <span className="font-medium">{cfg.on ? "Robô operando" : "Robô desligado"}</span>
+          <span className={`w-3 h-3 rounded-full ${connected ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
+          <span className="font-medium">{connected ? "Robô operando" : "Robô desligado"}</span>
           <span className="ml-auto text-sm px-3 py-1 rounded-md bg-muted">
             Conta: <strong>{cfg.accountType}</strong>
           </span>
         </div>
       </div>
+
+      <ConnectSection />
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
@@ -157,6 +186,82 @@ function RobotPage() {
   );
 }
 
+function ConnectSection() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const connect = useConnectBullex();
+  const hasBackend = !!apiConfig.BASE_URL;
+
+  async function handleConnect(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !password) return;
+    await connect.mutateAsync({ email, password, otp: otp || undefined });
+  }
+
+  return (
+    <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+      <div className="flex items-center gap-2">
+        <Plug className="w-4 h-4 text-primary" />
+        <h2 className="font-semibold">Conectar conta BullEx</h2>
+      </div>
+      {connect.isSuccess && (
+        <div className="rounded-lg bg-success/10 border border-success/20 px-4 py-2 text-sm text-success-foreground">
+          Conta conectada com sucesso!
+        </div>
+      )}
+      {connect.isError && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2 text-sm text-destructive-foreground">
+          {connect.error instanceof Error ? connect.error.message : "Erro ao conectar"}
+        </div>
+      )}
+      <form onSubmit={handleConnect} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Email BullEx</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seu@email.com"
+            disabled={!hasBackend || connect.isPending}
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Senha</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••"
+            disabled={!hasBackend || connect.isPending}
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">OTP (opcional)</label>
+          <input
+            type="text"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="123456"
+            disabled={!hasBackend || connect.isPending}
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={!hasBackend || connect.isPending || !email || !password}
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {connect.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+          Conectar
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function NumField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) {
   return (
     <div>
@@ -169,5 +274,24 @@ function NumField({ label, value, onChange, step = 1 }: { label: string; value: 
         className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20"
       />
     </div>
+  );
+}
+
+function Loader2(props: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={props.className}
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }
