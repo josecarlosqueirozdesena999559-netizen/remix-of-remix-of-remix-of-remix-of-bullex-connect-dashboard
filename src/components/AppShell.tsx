@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { LayoutDashboard, CandlestickChart, Bot, CreditCard, Settings, LogOut } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";

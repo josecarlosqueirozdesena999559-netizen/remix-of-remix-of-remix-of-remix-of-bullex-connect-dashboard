@@ -1,39 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { TrendingUp, TrendingDown, Target, Wallet, Trophy, Percent, Plug, Unplug, Gamepad2, TrendingUpIcon } from "lucide-react";
+import { Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useBullexAccount, useBullexBalance } from "@/lib/useBullex";
-import { apiConfig } from "@/lib/api";
+import { ApiError, apiConfig } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Dashboard - BullEx AutoBot" }] }),
   component: Dashboard,
 });
 
 function Dashboard() {
   const account = useBullexAccount();
-  const balance = useBullexBalance();
+  const acc = account.data;
+  const connected = acc?.connected === true || acc?.status === "connected";
+  const balance = useBullexBalance(connected);
 
   const isLoading = account.isLoading || balance.isLoading;
   const hasBackend = !!apiConfig.BASE_URL;
-  const apiError = account.error || balance.error;
+  const disconnected = account.error instanceof ApiError && account.error.code === "SESSION_NOT_FOUND";
+  const apiError = disconnected ? null : account.error || balance.error;
   const isNoBackend = apiError instanceof Error && apiError.message.includes("VITE_API_BASE_URL");
 
-  // Mock metrics (frontend-only). Will be wired to backend later.
-  const stats = useMemo(() => {
-    const wins = 38;
-    const losses = 14;
-    const total = wins + losses;
-    const profit = 842.5;
-    const loss = 312.0;
-    const net = profit - loss;
-    const winRate = total ? (wins / total) * 100 : 0;
-    return { wins, losses, profit, loss, net, winRate };
-  }, []);
-
-  const acc = account.data;
   const bal = balance.data;
-  const connected = acc?.status === "connected";
   const currency = bal?.currency ?? acc?.currency ?? "USD";
   const realBalance = bal?.balance ?? acc?.balance ?? null;
 
@@ -41,12 +29,18 @@ function Dashboard() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Resumo das operações e status da conta.</p>
+        <p className="text-sm text-muted-foreground">Resumo da sua conta BullEx.</p>
       </header>
 
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
           <strong>Backend não configurado.</strong> Defina <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_API_BASE_URL</code> e <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_PANEL_API_KEY</code> no ambiente para conectar à API BullEx.
+        </div>
+      )}
+
+      {hasBackend && disconnected && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+          Conta BullEx desconectada
         </div>
       )}
 
@@ -66,73 +60,41 @@ function Dashboard() {
         />
         <LiveCard
           label="Saldo"
-          value={realBalance !== null ? money(realBalance, currency) : isLoading ? "—" : "N/A"}
+          value={realBalance !== null ? money(realBalance, currency) : isLoading ? "-" : "N/A"}
           Icon={Wallet}
           accent
         />
         <LiveCard
+          label="Moeda"
+          value={currency}
+          Icon={Coins}
+          accent
+        />
+        <LiveCard
           label="Modo"
-          value={acc?.mode ?? "—"}
+          value={acc?.mode ?? "-"}
           Icon={Gamepad2}
           tone={acc?.mode === "REAL" ? "negative" : "positive"}
         />
         <LiveCard
-          label="Resultado do dia"
-          value={acc?.dayResult ?? "—"}
-          Icon={TrendingUpIcon}
-          tone={acc?.dayResult === "WIN" ? "positive" : acc?.dayResult === "LOSS" ? "negative" : undefined}
-          suffix={acc?.dayProfit ? ` (${money(acc.dayProfit, currency)})` : undefined}
+          label="Email BullEx"
+          value={acc?.email ?? "-"}
+          Icon={Mail}
         />
       </div>
 
-      <section>
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Métricas do mês (simulado)</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard label="Win Rate" value={`${stats.winRate.toFixed(1)}%`} Icon={Percent} tone="positive" />
-          <StatCard label="Resultado do mês" value={money(stats.net)} Icon={Trophy} tone={stats.net >= 0 ? "positive" : "negative"} />
-          <StatCard label="Wins" value={String(stats.wins)} Icon={TrendingUp} tone="positive" />
-          <StatCard label="Loss" value={String(stats.losses)} Icon={TrendingDown} tone="negative" />
-          <StatCard label="Lucro no mês" value={money(stats.profit)} Icon={Target} tone="positive" />
-          <StatCard label="Perca no mês" value={money(stats.loss)} Icon={Target} tone="negative" />
-        </div>
-      </section>
+      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        Esta tela exibe somente dados retornados pelo BullEx Gateway para o usuário autenticado.
+      </div>
     </div>
   );
 }
 
 function LiveCard({
-  label, value, Icon, accent, tone, badge, suffix,
+  label, value, Icon, accent, tone, badge,
 }: {
   label: string; value: string; Icon: React.ComponentType<{ className?: string }>;
-  accent?: boolean; tone?: "positive" | "negative"; badge?: string; suffix?: string;
-}) {
-  const valueClass = tone === "positive" ? "text-success"
-    : tone === "negative" ? "text-destructive"
-    : accent ? "text-primary" : "text-foreground";
-  return (
-    <div className="p-5 rounded-2xl bg-card border border-border">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-        <Icon className={`w-4 h-4 ${valueClass}`} />
-      </div>
-      <div className="flex items-baseline gap-2">
-        <div className={`text-2xl font-semibold ${valueClass}`}>{value}</div>
-        {suffix && <div className="text-sm text-muted-foreground">{suffix}</div>}
-      </div>
-      {badge && (
-        <Badge variant="secondary" className="mt-2">
-          {badge}
-        </Badge>
-      )}
-    </div>
-  );
-}
-
-function StatCard({
-  label, value, Icon, accent, tone,
-}: {
-  label: string; value: string; Icon: React.ComponentType<{ className?: string }>;
-  accent?: boolean; tone?: "positive" | "negative";
+  accent?: boolean; tone?: "positive" | "negative"; badge?: string;
 }) {
   const valueClass = tone === "positive" ? "text-success"
     : tone === "negative" ? "text-destructive"
@@ -144,6 +106,11 @@ function StatCard({
         <Icon className={`w-4 h-4 ${valueClass}`} />
       </div>
       <div className={`text-2xl font-semibold ${valueClass}`}>{value}</div>
+      {badge && (
+        <Badge variant="secondary" className="mt-2">
+          {badge}
+        </Badge>
+      )}
     </div>
   );
 }

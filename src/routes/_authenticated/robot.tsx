@@ -5,20 +5,9 @@ import { useBullexAccount, useConnectBullex, useDisconnectBullex, useReconnectBu
 import { apiConfig } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/robot")({
-  head: () => ({ meta: [{ title: "Robô — BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
   component: RobotPage,
 });
-
-const ASSETS = [
-  { symbol: "EUR/USD", payout: 87 },
-  { symbol: "GBP/USD", payout: 85 },
-  { symbol: "USD/JPY", payout: 84 },
-  { symbol: "AUD/CAD", payout: 82 },
-  { symbol: "EUR/JPY", payout: 86 },
-  { symbol: "BTC/USD", payout: 78 },
-  { symbol: "ETH/USD", payout: 76 },
-  { symbol: "XAU/USD", payout: 88 },
-];
 
 type Config = {
   on: boolean;
@@ -26,19 +15,26 @@ type Config = {
   stopWin: number;
   stopLoss: number;
   entry: number;
-  martingale: number; // G1, G2...
-  asset: string;
+  martingale: number;
 };
 
 const DEFAULT: Config = {
-  on: false, accountType: "DEMO", stopWin: 50, stopLoss: 30, entry: 2, martingale: 1, asset: "EUR/USD",
+  on: false,
+  accountType: "DEMO",
+  stopWin: 50,
+  stopLoss: 30,
+  entry: 2,
+  martingale: 1,
 };
 
 function RobotPage() {
   const [cfg, setCfg] = useState<Config>(() => {
     if (typeof window === "undefined") return DEFAULT;
-    try { return { ...DEFAULT, ...JSON.parse(localStorage.getItem("robotCfg") || "{}") }; }
-    catch { return DEFAULT; }
+    try {
+      return { ...DEFAULT, ...JSON.parse(localStorage.getItem("robotCfg") || "{}") };
+    } catch {
+      return DEFAULT;
+    }
   });
 
   useEffect(() => {
@@ -52,7 +48,7 @@ function RobotPage() {
   const disconnect = useDisconnectBullex();
   const reconnect = useReconnectBullex();
 
-  const connected = account.data?.status === "connected";
+  const connected = account.data?.connected === true || account.data?.status === "connected";
   const isToggling = connect.isPending || disconnect.isPending || reconnect.isPending;
   const hasBackend = !!apiConfig.BASE_URL;
 
@@ -70,7 +66,7 @@ function RobotPage() {
       <header className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Bot className="w-6 h-6" /> Robô</h1>
-          <p className="text-sm text-muted-foreground">Configuração e controle do AutoBot.</p>
+          <p className="text-sm text-muted-foreground">Controle da sua conta BullEx conectada.</p>
         </div>
         <button
           onClick={handleToggle}
@@ -80,14 +76,14 @@ function RobotPage() {
           }`}
         >
           {isToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
-          {connected ? "Desligar robô" : "Ligar robô"}
+          {connected ? "Desconectar" : "Reconectar"}
         </button>
       </header>
 
       {(disconnect.isError || reconnect.isError) && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
           <strong>Erro:</strong>{" "}
-          {disconnect.error instanceof Error ? disconnect.error.message : reconnect.error instanceof Error ? reconnect.error.message : "Falha ao alternar o robô"}
+          {disconnect.error instanceof Error ? disconnect.error.message : reconnect.error instanceof Error ? reconnect.error.message : "Falha ao alternar a conta"}
         </div>
       )}
 
@@ -100,7 +96,7 @@ function RobotPage() {
       <div className="p-5 rounded-2xl bg-card border border-border">
         <div className="flex items-center gap-3">
           <span className={`w-3 h-3 rounded-full ${connected ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
-          <span className="font-medium">{connected ? "Robô operando" : "Robô desligado"}</span>
+          <span className="font-medium">{connected ? "Conta BullEx conectada" : "Conta BullEx desconectada"}</span>
           <span className="ml-auto text-sm px-3 py-1 rounded-md bg-muted">
             Conta: <strong>{cfg.accountType}</strong>
           </span>
@@ -148,46 +144,8 @@ function RobotPage() {
         </div>
       </div>
 
-      <div className="p-5 rounded-2xl bg-card border border-border">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Ativos & Payout</h2>
-          <span className="text-xs text-muted-foreground">Ativo selecionado: <strong>{cfg.asset}</strong></span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
-                <th className="py-2">Ativo</th>
-                <th className="py-2">Payout</th>
-                <th className="py-2 text-right">Ação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ASSETS.map((a) => (
-                <tr key={a.symbol} className="border-b border-border/50">
-                  <td className="py-2.5 font-medium">{a.symbol}</td>
-                  <td className="py-2.5">
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
-                      a.payout >= 85 ? "bg-success/15 text-success-foreground" : "bg-muted text-muted-foreground"
-                    }`}>{a.payout}%</span>
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <button
-                      onClick={() => update("asset", a.symbol)}
-                      className={`px-3 py-1 rounded-md text-xs font-medium ${
-                        cfg.asset === a.symbol
-                          ? "bg-primary text-primary-foreground"
-                          : "border border-border hover:bg-accent"
-                      }`}
-                    >
-                      {cfg.asset === a.symbol ? "Selecionado" : "Selecionar"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        Dados de mercado ficam disponíveis na tela Mercado.
       </div>
     </div>
   );
@@ -196,14 +154,20 @@ function RobotPage() {
 function ConnectSection() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
+  const [smsCode, setSmsCode] = useState("");
   const connect = useConnectBullex();
   const hasBackend = !!apiConfig.BASE_URL;
 
   async function handleConnect(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !password) return;
-    await connect.mutateAsync({ email, password, otp: otp || undefined });
+    try {
+      await connect.mutateAsync({ email, password, sms_code: smsCode || undefined });
+      setPassword("");
+      setSmsCode("");
+    } catch {
+      setPassword("");
+    }
   }
 
   return (
@@ -240,17 +204,17 @@ function ConnectSection() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••"
+            placeholder="******"
             disabled={!hasBackend || connect.isPending}
             className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
           />
         </div>
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">OTP (opcional)</label>
+          <label className="block text-xs text-muted-foreground mb-1">SMS (opcional)</label>
           <input
             type="text"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
+            value={smsCode}
+            onChange={(e) => setSmsCode(e.target.value)}
             placeholder="123456"
             disabled={!hasBackend || connect.isPending}
             className="w-full px-3 py-2 rounded-lg bg-input border border-border outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
@@ -283,4 +247,3 @@ function NumField({ label, value, onChange, step = 1 }: { label: string; value: 
     </div>
   );
 }
-
