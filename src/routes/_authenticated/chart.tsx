@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   createChart,
@@ -24,6 +24,7 @@ type Asset = {
   symbol: string;
   active_id: string | number;
   enabled: boolean;
+  payout: number | null;
 };
 
 type Candle = CandlestickData<UTCTimestamp>;
@@ -80,27 +81,20 @@ function MarketPage() {
   });
 
   const assets = assetsQuery.data ?? [];
-  const tradableAssets = useMemo(
-    () => assets.filter((asset) => asset.symbol.includes("-OTC")),
-    [assets],
-  );
   const selected =
-    tradableAssets.find((asset) => asset.symbol === selectedSymbol) ??
-    assets.find((asset) => asset.symbol === selectedSymbol) ??
-    null;
+    assets.find((asset) => asset.symbol === selectedSymbol) ?? null;
 
   useEffect(() => {
     if (selectedSymbol) return;
 
     const defaultAsset =
-      tradableAssets.find((asset) => asset.symbol === "EURUSD-OTC") ??
-      tradableAssets[0] ??
+      assets.find((asset) => asset.symbol === "EURUSD-OTC") ??
       assets[0];
 
     if (defaultAsset?.symbol) {
       setSelectedSymbol(defaultAsset.symbol);
     }
-  }, [assets, selectedSymbol, tradableAssets]);
+  }, [assets, selectedSymbol]);
 
   useEffect(() => {
     if (!selectedSymbol) {
@@ -175,7 +169,7 @@ function MarketPage() {
         if (cancelled) return;
 
         if (nextCandles.length > 0) {
-          setCandles(nextCandles);
+          setCandles(nextCandles.slice(-200));
           const nextLastPrice = nextCandles[nextCandles.length - 1]?.close ?? null;
           setLastPrice(nextLastPrice);
           console.log("[REALTIME LAST PRICE]", nextLastPrice);
@@ -237,9 +231,10 @@ function MarketPage() {
   }, [marketSocketStatus]);
 
   useEffect(() => {
-    if (marketSocketError === "SESSION_DISCONNECTED") {
-      setSocketMessage("Sessao BullEx desconectada. Reconecte sua conta.");
-      setCandlesError(new Error("Sessao BullEx desconectada. Reconecte sua conta."));
+    if (isBinaryMarketErrorCode(marketSocketError)) {
+      const message = getBinaryMarketErrorMessage(marketSocketError);
+      setSocketMessage(message);
+      setCandlesError(new ApiError(message, marketSocketError));
       return;
     }
 
@@ -250,7 +245,7 @@ function MarketPage() {
     if (socketStatus === "connected") {
       setSocketMessage(null);
       setCandlesError((current) =>
-        current instanceof Error && current.message === "Sessao BullEx desconectada. Reconecte sua conta."
+        current instanceof Error && current.message === getBinaryMarketErrorMessage("SESSION_DISCONNECTED")
           ? null
           : current,
       );
@@ -410,17 +405,22 @@ function MarketPage() {
   }, [candles, followPrice, lastPrice, selectedSymbol]);
 
   const sessionMissing =
-    isSessionMissing(account.error) ||
-    isSessionMissing(assetsQuery.error) ||
-    isSessionMissing(candlesError) ||
-    isSessionMissing(payoutError);
+    isSessionError(account.error) ||
+    isSessionError(assetsQuery.error) ||
+    isSessionError(candlesError) ||
+    isSessionError(payoutError);
+
+  const assetNotAllowedError =
+    isAssetNotAllowed(assetsQuery.error) ||
+    isAssetNotAllowed(candlesError) ||
+    isAssetNotAllowed(payoutError);
 
   const displayedCandle = hoveredCandle ?? candles[candles.length - 1] ?? null;
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Grafico em tempo real</h1>
+        <h1 className="text-2xl font-semibold">Mercado binário - 21 pares monitorados</h1>
         <p className="text-sm text-muted-foreground">
           Selecione um ativo para acompanhar os candles retornados pela BullEx.
         </p>
@@ -428,11 +428,17 @@ function MarketPage() {
 
       {sessionMissing && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          Conecte sua conta BullEx primeiro
+          {getBinaryMarketErrorMessage("SESSION_DISCONNECTED")}
         </div>
       )}
 
-      {assetsQuery.error && !isSessionMissing(assetsQuery.error) && (
+      {assetNotAllowedError && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
+          {getBinaryMarketErrorMessage("ASSET_NOT_ALLOWED")}
+        </div>
+      )}
+
+      {assetsQuery.error && !isSessionError(assetsQuery.error) && !isAssetNotAllowed(assetsQuery.error) && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
           {assetsQuery.error instanceof Error ? assetsQuery.error.message : "Erro ao carregar ativos"}
         </div>
@@ -447,19 +453,19 @@ function MarketPage() {
             <select
               value={selectedSymbol}
               onChange={(event) => setSelectedSymbol(event.target.value)}
-              disabled={assetsQuery.isLoading || tradableAssets.length === 0}
+              disabled={assetsQuery.isLoading || assets.length === 0}
               className="w-full rounded-lg border border-border bg-input px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
             >
               <option value="">
                 {assetsQuery.isLoading
                   ? "Carregando ativos..."
-                  : tradableAssets.length === 0
-                    ? "Nenhum ativo recebido da API"
+                  : assets.length === 0
+                    ? "Nenhum ativo binário disponível no momento."
                     : "Selecione um ativo"}
               </option>
-              {tradableAssets.map((asset) => (
+              {assets.map((asset) => (
                 <option key={`${asset.symbol}-${asset.active_id}`} value={asset.symbol}>
-                  {`${asset.symbol} | ID ${asset.active_id}`}
+                  {`${asset.symbol} | ID ${asset.active_id} | ${formatPayoutValue(getAssetPayout(asset, selectedSymbol, selectedPayout))}`}
                 </option>
               ))}
             </select>
@@ -467,16 +473,16 @@ function MarketPage() {
 
           <div className="flex flex-wrap gap-2">
             <BadgeLabel label="Payout" value={isPayoutLoading ? "..." : formatPayoutValue(selectedPayout)} />
-            <BadgeLabel label="Modo" value={account.data?.mode ?? "-"} />
+            <BadgeLabel label="Modo" value={formatAccountMode(account.data?.mode)} />
             <BadgeLabel label="Ultimo preco" value={lastPrice != null ? formatNumber(lastPrice) : "-"} />
             <BadgeLabel label="Atualizado" value={lastUpdated ? formatDateTime(lastUpdated) : "-"} />
             <BadgeLabel label="WebSocket" value={formatSocketStatus(socketStatus)} />
           </div>
         </div>
 
-        {!assetsQuery.isLoading && tradableAssets.length === 0 && (
+        {!assetsQuery.isLoading && assets.length === 0 && (
           <div className="rounded-xl border border-border p-4 text-sm text-muted-foreground">
-            Nenhum ativo recebido da API
+            Nenhum ativo binário disponível no momento.
           </div>
         )}
       </section>
@@ -486,7 +492,7 @@ function MarketPage() {
           <div>
             <h2 className="font-semibold">{selected ? selected.symbol : "Selecione um ativo"}</h2>
             <p className="text-xs text-muted-foreground">
-              Intervalo 60s, ultimos 100 candles. Atualiza a cada 5 segundos.
+              Intervalo 60s, últimos 100 candles. Atualização em tempo real via WebSocket.
             </p>
           </div>
 
@@ -528,13 +534,13 @@ function MarketPage() {
           </div>
         </div>
 
-        {candlesError && !isSessionMissing(candlesError) && (
+        {candlesError && !isSessionError(candlesError) && !isAssetNotAllowed(candlesError) && (
           <div className="m-5 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
             {candlesError instanceof Error ? candlesError.message : "Erro ao carregar candles"}
           </div>
         )}
 
-        {socketMessage && socketMessage !== "SESSION_DISCONNECTED" && (
+        {socketMessage && !isBinaryMarketErrorMessage(socketMessage) && (
           <div className="mx-5 mt-5 rounded-xl border border-border/60 bg-muted/40 p-4 text-sm text-muted-foreground">
             {socketMessage}
           </div>
@@ -631,8 +637,40 @@ function unwrap<T>(res: ApiResult<T>): T {
   return res.data;
 }
 
-function isSessionMissing(error: unknown) {
-  return error instanceof ApiError && error.code === "SESSION_NOT_FOUND";
+function isSessionError(error: unknown) {
+  return error instanceof ApiError && isSessionErrorCode(error.code);
+}
+
+function isSessionErrorCode(code?: string | null) {
+  return code === "SESSION_NOT_FOUND" || code === "SESSION_DISCONNECTED";
+}
+
+function isAssetNotAllowed(error: unknown) {
+  return error instanceof ApiError && error.code === "ASSET_NOT_ALLOWED";
+}
+
+function isBinaryMarketErrorCode(code?: string | null) {
+  return code === "ASSET_NOT_ALLOWED" || isSessionErrorCode(code);
+}
+
+function isBinaryMarketErrorMessage(message: string) {
+  return (
+    message === getBinaryMarketErrorMessage("ASSET_NOT_ALLOWED") ||
+    message === getBinaryMarketErrorMessage("SESSION_NOT_FOUND") ||
+    message === getBinaryMarketErrorMessage("SESSION_DISCONNECTED")
+  );
+}
+
+function getBinaryMarketErrorMessage(code?: string | null) {
+  if (code === "ASSET_NOT_ALLOWED") {
+    return "Ativo não permitido para análise binária.";
+  }
+
+  if (isSessionErrorCode(code)) {
+    return "Conta BullEx desconectada. Reconecte sua conta.";
+  }
+
+  return code ?? "Erro inesperado no mercado binário.";
 }
 
 function normalizeCollection(input: unknown) {
@@ -664,33 +702,48 @@ function normalizeAsset(item: unknown): Asset | null {
   const value = item as Record<string, unknown>;
   const symbol = String(value.symbol ?? value.active ?? value.name ?? value.asset ?? "");
   if (!symbol) return null;
+  const rawPayout = value.payout ?? value.profit ?? value.percent;
+  const payout = normalizeNumber(rawPayout);
 
   return {
     symbol,
     active_id: String(value.active_id ?? value.activeId ?? value.id ?? value.active ?? symbol),
     enabled: Boolean(value.enabled ?? value.is_enabled ?? value.open ?? value.status === "enabled"),
+    payout,
   };
 }
 
 function normalizePayout(active: string, input: unknown): Payout {
-  if (!Array.isArray(input)) {
+  const data = getPayoutResponseData(input);
+  const row = data?.[0];
+
+  if (!row || typeof row !== "object") {
     console.error("[bullex/chart] Unexpected payouts payload", { active, payload: input });
     return { active, payout: null };
   }
 
-  const value = input[0];
-  if (!value || typeof value !== "object") return { active, payout: null };
+  const payout = normalizeNumber((row as Record<string, unknown>).payout);
 
-  const row = value as Record<string, unknown>;
-  const raw = row.payout;
-  const payout = typeof raw === "number" ? raw : Number(raw);
-
-  if (!Number.isFinite(payout)) {
+  if (payout == null) {
     console.error("[bullex/chart] Unexpected payout row", { active, row });
     return { active, payout: null };
   }
 
   return { active, payout };
+}
+
+function getPayoutResponseData(input: unknown): unknown[] | null {
+  if (Array.isArray(input)) return input;
+  if (!input || typeof input !== "object") return null;
+
+  const value = input as Record<string, unknown>;
+  return Array.isArray(value.data) ? value.data : null;
+}
+
+function normalizeNumber(value: unknown) {
+  if (value == null || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizeCandlesPayload(active: string, input: unknown): Candle[] {
@@ -827,6 +880,20 @@ function formatSocketStatus(status: MarketSocketStatus) {
 function formatPayoutValue(value: number | null | undefined) {
   if (value == null) return "-";
   return `${value}%`;
+}
+
+function getAssetPayout(asset: Asset, selectedSymbol: string, selectedPayout: number | null) {
+  if (asset.symbol === selectedSymbol) {
+    return selectedPayout ?? asset.payout;
+  }
+
+  return asset.payout;
+}
+
+function formatAccountMode(mode?: string) {
+  if (mode === "PRACTICE" || mode === "DEMO") return "DEMO";
+  if (mode === "REAL") return "REAL";
+  return "-";
 }
 
 function formatTime(value: UTCTimestamp) {
