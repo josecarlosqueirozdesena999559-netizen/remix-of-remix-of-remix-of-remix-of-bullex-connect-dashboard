@@ -84,6 +84,13 @@ function RobotPage() {
         </button>
       </header>
 
+      {(disconnect.isError || reconnect.isError) && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
+          <strong>Erro:</strong>{" "}
+          {disconnect.error instanceof Error ? disconnect.error.message : reconnect.error instanceof Error ? reconnect.error.message : "Falha ao alternar o robô"}
+        </div>
+      )}
+
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
           <strong>Backend não configurado.</strong> Defina <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_API_BASE_URL</code> e <code className="font-mono text-xs bg-background/40 px-1 rounded">VITE_PANEL_API_KEY</code> no ambiente para controlar o robô.
