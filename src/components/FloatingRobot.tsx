@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
-import { createStoppedRobotState, useRobotState } from "@/hooks/useRobotState";
+import { useRobotState } from "@/hooks/useRobotState";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
 
   return (
     <RobotOverlay
-      robotState={robotState.data ?? createStoppedRobotState()}
+      robotState={robotState.data}
       storageKey={positionKey}
       onClose={() => setOverlayVisible(false)}
       onConfig={() => void navigate({ to: "/robot" })}

@@ -7,9 +7,11 @@ import {
 } from "react";
 import { Settings, X } from "lucide-react";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
+import { useRecentRobotResult } from "@/hooks/useRecentRobotResult";
+import { formatDuration, getRobotPresentation } from "@/lib/robotPresentation";
 
 type RobotOverlayProps = {
-  robotState: RobotState;
+  robotState?: RobotState;
   onClose?: () => void;
   onConfig?: () => void;
   storageKey?: string;
@@ -40,7 +42,8 @@ export function RobotOverlay({
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const now = useCurrentTime();
-  const content = getOverlayContent(robotState, now);
+  const recentResult = useRecentRobotResult(robotState);
+  const content = getOverlayContent(robotState, recentResult, now);
 
   useEffect(() => {
     const savedPosition = readPosition(storageKey);
@@ -135,14 +138,14 @@ export function RobotOverlay({
       </div>
 
       <div className="grid grid-cols-[72px_90px_72px] items-center gap-2 sm:grid-cols-[92px_140px_92px] sm:gap-4">
-        <Score label="WIN" value={robotState.wins} tone="win" />
+        <Score label="WIN" value={robotState?.wins ?? 0} tone="win" />
         <img
           src="/robo.png"
           alt="Robô analisando o mercado"
           className="pointer-events-none h-auto w-[90px] object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.8)] sm:w-[140px]"
           draggable={false}
         />
-        <Score label="LOSS" value={robotState.losses} tone="loss" />
+        <Score label="LOSS" value={robotState?.losses ?? 0} tone="loss" />
       </div>
 
       <div className="-mt-1 max-w-[92vw] text-center text-white [text-shadow:0_2px_5px_#000,0_0_10px_#000] sm:-mt-2">
@@ -171,131 +174,55 @@ function useCurrentTime() {
   return now;
 }
 
-function getOverlayContent(robotState: RobotState, now: number): OverlayContent {
-  const trade = robotState.last_trade;
-  const result = trade?.result.toUpperCase();
+function getOverlayContent(
+  robotState: RobotState | undefined,
+  recentResult: "WIN" | "LOSS" | null,
+  now: number,
+): OverlayContent {
+  const presentation = getRobotPresentation(robotState, recentResult, now);
+  const trade = presentation.trade;
+  const signal = presentation.signal;
+  const tone =
+    presentation.kind === "result"
+      ? recentResult === "WIN"
+        ? "text-emerald-300"
+        : "text-red-300"
+      : presentation.kind === "operation"
+        ? "text-amber-200"
+        : "";
 
-  if (!robotState.enabled || robotState.status === "STOPPED") {
-    return {
-      title: "Robô parado",
-      tone: "",
-      details: robotState.disconnected ? <span>Conta BullEx desconectada</span> : null,
-      footer: null,
-    };
-  }
+  let details: ReactNode = presentation.detail ? <span>{presentation.detail}</span> : null;
 
-  if (trade && result === "WIN") {
-    return {
-      title: "\u2705 WIN",
-      tone: "text-emerald-300",
-      details: (
-        <>
-          <TradeIdentity active={trade.active} direction={trade.direction} />
-          <span>Lucro: {formatMoney(Math.abs(trade.profit ?? 0))}</span>
-        </>
-      ),
-      footer: null,
-    };
-  }
-
-  if (trade && result === "LOSS") {
-    return {
-      title: "\u274c LOSS",
-      tone: "text-red-300",
-      details: (
-        <>
-          <TradeIdentity active={trade.active} direction={trade.direction} />
-          <span>Prejuízo: {formatMoney(-Math.abs(trade.profit ?? trade.amount ?? 0))}</span>
-        </>
-      ),
-      footer: null,
-    };
-  }
-
-  if (trade && (robotState.operation_in_progress || result === "PENDING_RESULT")) {
-    return {
-      title: "Operando DEMO...",
-      tone: "text-amber-200",
-      details: (
-        <>
-          <TradeIdentity active={trade.active} direction={trade.direction} />
-          {trade.amount != null ? <span>Entrada: {formatMoney(trade.amount)}</span> : null}
-          {trade.confidence != null ? (
-            <span>Confiança: {formatPercentage(trade.confidence)}%</span>
-          ) : null}
-          {trade.payout != null ? <span>Payout: {formatPercentage(trade.payout)}%</span> : null}
-          <span>Resultado: Aguardando...</span>
-        </>
-      ),
-      footer: `Expira em: ${formatDuration(getTradeRemainingSeconds(trade.sent_at, now))}`,
-    };
-  }
-
-  if (robotState.status === "SIGNAL_SELECTED" && robotState.last_signal) {
-    const signal = robotState.last_signal;
-    return {
-      title: "Sinal selecionado",
-      tone: "text-sky-200",
-      details: (
-        <>
-          <TradeIdentity active={signal.symbol} direction={signal.direction} />
-          {signal.confidence != null ? (
-            <span>Confiança: {formatPercentage(signal.confidence)}%</span>
-          ) : null}
-          {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
-        </>
-      ),
-      footer: null,
-    };
-  }
-
-  if (robotState.status === "SIGNAL_REJECTED") {
-    return {
-      title: "Sinal rejeitado",
-      tone: "text-amber-200",
-      details: robotState.rejection_reason ? (
-        <span>Motivo: {robotState.rejection_reason}</span>
-      ) : null,
-      footer: `Próxima análise em ${formatDuration(getCycleRemainingSeconds(robotState, now))}`,
-    };
-  }
-
-  if (robotState.status === "WAITING_NEXT_CYCLE") {
-    return {
-      title: `Próxima análise em ${formatDuration(getCycleRemainingSeconds(robotState, now))}`,
-      tone: "",
-      details: null,
-      footer: null,
-    };
-  }
-
-  if (
-    robotState.status === "ORDER_SENT" ||
-    robotState.status === "OPERATION_SENT" ||
-    robotState.status === "DEMO_ORDER_SENT"
-  ) {
-    return {
-      title: "Operação enviada",
-      tone: "text-amber-200",
-      details: null,
-      footer: null,
-    };
-  }
-
-  if (robotState.status === "WAITING_RESULT" || robotState.status === "PENDING_RESULT") {
-    return {
-      title: "Aguardando resultado",
-      tone: "text-amber-200",
-      details: null,
-      footer: null,
-    };
+  if (trade) {
+    details = (
+      <>
+        <TradeIdentity active={trade.active} direction={trade.direction} />
+        {trade.amount != null ? <span>Entrada: {formatMoney(trade.amount)}</span> : null}
+        {presentation.kind === "result" && trade.profit != null ? (
+          <span>Resultado: {formatMoney(trade.profit)}</span>
+        ) : null}
+      </>
+    );
+  } else if (signal) {
+    details = (
+      <>
+        <TradeIdentity active={signal.symbol} direction={signal.direction} />
+        {signal.confidence != null ? (
+          <span>Confiança: {formatPercentage(signal.confidence)}%</span>
+        ) : null}
+        {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
+      </>
+    );
   }
 
   return {
-    title: "Analisando...",
-    tone: "",
-    details: null,
-    footer: null,
+    title: presentation.title,
+    tone,
+    details,
+    footer:
+      presentation.kind === "operation" && trade?.sent_at
+        ? `Expira em: ${formatDuration(getTradeRemainingSeconds(trade.sent_at, now))}`
+        : presentation.footer,
   };
 }
 
@@ -310,16 +237,6 @@ function TradeIdentity({ active, direction }: { active: string; direction: Robot
   );
 }
 
-function getCycleRemainingSeconds(robotState: RobotState, now: number) {
-  const nextCycleAt = parseDate(robotState.next_cycle_at);
-  if (nextCycleAt != null) {
-    return Math.max(0, Math.ceil((nextCycleAt - now) / 1000));
-  }
-
-  const elapsed = Math.floor((now - robotState.fetched_at) / 1000);
-  return Math.max(0, Math.ceil(robotState.seconds_until_next_cycle - elapsed));
-}
-
 function getTradeRemainingSeconds(sentAt: string | null, now: number) {
   const sentAtTime = parseDate(sentAt);
   if (sentAtTime == null) return 0;
@@ -331,13 +248,6 @@ function parseDate(value: string | null) {
   const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
   const parsed = Date.parse(hasTimezone ? value : `${value}Z`);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatDuration(totalSeconds: number) {
-  const seconds = Math.max(0, Math.floor(totalSeconds));
-  const minutesPart = Math.floor(seconds / 60);
-  const secondsPart = seconds % 60;
-  return `${String(minutesPart).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
 }
 
 function Score({
