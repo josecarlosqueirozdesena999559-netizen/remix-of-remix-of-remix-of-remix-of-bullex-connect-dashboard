@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { LayoutDashboard, CandlestickChart, Bot, CreditCard, Settings, LogOut } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
+import { FloatingRobot } from "@/components/FloatingRobot";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -68,6 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {pathname !== "/welcome-trial" && <TrialBanner />}
         {children}
       </main>
+      <FloatingRobot userId={user?.id} />
     </div>
   );
 }
