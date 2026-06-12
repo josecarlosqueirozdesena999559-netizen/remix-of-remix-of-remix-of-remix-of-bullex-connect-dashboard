@@ -137,12 +137,12 @@ export function RobotOverlay({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-[72px_90px_72px] items-center gap-2 sm:grid-cols-[92px_140px_92px] sm:gap-4">
+      <div className="grid grid-cols-[72px_110px_72px] items-center gap-2 sm:grid-cols-[92px_170px_92px] sm:gap-4">
         <Score label="WIN" value={robotState?.wins ?? 0} tone="win" />
         <video
           src="/robo-wink.webm"
           aria-label="Robô analisando o mercado"
-          className="pointer-events-none h-auto w-[90px] object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.8)] sm:w-[140px]"
+          className="pointer-events-none h-auto w-[110px] object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.8)] sm:w-[170px]"
           autoPlay
           loop
           muted
@@ -276,8 +276,8 @@ function Score({
 }
 
 function getDefaultPosition(): Position {
-  const estimatedWidth = window.innerWidth < 640 ? 250 : 356;
-  const estimatedHeight = window.innerWidth < 640 ? 155 : 210;
+  const estimatedWidth = window.innerWidth < 640 ? 274 : 386;
+  const estimatedHeight = window.innerWidth < 640 ? 175 : 240;
   const bounds = getViewportBounds();
   return {
     x: Math.max(bounds.minX, bounds.minX + (window.innerWidth - bounds.minX - estimatedWidth) / 2),
@@ -286,8 +286,8 @@ function getDefaultPosition(): Position {
 }
 
 function clampPosition(position: Position, element: HTMLDivElement | null): Position {
-  const width = element?.offsetWidth ?? (window.innerWidth < 640 ? 250 : 356);
-  const height = element?.offsetHeight ?? (window.innerWidth < 640 ? 155 : 210);
+  const width = element?.offsetWidth ?? (window.innerWidth < 640 ? 274 : 386);
+  const height = element?.offsetHeight ?? (window.innerWidth < 640 ? 175 : 240);
   const bounds = getViewportBounds();
   return {
     x: Math.min(
