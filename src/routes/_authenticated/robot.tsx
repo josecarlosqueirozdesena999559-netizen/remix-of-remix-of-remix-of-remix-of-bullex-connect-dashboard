@@ -4,6 +4,7 @@ import { Power, Bot, Plug, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
 import { apiConfig } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robo - BullEx AutoBot" }] }),
@@ -29,6 +30,7 @@ const DEFAULT: Config = {
 };
 
 function RobotPage() {
+  const { user } = useAuth();
   const [cfg, setCfg] = useState<Config>(() => {
     if (typeof window === "undefined") return DEFAULT;
     try {
@@ -70,6 +72,7 @@ function RobotPage() {
             <Bot className="h-6 w-6" /> Robo
           </h1>
           <p className="text-sm text-muted-foreground">Controle da sua conta BullEx conectada.</p>
+          {user?.id && <p className="mt-1 text-xs text-muted-foreground">Sessão: {user.id.slice(0, 8)}</p>}
         </div>
         <button
           onClick={handleToggle}
@@ -104,14 +107,16 @@ function RobotPage() {
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="flex items-center gap-3">
           <span className={`h-3 w-3 rounded-full ${connected ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
-          <span className="font-medium">{connected ? "Conta BullEx conectada" : "Conta BullEx desconectada"}</span>
+          <span className="font-medium">
+            {connected ? "Conta BullEx conectada" : "Conta BullEx desconectada. Clique em Conectar BullEx."}
+          </span>
           <span className="ml-auto rounded-md bg-muted px-3 py-1 text-sm">
             Conta: <strong>{cfg.accountType}</strong>
           </span>
         </div>
       </div>
 
-      <ConnectSection connected={connected} />
+      <ConnectSection connected={connected} refetchAccount={account.refetch} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
@@ -164,7 +169,13 @@ function RobotPage() {
   );
 }
 
-function ConnectSection({ connected }: { connected: boolean }) {
+function ConnectSection({
+  connected,
+  refetchAccount,
+}: {
+  connected: boolean;
+  refetchAccount: () => Promise<unknown>;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [smsCode, setSmsCode] = useState("");
@@ -184,8 +195,10 @@ function ConnectSection({ connected }: { connected: boolean }) {
       await connect.mutateAsync({ email, password, sms_code: smsCode || undefined });
       setPassword("");
       setSmsCode("");
+      await refetchAccount();
     } catch {
       setPassword("");
+      setSmsCode("");
     }
   }
 
@@ -255,7 +268,7 @@ function ConnectSection({ connected }: { connected: boolean }) {
             className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {connect.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Conectar
+            Conectar BullEx
           </button>
         </form>
       )}

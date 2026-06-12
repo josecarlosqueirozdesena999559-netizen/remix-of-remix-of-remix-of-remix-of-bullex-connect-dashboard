@@ -38,9 +38,8 @@ export function useConnectBullex() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) => unwrap(await bullexApi.connect(payload)),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["bullex"] });
-      await qc.invalidateQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY });
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["bullex"] });
     },
     onError: toastGenericError,
   });

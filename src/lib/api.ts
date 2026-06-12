@@ -7,7 +7,8 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; c
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_API_KEY: "Erro de configuração da API",
-  SESSION_NOT_FOUND: "Conta BullEx desconectada",
+  SESSION_NOT_FOUND: "Conta BullEx desconectada. Clique em Conectar BullEx.",
+  SESSION_DISCONNECTED: "Conta BullEx desconectada. Clique em Conectar BullEx.",
   invalid_credentials: "Email ou senha BullEx inválidos",
 };
 
@@ -43,14 +44,20 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const userId = await getUserId();
   if (!userId) return { ok: false, error: "Não autenticado", code: "NO_AUTH" };
 
+  if (path === "/bullex/connect") {
+    console.log("[BULLEX CONNECT USER_ID]", userId);
+  } else if (path === "/bullex/account") {
+    console.log("[BULLEX ACCOUNT USER_ID]", userId);
+  }
+
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...(init.headers ?? {}),
         "x-api-key": API_KEY,
         "x-user-id": userId,
-        ...(init.headers ?? {}),
       },
     });
     const text = await res.text();
@@ -75,8 +82,8 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     }
 
     return { ok: true, data: (json?.ok === true && "data" in json ? json.data : json) as T };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erro de rede" };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Erro de rede" };
   }
 }
 

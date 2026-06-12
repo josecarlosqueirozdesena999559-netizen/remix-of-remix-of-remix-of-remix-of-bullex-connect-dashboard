@@ -101,6 +101,7 @@ export function useMarketSocket({
       const base = API_BASE_URL.replace(/^http/i, "ws").replace(/\/$/, "");
       const url = `${base}/ws/market?user_id=${encodeURIComponent(user.id)}&active=${encodeURIComponent(active)}&api_key=${encodeURIComponent(API_KEY)}`;
 
+      console.log("[MARKET WS USER_ID]", user.id);
       console.log("[MARKET WS CONNECTING]", { active, userId: user.id });
       updateStatus(socketRef.current ? "reconnecting" : "connecting");
 

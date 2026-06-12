@@ -3,6 +3,7 @@ import { Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard - BullEx AutoBot" }] }),
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
+  const { user } = useAuth();
   const account = useBullExAccount();
   const acc = account.data;
   const connected = acc?.connected === true;
@@ -30,6 +32,7 @@ function Dashboard() {
       <header>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Resumo da sua conta BullEx.</p>
+        {user?.id && <p className="mt-1 text-xs text-muted-foreground">Sessão: {user.id.slice(0, 8)}</p>}
       </header>
 
       {!hasBackend && (
@@ -41,7 +44,7 @@ function Dashboard() {
 
       {hasBackend && disconnected && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          Conta BullEx desconectada
+          Conta BullEx desconectada. Clique em Conectar BullEx.
         </div>
       )}
 
