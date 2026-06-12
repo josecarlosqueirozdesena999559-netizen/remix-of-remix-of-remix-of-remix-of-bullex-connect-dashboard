@@ -1,5 +1,4 @@
 const DEFAULT_API_BASE_URL = "https://api.elcapobot.online";
-const DEFAULT_WS_BASE_URL = "wss://api.elcapobot.online";
 
 function normalizeBaseUrl(value: string | undefined, fallback: string, label: string) {
   const normalized = value?.trim().replace(/\/+$/, "");
@@ -23,11 +22,4 @@ export const API_BASE_URL = normalizeBaseUrl(
   "VITE_API_BASE_URL",
 );
 
-export const WS_BASE_URL = normalizeBaseUrl(
-  import.meta.env.VITE_WS_URL,
-  DEFAULT_WS_BASE_URL,
-  "VITE_WS_URL",
-);
-
 console.log("API_BASE_URL", API_BASE_URL);
-console.log("WS_BASE_URL", WS_BASE_URL);

@@ -12,7 +12,7 @@ import {
 } from "lightweight-charts";
 import { BarChart3, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
-import { useMarketSocket, type MarketSocketCandleMessage, type MarketSocketStatus } from "@/hooks/useMarketSocket";
+import { useMarketData } from "@/hooks/useMarketData";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chart")({
@@ -32,26 +32,10 @@ type HoveredCandle = Candle | null;
 type ChartApi = ReturnType<typeof createChart>;
 type CandlestickSeriesApi = ReturnType<ChartApi["addSeries"]>;
 
-type Payout = {
-  active: string;
-  payout: number | null;
-};
-
 function MarketPage() {
   const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [selectedPayout, setSelectedPayout] = useState<number | null>(null);
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [lastPrice, setLastPrice] = useState<number | null>(null);
-  const [isPayoutLoading, setIsPayoutLoading] = useState(false);
-  const [isCandlesLoading, setIsCandlesLoading] = useState(false);
-  const [payoutError, setPayoutError] = useState<unknown>(null);
-  const [candlesError, setCandlesError] = useState<unknown>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [followPrice, setFollowPrice] = useState(true);
   const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
-  const [socketStatus, setSocketStatus] = useState<MarketSocketStatus>("disconnected");
-  const [socketMessage, setSocketMessage] = useState<string | null>(null);
-  const [historyReady, setHistoryReady] = useState(false);
   const account = useBullExAccount();
 
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -83,6 +67,18 @@ function MarketPage() {
   const assets = assetsQuery.data ?? [];
   const selected =
     assets.find((asset) => asset.symbol === selectedSymbol) ?? null;
+  const {
+    candles,
+    candlesError,
+    isCandlesLoading,
+    isPayoutLoading,
+    lastCandleReceivedAt,
+    lastCandleTimestamp,
+    lastPrice,
+    payoutError,
+    pollingStatus,
+    selectedPayout,
+  } = useMarketData(selectedSymbol || null);
 
   useEffect(() => {
     if (selectedSymbol) return;
@@ -95,162 +91,6 @@ function MarketPage() {
       setSelectedSymbol(defaultAsset.symbol);
     }
   }, [assets, selectedSymbol]);
-
-  useEffect(() => {
-    if (!selectedSymbol) {
-      setSelectedPayout(null);
-      setPayoutError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchPayout = async () => {
-      setIsPayoutLoading(true);
-      setPayoutError(null);
-      try {
-        const payoutResponse = await apiRequest<unknown>(
-          `/bullex/payouts?active=${encodeURIComponent(selectedSymbol)}`,
-        );
-        console.log("[PAYOUT RESPONSE]", payoutResponse);
-        const payout = normalizePayout(selectedSymbol, unwrap(payoutResponse)).payout;
-        if (!cancelled) {
-          setSelectedPayout(payout);
-        }
-      } catch (error) {
-        console.error("[PAYOUT ERROR]", error);
-        if (!cancelled) {
-          setPayoutError(error);
-          setSelectedPayout(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsPayoutLoading(false);
-        }
-      }
-    };
-
-    void fetchPayout();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedSymbol]);
-
-  useEffect(() => {
-    if (!selectedSymbol) {
-      setCandles([]);
-      setLastPrice(null);
-      setCandlesError(null);
-      setLastUpdated(null);
-      setHistoryReady(false);
-      return;
-    }
-
-    let cancelled = false;
-    setHistoryReady(false);
-
-    const fetchCandlesHistory = async (symbol: string) => {
-      setIsCandlesLoading(true);
-      setCandlesError(null);
-
-      const url = `/bullex/candles?active=${encodeURIComponent(symbol)}&interval=60&count=100`;
-      console.log("[SELECTED SYMBOL]", symbol);
-      console.log("[FETCH CANDLES URL]", url);
-
-      try {
-        const candlesResponse = await apiRequest<unknown>(url);
-        console.log("[CANDLES RESPONSE]", candlesResponse);
-        const nextCandles = normalizeCandlesPayload(symbol, unwrap(candlesResponse));
-        console.log("[NORMALIZED CANDLES]", nextCandles.slice(-5));
-        console.log("[CHART DATA]", nextCandles.slice(-10));
-        console.log("[CANDLES LENGTH]", nextCandles.length);
-
-        if (cancelled) return;
-
-        if (nextCandles.length > 0) {
-          setCandles(nextCandles.slice(-200));
-          const nextLastPrice = nextCandles[nextCandles.length - 1]?.close ?? null;
-          setLastPrice(nextLastPrice);
-          console.log("[REALTIME LAST PRICE]", nextLastPrice);
-        } else {
-          setCandles([]);
-          setLastPrice(null);
-        }
-
-        setLastUpdated(new Date());
-        setHistoryReady(true);
-      } catch (error) {
-        console.error("[CANDLES ERROR]", error);
-        if (!cancelled) {
-          setCandlesError(error);
-          setCandles([]);
-          setLastPrice(null);
-          setLastUpdated(null);
-          setHistoryReady(false);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsCandlesLoading(false);
-        }
-      }
-    };
-
-    void fetchCandlesHistory(selectedSymbol);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedSymbol]);
-
-  const handleSocketCandle = (message: MarketSocketCandleMessage) => {
-    const nextCandle = normalizeSocketCandle(message);
-    if (!nextCandle) return;
-
-    seriesRef.current?.update(nextCandle);
-
-    setCandles((current) => {
-      const merged = mergeRealtimeCandle(current, nextCandle);
-      const nextLastPrice = merged[merged.length - 1]?.close ?? null;
-      setLastPrice(nextLastPrice);
-      setLastUpdated(new Date());
-      console.log("[REALTIME LAST PRICE]", nextLastPrice);
-      return merged;
-    });
-  };
-
-  const { status: marketSocketStatus, lastError: marketSocketError } = useMarketSocket({
-    active: selectedSymbol || null,
-    enabled: !!selectedSymbol && historyReady,
-    onCandle: handleSocketCandle,
-    onStatus: setSocketStatus,
-  });
-
-  useEffect(() => {
-    setSocketStatus(marketSocketStatus);
-  }, [marketSocketStatus]);
-
-  useEffect(() => {
-    if (isBinaryMarketErrorCode(marketSocketError)) {
-      const message = getBinaryMarketErrorMessage(marketSocketError);
-      setSocketMessage(message);
-      setCandlesError(new ApiError(message, marketSocketError));
-      return;
-    }
-
-    setSocketMessage(marketSocketError);
-  }, [marketSocketError]);
-
-  useEffect(() => {
-    if (socketStatus === "connected") {
-      setSocketMessage(null);
-      setCandlesError((current) =>
-        current instanceof Error && current.message === getBinaryMarketErrorMessage("SESSION_DISCONNECTED")
-          ? null
-          : current,
-      );
-    }
-  }, [socketStatus]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -475,8 +315,9 @@ function MarketPage() {
             <BadgeLabel label="Payout" value={isPayoutLoading ? "..." : formatPayoutValue(selectedPayout)} />
             <BadgeLabel label="Modo" value={formatAccountMode(account.data?.mode)} />
             <BadgeLabel label="Ultimo preco" value={lastPrice != null ? formatNumber(lastPrice) : "-"} />
-            <BadgeLabel label="Atualizado" value={lastUpdated ? formatDateTime(lastUpdated) : "-"} />
-            <BadgeLabel label="WebSocket" value={formatSocketStatus(socketStatus)} />
+            <BadgeLabel label="Ultimo candle" value={lastCandleTimestamp ? formatDateTimeFromTimestamp(lastCandleTimestamp) : "-"} />
+            <BadgeLabel label="Recebido" value={lastCandleReceivedAt ? formatDateTime(lastCandleReceivedAt) : "-"} />
+            <BadgeLabel label="Polling" value={formatPollingStatus(pollingStatus)} />
           </div>
         </div>
 
@@ -492,7 +333,7 @@ function MarketPage() {
           <div>
             <h2 className="font-semibold">{selected ? selected.symbol : "Selecione um ativo"}</h2>
             <p className="text-xs text-muted-foreground">
-              Intervalo 60s, últimos 100 candles. Atualização em tempo real via WebSocket.
+              Intervalo 60s, ultimos 100 candles. Atualizacao via REST polling.
             </p>
           </div>
 
@@ -537,12 +378,6 @@ function MarketPage() {
         {candlesError && !isSessionError(candlesError) && !isAssetNotAllowed(candlesError) && (
           <div className="m-5 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
             {candlesError instanceof Error ? candlesError.message : "Erro ao carregar candles"}
-          </div>
-        )}
-
-        {socketMessage && !isBinaryMarketErrorMessage(socketMessage) && (
-          <div className="mx-5 mt-5 rounded-xl border border-border/60 bg-muted/40 p-4 text-sm text-muted-foreground">
-            {socketMessage}
           </div>
         )}
 
@@ -649,18 +484,6 @@ function isAssetNotAllowed(error: unknown) {
   return error instanceof ApiError && error.code === "ASSET_NOT_ALLOWED";
 }
 
-function isBinaryMarketErrorCode(code?: string | null) {
-  return code === "ASSET_NOT_ALLOWED" || isSessionErrorCode(code);
-}
-
-function isBinaryMarketErrorMessage(message: string) {
-  return (
-    message === getBinaryMarketErrorMessage("ASSET_NOT_ALLOWED") ||
-    message === getBinaryMarketErrorMessage("SESSION_NOT_FOUND") ||
-    message === getBinaryMarketErrorMessage("SESSION_DISCONNECTED")
-  );
-}
-
 function getBinaryMarketErrorMessage(code?: string | null) {
   if (code === "ASSET_NOT_ALLOWED") {
     return "Ativo não permitido para análise binária.";
@@ -713,100 +536,10 @@ function normalizeAsset(item: unknown): Asset | null {
   };
 }
 
-function normalizePayout(active: string, input: unknown): Payout {
-  const data = getPayoutResponseData(input);
-  const row = data?.[0];
-
-  if (!row || typeof row !== "object") {
-    console.error("[bullex/chart] Unexpected payouts payload", { active, payload: input });
-    return { active, payout: null };
-  }
-
-  const payout = normalizeNumber((row as Record<string, unknown>).payout);
-
-  if (payout == null) {
-    console.error("[bullex/chart] Unexpected payout row", { active, row });
-    return { active, payout: null };
-  }
-
-  return { active, payout };
-}
-
-function getPayoutResponseData(input: unknown): unknown[] | null {
-  if (Array.isArray(input)) return input;
-  if (!input || typeof input !== "object") return null;
-
-  const value = input as Record<string, unknown>;
-  return Array.isArray(value.data) ? value.data : null;
-}
-
 function normalizeNumber(value: unknown) {
   if (value == null || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normalizeCandlesPayload(active: string, input: unknown): Candle[] {
-  const raw = getRawCandles(input);
-
-  if (raw.length === 0) {
-    if (input == null || (typeof input !== "object" && !Array.isArray(input))) {
-      console.error("[bullex/chart] Unexpected candles payload", { active, payload: input });
-    }
-    return [];
-  }
-
-  const normalized = raw.map((item) => normalizeCandle(active, item)).filter(Boolean) as Candle[];
-  normalized.sort((a, b) => Number(a.time) - Number(b.time));
-
-  return normalized.filter((candle, index, array) => {
-    const previous = array[index - 1];
-    return !previous || Number(previous.time) !== Number(candle.time);
-  });
-}
-
-function normalizeCandle(active: string, item: unknown): Candle | null {
-  if (!item || typeof item !== "object") {
-    console.error("[bullex/chart] Invalid candle item", { active, candle: item });
-    return null;
-  }
-
-  const value = item as Record<string, unknown>;
-  const open = Number(value.open);
-  const high = Number(value.max ?? value.high);
-  const low = Number(value.min ?? value.low);
-  const close = Number(value.close);
-  const rawTime = Math.floor(Number(value.from));
-
-  if (![open, high, low, close, rawTime].every(Number.isFinite)) {
-    console.error("[bullex/chart] Unexpected candle shape", { active, candle: item });
-    return null;
-  }
-
-  return {
-    time: rawTime as UTCTimestamp,
-    open,
-    high,
-    low,
-    close,
-  };
-}
-
-function getRawCandles(input: unknown): unknown[] {
-  if (Array.isArray(input)) return input;
-  if (!input || typeof input !== "object") return [];
-
-  const value = input as Record<string, unknown>;
-  if (Array.isArray(value.data)) return value.data;
-
-  const data = value.data;
-  if (data && typeof data === "object") {
-    const nested = data as Record<string, unknown>;
-    if (Array.isArray(nested.candles)) return nested.candles;
-  }
-
-  if (Array.isArray(value.candles)) return value.candles;
-  return [];
 }
 
 function buildPriceFormat(symbol: string, lastPrice: number | null) {
@@ -828,52 +561,14 @@ function buildPriceFormat(symbol: string, lastPrice: number | null) {
   return { type: "price" as const, precision: 6, minMove: 0.000001 };
 }
 
-function normalizeSocketCandle(message: MarketSocketCandleMessage): Candle | null {
-  const time = Math.floor(Number(message.time));
-  const open = Number(message.open);
-  const high = Number(message.high);
-  const low = Number(message.low);
-  const close = Number(message.close);
-
-  if (![time, open, high, low, close].every(Number.isFinite)) {
-    return null;
-  }
-
-  return {
-    time: time as UTCTimestamp,
-    open,
-    high,
-    low,
-    close,
-  };
-}
-
-function mergeRealtimeCandle(current: Candle[], nextCandle: Candle) {
-  const next = [...current];
-  const existingIndex = next.findIndex((candle) => Number(candle.time) === Number(nextCandle.time));
-
-  if (existingIndex >= 0) {
-    next[existingIndex] = nextCandle;
-  } else {
-    next.push(nextCandle);
-  }
-
-  next.sort((a, b) => Number(a.time) - Number(b.time));
-  return next.slice(-200);
-}
-
-function formatSocketStatus(status: MarketSocketStatus) {
+function formatPollingStatus(status: string) {
   switch (status) {
-    case "connected":
-      return "WS conectado";
-    case "reconnecting":
-      return "WS reconectando";
-    case "connecting":
-      return "WS conectando";
+    case "polling":
+      return "REST ativo";
     case "error":
-      return "WS erro";
+      return "REST erro";
     default:
-      return "WS desconectado";
+      return "REST parado";
   }
 }
 
@@ -912,6 +607,10 @@ function formatDateTime(value: Date) {
     minute: "2-digit",
     second: "2-digit",
   }).format(value);
+}
+
+function formatDateTimeFromTimestamp(value: UTCTimestamp) {
+  return formatDateTime(new Date(Number(value) * 1000));
 }
 
 function formatNumber(value: number) {
