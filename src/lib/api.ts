@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { API_BASE_URL } from "@/lib/config";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const API_KEY = import.meta.env.VITE_PANEL_API_KEY ?? "";
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; code?: string };
@@ -37,7 +37,7 @@ async function getUserId(): Promise<string | null> {
 }
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
-  if (!BASE_URL) {
+  if (!API_BASE_URL) {
     return { ok: false, error: "VITE_API_BASE_URL não configurada", code: "NO_BACKEND" };
   }
 
@@ -51,7 +51,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
 
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
@@ -109,4 +109,4 @@ export const bullexApi = {
   balance: () => apiRequest<{ balance: number; currency: string }>("/bullex/balance"),
 };
 
-export const apiConfig = { BASE_URL, hasKey: !!API_KEY };
+export const apiConfig = { BASE_URL: API_BASE_URL, hasKey: !!API_KEY };

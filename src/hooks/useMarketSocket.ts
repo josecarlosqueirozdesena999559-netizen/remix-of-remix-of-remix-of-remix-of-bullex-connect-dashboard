@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { WS_BASE_URL } from "@/lib/config";
 import { useAuth } from "@/lib/useAuth";
 
 export type MarketSocketStatus =
@@ -34,7 +35,6 @@ type UseMarketSocketParams = {
 };
 
 const API_KEY = import.meta.env.VITE_PANEL_API_KEY ?? "";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export function useMarketSocket({
   active,
@@ -81,7 +81,7 @@ export function useMarketSocket({
       }
     };
 
-    if (!enabled || !active || !user?.id || !API_KEY || !API_BASE_URL) {
+    if (!enabled || !active || !user?.id || !API_KEY || !WS_BASE_URL) {
       shouldReconnectRef.current = false;
       clearReconnectTimeout();
       cleanupSocket();
@@ -98,7 +98,7 @@ export function useMarketSocket({
     const connect = () => {
       if (connectionKeyRef.current !== connectionKey) return;
       clearReconnectTimeout();
-      const base = API_BASE_URL.replace(/^http/i, "ws").replace(/\/$/, "");
+      const base = WS_BASE_URL.replace(/\/$/, "");
       const url = `${base}/ws/market?user_id=${encodeURIComponent(user.id)}&active=${encodeURIComponent(active)}&api_key=${encodeURIComponent(API_KEY)}`;
 
       console.log("[MARKET WS USER_ID]", user.id);
