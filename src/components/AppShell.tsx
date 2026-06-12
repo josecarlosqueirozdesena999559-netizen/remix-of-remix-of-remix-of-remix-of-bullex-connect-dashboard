@@ -42,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={to}
                 to={to}
+                preload="render"
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                   active
                     ? "bg-primary text-primary-foreground shadow-sm"
