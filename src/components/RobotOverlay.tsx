@@ -200,7 +200,8 @@ function getOverlayContent(
     details = (
       <>
         <TradeIdentity active={trade.active} direction={trade.direction} />
-        {trade.amount != null ? <span>Entrada: {formatMoney(trade.amount)}</span> : null}
+        {trade.amount != null ? <span>Entrada: {formatEntryAmount(trade.amount)}</span> : null}
+        {trade.order_id ? <span>Ordem: {trade.order_id}</span> : null}
         {presentation.kind === "result" && trade.profit != null ? (
           <span>Resultado: {formatMoney(trade.profit)}</span>
         ) : null}
@@ -330,4 +331,8 @@ function formatMoney(value: number) {
     style: "currency",
     currency: "USD",
   }).format(value);
+}
+
+function formatEntryAmount(value: number) {
+  return `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
 }

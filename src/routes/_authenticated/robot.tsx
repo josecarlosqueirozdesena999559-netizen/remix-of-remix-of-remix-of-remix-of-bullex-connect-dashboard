@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Power, Bot, Plug, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
-import { apiConfig } from "@/lib/api";
+import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
 import { useRecentRobotResult } from "@/hooks/useRecentRobotResult";
@@ -15,37 +15,32 @@ export const Route = createFileRoute("/_authenticated/robot")({
 });
 
 type Config = {
-  on: boolean;
   accountType: "REAL" | "DEMO";
   stopWin: number;
   stopLoss: number;
   entry: number;
+  cycleMinutes: number;
+  minConfidence: number;
+  minPayout: number;
   martingale: number;
 };
 
 const DEFAULT: Config = {
-  on: false,
   accountType: "DEMO",
   stopWin: 50,
   stopLoss: 30,
   entry: 2,
+  cycleMinutes: 10,
+  minConfidence: 80,
+  minPayout: 80,
   martingale: 1,
 };
 
 function RobotPage() {
   const { user } = useAuth();
-  const [cfg, setCfg] = useState<Config>(() => {
-    if (typeof window === "undefined") return DEFAULT;
-    try {
-      return { ...DEFAULT, ...JSON.parse(localStorage.getItem("robotCfg") || "{}") };
-    } catch {
-      return DEFAULT;
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem("robotCfg", JSON.stringify(cfg));
-  }, [cfg]);
+  const [cfg, setCfg] = useState<Config>(DEFAULT);
+  const [robotActionPending, setRobotActionPending] = useState(false);
+  const [robotActionError, setRobotActionError] = useState<string | null>(null);
 
   const update = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
 
@@ -58,6 +53,7 @@ function RobotPage() {
   const robotPresentation = getRobotPresentation(robotState.data, recentResult, Date.now());
 
   const connected = account.data?.connected === true;
+  const robotEnabled = robotState.data?.enabled === true && robotState.data.status !== "STOPPED";
   const isToggling = connect.isPending || disconnect.isPending || reconnect.isPending;
   const hasBackend = !!apiConfig.BASE_URL;
 
@@ -67,6 +63,43 @@ function RobotPage() {
       await disconnect.mutateAsync();
     } else {
       await reconnect.mutateAsync();
+    }
+  }
+
+  async function handleRobotToggle() {
+    if (!hasBackend || robotActionPending) return;
+    setRobotActionError(null);
+
+    if (!robotEnabled && !connected) {
+      setRobotActionError("Conecte sua conta BullEx antes de iniciar o robô.");
+      return;
+    }
+
+    setRobotActionPending(true);
+    try {
+      if (robotEnabled) {
+        unwrapApiResult(await robotConfig({ enabled: false }));
+      } else {
+        unwrapApiResult(
+          await robotConfig({
+            enabled: true,
+            account_mode: cfg.accountType,
+            entry_value: cfg.entry,
+            cycle_minutes: cfg.cycleMinutes,
+            min_confidence: cfg.minConfidence,
+            min_payout: cfg.minPayout,
+            stop_win: cfg.stopWin,
+            stop_loss: cfg.stopLoss,
+          }),
+        );
+        unwrapApiResult(await robotStart());
+      }
+
+      await robotState.refetch();
+    } catch (error) {
+      setRobotActionError(error instanceof Error ? error.message : "Falha ao atualizar o robô.");
+    } finally {
+      setRobotActionPending(false);
     }
   }
 
@@ -168,7 +201,18 @@ function RobotPage() {
             </span>
             {robotPresentation.trade.amount != null ? (
               <span className="rounded-md bg-muted px-3 py-1">
-                Entrada: <strong>US$ {robotPresentation.trade.amount.toFixed(2)}</strong>
+                Entrada:{" "}
+                <strong>
+                  $
+                  {Number.isInteger(robotPresentation.trade.amount)
+                    ? robotPresentation.trade.amount
+                    : robotPresentation.trade.amount.toFixed(2)}
+                </strong>
+              </span>
+            ) : null}
+            {robotPresentation.trade.order_id ? (
+              <span className="rounded-md bg-muted px-3 py-1">
+                Ordem: <strong>{robotPresentation.trade.order_id}</strong>
               </span>
             ) : null}
           </div>
@@ -188,6 +232,40 @@ function RobotPage() {
               </span>
             ) : null}
           </div>
+        ) : null}
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleRobotToggle}
+            disabled={
+              !hasBackend ||
+              robotActionPending ||
+              robotState.isLoading ||
+              (!robotEnabled && !connected)
+            }
+            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              robotEnabled
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-success text-success-foreground"
+            }`}
+          >
+            {robotActionPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Power className="h-4 w-4" />
+            )}
+            {robotEnabled ? "Parar robô" : "Iniciar robô"}
+          </button>
+          {!robotEnabled && !connected ? (
+            <p className="text-sm text-warning-foreground">
+              Conecte sua conta BullEx antes de iniciar o robô.
+            </p>
+          ) : null}
+        </div>
+
+        {robotActionError ? (
+          <p className="mt-3 text-sm text-destructive">{robotActionError}</p>
         ) : null}
       </div>
 
@@ -232,6 +310,26 @@ function RobotPage() {
             value={cfg.entry}
             onChange={(v) => update("entry", v)}
             step={0.5}
+          />
+          <NumField
+            label="Ciclo (minutos)"
+            value={cfg.cycleMinutes}
+            onChange={(v) => update("cycleMinutes", v)}
+            min={1}
+          />
+          <NumField
+            label="Confiança mínima (%)"
+            value={cfg.minConfidence}
+            onChange={(v) => update("minConfidence", v)}
+            min={0}
+            max={100}
+          />
+          <NumField
+            label="Payout mínimo (%)"
+            value={cfg.minPayout}
+            onChange={(v) => update("minPayout", v)}
+            min={0}
+            max={100}
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium">Martingale (Gales)</label>
@@ -372,11 +470,15 @@ function NumField({
   value,
   onChange,
   step = 1,
+  min,
+  max,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   step?: number;
+  min?: number;
+  max?: number;
 }) {
   return (
     <div>
@@ -384,10 +486,17 @@ function NumField({
       <input
         type="number"
         step={step}
+        min={min}
+        max={max}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full rounded-lg border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring/20"
       />
     </div>
   );
+}
+
+function unwrapApiResult<T>(result: ApiResult<T>) {
+  if (!result.ok) throw new ApiError(result.error, result.code);
+  return result.data;
 }

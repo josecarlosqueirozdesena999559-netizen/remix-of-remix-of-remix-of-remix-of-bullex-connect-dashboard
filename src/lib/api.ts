@@ -99,9 +99,38 @@ export interface BullexAccount {
   dayProfit?: number;
 }
 
+export type RobotConfigPayload = {
+  enabled: boolean;
+  account_mode?: "DEMO" | "REAL";
+  entry_value?: number;
+  cycle_minutes?: number;
+  min_confidence?: number;
+  min_payout?: number;
+  stop_win?: number;
+  stop_loss?: number;
+};
+
+export function robotConfig(payload: RobotConfigPayload) {
+  return apiRequest<unknown>("/robot/config", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function robotStart() {
+  return apiRequest<unknown>("/robot/start", { method: "POST" });
+}
+
+export function robotState() {
+  return apiRequest<unknown>("/robot/state");
+}
+
 export const bullexApi = {
   connect: (payload: { email: string; password: string; sms_code?: string }) =>
-    apiRequest<{ ok: boolean }>("/bullex/connect", { method: "POST", body: JSON.stringify(payload) }),
+    apiRequest<{ ok: boolean }>("/bullex/connect", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),
   status: () => apiRequest<{ status: string }>("/bullex/status"),

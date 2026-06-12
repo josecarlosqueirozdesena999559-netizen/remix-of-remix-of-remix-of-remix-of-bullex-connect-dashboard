@@ -30,7 +30,19 @@ export function getRobotPresentation(
 
   const trade = robotState.last_trade;
 
-  if (robotState.operation_in_progress) {
+  if (trade && recentResult) {
+    return {
+      ...createPresentation("result", recentResult === "WIN" ? "WIN ✅" : "LOSS ❌"),
+      trade,
+      direction: trade.direction,
+    };
+  }
+
+  if (
+    robotState.operation_in_progress ||
+    robotState.status === "PENDING_RESULT" ||
+    robotState.last_trade?.result === "PENDING_RESULT"
+  ) {
     return {
       ...createPresentation("operation", "Operação em andamento"),
       trade,
@@ -38,12 +50,12 @@ export function getRobotPresentation(
     };
   }
 
-  if (trade && recentResult) {
-    return {
-      ...createPresentation("result", recentResult === "WIN" ? "WIN ✅" : "LOSS ❌"),
-      trade,
-      direction: trade.direction,
-    };
+  if (robotState.status === "ERROR") {
+    return createPresentation(
+      "analyzing",
+      "Erro no robô",
+      robotState.rejection_reason ?? "Não foi possível concluir o ciclo.",
+    );
   }
 
   if (robotState.status === "SIGNAL_REJECTED") {
