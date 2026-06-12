@@ -139,11 +139,14 @@ export function RobotOverlay({
 
       <div className="grid grid-cols-[72px_90px_72px] items-center gap-2 sm:grid-cols-[92px_140px_92px] sm:gap-4">
         <Score label="WIN" value={robotState?.wins ?? 0} tone="win" />
-        <img
-          src="/robo.png"
-          alt="Robô analisando o mercado"
+        <video
+          src="/robo-wink.webm"
+          aria-label="Robô analisando o mercado"
           className="pointer-events-none h-auto w-[90px] object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.8)] sm:w-[140px]"
-          draggable={false}
+          autoPlay
+          loop
+          muted
+          playsInline
         />
         <Score label="LOSS" value={robotState?.losses ?? 0} tone="loss" />
       </div>
