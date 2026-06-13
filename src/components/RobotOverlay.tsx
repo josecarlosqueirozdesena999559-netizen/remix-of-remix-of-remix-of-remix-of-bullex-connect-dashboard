@@ -6,12 +6,14 @@ import {
   type ReactNode,
 } from "react";
 import { Settings, X } from "lucide-react";
+import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useRecentRobotResult } from "@/hooks/useRecentRobotResult";
 import { formatDuration, getRobotPresentation } from "@/lib/robotPresentation";
 
 type RobotOverlayProps = {
   robotState?: RobotState;
+  account?: BullExAccountState;
   onClose?: () => void;
   onConfig?: () => void;
   storageKey?: string;
@@ -33,6 +35,7 @@ const VIEWPORT_GAP = 12;
 
 export function RobotOverlay({
   robotState,
+  account,
   onClose,
   onConfig,
   storageKey = "robot-overlay-position",
@@ -152,6 +155,14 @@ export function RobotOverlay({
       </div>
 
       <div className="-mt-1 max-w-[92vw] text-center text-white [text-shadow:0_2px_5px_#000,0_0_10px_#000] sm:-mt-2">
+        {account?.connected ? (
+          <p className="mb-1 text-[11px] font-semibold sm:text-xs">
+            {account.mode ?? "-"}
+            {account.balance != null
+              ? ` | ${formatAccountBalance(account.balance, account.currency)}`
+              : ""}
+          </p>
+        ) : null}
         <p className={`text-sm font-bold sm:text-base ${content.tone}`}>{content.title}</p>
         {content.details ? (
           <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-semibold sm:text-xs">
@@ -335,4 +346,11 @@ function formatMoney(value: number) {
 
 function formatEntryAmount(value: number) {
   return `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
+}
+
+function formatAccountBalance(value: number, currency: string | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency ?? "USD",
+  }).format(value);
 }

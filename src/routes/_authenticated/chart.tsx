@@ -586,9 +586,7 @@ function getAssetPayout(asset: Asset, selectedSymbol: string, selectedPayout: nu
 }
 
 function formatAccountMode(mode?: string) {
-  if (mode === "PRACTICE" || mode === "DEMO") return "DEMO";
-  if (mode === "REAL") return "REAL";
-  return "-";
+  return mode === "PRACTICE" || mode === "REAL" ? mode : "-";
 }
 
 function formatTime(value: UTCTimestamp) {

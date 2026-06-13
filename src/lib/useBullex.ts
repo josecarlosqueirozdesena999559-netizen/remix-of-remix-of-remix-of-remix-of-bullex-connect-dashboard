@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BULLEX_ACCOUNT_QUERY_KEY, getDisconnectedState } from "@/hooks/useBullExAccount";
-import { ApiError, type ApiResult, bullexApi, isKnownApiError } from "./api";
+import {
+  ApiError,
+  type ApiResult,
+  type BullexAccountMode,
+  bullexApi,
+  isKnownApiError,
+} from "./api";
 
 function unwrap<T>(res: ApiResult<T>): T {
   if (!res.ok) throw new ApiError(res.error, res.code);
@@ -37,7 +43,8 @@ export function useBullexBalance(enabled = true) {
 export function useConnectBullex() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) => unwrap(await bullexApi.connect(payload)),
+    mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) =>
+      unwrap(await bullexApi.connect(payload)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["bullex"] });
     },
@@ -65,6 +72,17 @@ export function useReconnectBullex() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["bullex"] });
       await qc.invalidateQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY });
+    },
+    onError: toastGenericError,
+  });
+}
+
+export function useChangeBullexMode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (mode: BullexAccountMode) => unwrap(await bullexApi.changeMode(mode)),
+    onSuccess: async () => {
+      await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
     },
     onError: toastGenericError,
   });

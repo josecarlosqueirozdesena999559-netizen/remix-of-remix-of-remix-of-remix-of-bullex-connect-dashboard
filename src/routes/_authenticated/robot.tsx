@@ -2,7 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Power, Bot, Plug, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
-import { useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
+import {
+  useChangeBullexMode,
+  useConnectBullex,
+  useDisconnectBullex,
+  useReconnectBullex,
+} from "@/lib/useBullex";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
@@ -15,7 +20,6 @@ export const Route = createFileRoute("/_authenticated/robot")({
 });
 
 type Config = {
-  accountType: "REAL" | "DEMO";
   allowReal: boolean;
   confirmReal: boolean;
   stopWin: number;
@@ -28,7 +32,6 @@ type Config = {
 };
 
 const DEFAULT: Config = {
-  accountType: "DEMO",
   allowReal: false,
   confirmReal: false,
   stopWin: 50,
@@ -52,23 +55,33 @@ function RobotPage() {
   const connect = useConnectBullex();
   const disconnect = useDisconnectBullex();
   const reconnect = useReconnectBullex();
+  const changeMode = useChangeBullexMode();
   const robotState = useRobotState(user?.id);
   const recentResult = useRecentRobotResult(robotState.data);
   const robotPresentation = getRobotPresentation(robotState.data, recentResult, Date.now());
 
   const connected = account.data?.connected === true;
   const robotEnabled = robotState.data?.enabled === true && robotState.data.status !== "STOPPED";
-  const isToggling = connect.isPending || disconnect.isPending || reconnect.isPending;
+  const isToggling =
+    connect.isPending || disconnect.isPending || reconnect.isPending || changeMode.isPending;
   const hasBackend = !!apiConfig.BASE_URL;
-  const realSelected = cfg.accountType === "REAL";
+  const activeMode = account.data?.mode ?? null;
+  const realSelected = activeMode === "REAL";
   const realConfirmed = cfg.allowReal && cfg.confirmReal;
 
-  function selectAccountType(accountType: Config["accountType"]) {
-    setCfg((current) => ({
-      ...current,
-      accountType,
-      ...(accountType === "DEMO" ? { allowReal: false, confirmReal: false } : {}),
-    }));
+  async function selectAccountType(mode: "PRACTICE" | "REAL") {
+    setRobotActionError(null);
+    if (mode === "PRACTICE") {
+      setCfg((current) => ({ ...current, allowReal: false, confirmReal: false }));
+    }
+
+    try {
+      await changeMode.mutateAsync(mode);
+    } catch (error) {
+      setRobotActionError(
+        error instanceof Error ? error.message : "Falha ao alterar o modo da conta BullEx.",
+      );
+    }
   }
 
   function setRealAuthorization(authorized: boolean) {
@@ -112,7 +125,7 @@ function RobotPage() {
         unwrapApiResult(
           await robotConfig({
             enabled: true,
-            account_mode: cfg.accountType,
+            account_mode: realSelected ? "REAL" : "DEMO",
             allow_real: realSelected ? cfg.allowReal : false,
             confirm_real: realSelected ? cfg.confirmReal : false,
             entry_value: cfg.entry,
@@ -198,7 +211,7 @@ function RobotPage() {
               : "Conta BullEx desconectada. Clique em Conectar BullEx."}
           </span>
           <span className="ml-auto rounded-md bg-muted px-3 py-1 text-sm">
-            Conta: <strong>{cfg.accountType}</strong>
+            Conta: <strong>{activeMode ?? "-"}</strong>
           </span>
         </div>
       </div>
@@ -306,23 +319,40 @@ function RobotPage() {
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Tipo de conta</h2>
           <div className="grid grid-cols-2 gap-2">
-            {(["DEMO", "REAL"] as const).map((t) => (
+            {(
+              [
+                { label: "DEMO", mode: "PRACTICE" },
+                { label: "REAL", mode: "REAL" },
+              ] as const
+            ).map(({ label, mode }) => (
               <button
-                key={t}
+                key={mode}
                 type="button"
-                onClick={() => selectAccountType(t)}
+                onClick={() => void selectAccountType(mode)}
+                disabled={!connected || changeMode.isPending || activeMode === mode}
                 className={`rounded-lg border py-3 font-medium transition ${
-                  cfg.accountType === t
-                    ? t === "REAL"
+                  activeMode === mode
+                    ? mode === "REAL"
                       ? "border-destructive bg-destructive text-destructive-foreground"
                       : "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-card hover:bg-accent"
-                }`}
+                } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                {t}
+                {changeMode.isPending && activeMode !== mode ? (
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                ) : (
+                  label
+                )}
               </button>
             ))}
           </div>
+          {changeMode.isError ? (
+            <p className="text-sm text-destructive">
+              {changeMode.error instanceof Error
+                ? changeMode.error.message
+                : "Falha ao alterar o modo da conta BullEx."}
+            </p>
+          ) : null}
           {realSelected ? (
             <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
               <label className="flex cursor-pointer items-start gap-3 text-sm font-medium">

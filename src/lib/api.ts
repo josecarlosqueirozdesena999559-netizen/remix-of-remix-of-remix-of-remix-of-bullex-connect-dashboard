@@ -99,6 +99,8 @@ export interface BullexAccount {
   dayProfit?: number;
 }
 
+export type BullexAccountMode = "PRACTICE" | "REAL";
+
 export type RobotConfigPayload = {
   enabled: boolean;
   account_mode?: "DEMO" | "REAL";
@@ -135,6 +137,11 @@ export const bullexApi = {
     }),
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),
+  changeMode: (mode: BullexAccountMode) =>
+    apiRequest<{ ok: boolean }>("/bullex/change-mode", {
+      method: "POST",
+      body: JSON.stringify({ mode }),
+    }),
   status: () => apiRequest<{ status: string }>("/bullex/status"),
   account: () => apiRequest<BullexAccount>("/bullex/account"),
   balance: () => apiRequest<{ balance: number; currency: string }>("/bullex/balance"),

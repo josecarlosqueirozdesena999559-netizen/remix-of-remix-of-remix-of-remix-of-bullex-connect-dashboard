@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
+import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useRobotState } from "@/hooks/useRobotState";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
@@ -10,6 +11,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const positionKey = `robot-overlay-position:${userId ?? "anonymous"}`;
   const [visible, setVisible] = useState(() => readVisibility(visibilityKey));
   const robotState = useRobotState(userId);
+  const account = useBullExAccount();
 
   useEffect(() => {
     setVisible(readVisibility(visibilityKey));
@@ -36,6 +38,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   return (
     <RobotOverlay
       robotState={robotState.data}
+      account={account.data}
       storageKey={positionKey}
       onClose={() => setOverlayVisible(false)}
       onConfig={() => void navigate({ to: "/robot" })}
