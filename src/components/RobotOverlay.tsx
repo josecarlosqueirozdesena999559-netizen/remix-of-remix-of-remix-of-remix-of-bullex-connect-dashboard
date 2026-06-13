@@ -204,13 +204,16 @@ function getOverlayContent(
         : "text-red-300"
       : presentation.kind === "operation"
         ? "text-amber-200"
-        : "";
+        : presentation.kind === "rejected"
+          ? "text-red-300"
+          : "";
 
   let details: ReactNode = presentation.detail ? <span>{presentation.detail}</span> : null;
 
   if (trade) {
     details = (
       <>
+        {presentation.detail ? <span>{presentation.detail}</span> : null}
         <TradeIdentity active={trade.active} direction={trade.direction} />
         {presentation.kind === "operation" && trade.amount != null ? (
           <span>Valor: {formatEntryAmount(trade.amount)}</span>
@@ -227,6 +230,7 @@ function getOverlayContent(
   } else if (signal) {
     details = (
       <>
+        {presentation.detail ? <span>{presentation.detail}</span> : null}
         <TradeIdentity active={signal.symbol} direction={signal.direction} />
         {signal.confidence != null ? (
           <span>Confiança: {formatPercentage(signal.confidence)}%</span>

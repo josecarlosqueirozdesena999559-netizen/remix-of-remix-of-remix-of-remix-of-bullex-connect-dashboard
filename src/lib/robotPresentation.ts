@@ -4,7 +4,7 @@ type RobotResult = "WIN" | "LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
 
 export type RobotPresentation = {
-  kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "result";
+  kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "rejected" | "result";
   title: string;
   detail: string | null;
   footer: string | null;
@@ -30,11 +30,35 @@ export function getRobotPresentation(
     );
   }
 
+  const status = robotState.status;
   const trade = robotState.last_trade;
   const signal = robotState.pending_signal ?? robotState.last_signal;
+
+  if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
+    return {
+      ...createPresentation(
+        "rejected",
+        "Entrada rejeitada",
+        `Motivo: ${robotState.rejection_reason ?? "Ordem recusada pela corretora."}`,
+      ),
+      trade,
+      signal,
+      direction: trade?.direction ?? signal?.direction ?? null,
+    };
+  }
+
+  if (status === "SENDING_ORDER") {
+    return {
+      ...createPresentation("operation", "Enviando ordem..."),
+      trade,
+      signal,
+      direction: trade?.direction ?? signal?.direction ?? null,
+    };
+  }
+
   const operationInProgress =
     robotState.operation_in_progress ||
-    robotState.status === "PENDING_RESULT" ||
+    status === "PENDING_RESULT" ||
     trade?.result === "PENDING_RESULT";
 
   if (operationInProgress) {
@@ -46,7 +70,8 @@ export function getRobotPresentation(
         `Expira em ${formatDuration(getRemainingSeconds(robotState.expiration_seconds, robotState.fetched_at, now))}`,
       ),
       trade,
-      direction: trade?.direction ?? null,
+      signal: trade ? null : signal,
+      direction: trade?.direction ?? signal?.direction ?? null,
     };
   }
 
