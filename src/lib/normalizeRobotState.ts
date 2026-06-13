@@ -2,7 +2,15 @@ import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hook
 
 export function normalizeRobotState(input: unknown): RobotState {
   const value = unwrapRobotState(input);
-  const tradeValue = asRecord(value.last_trade ?? value.lastTrade);
+  const tradeInput =
+    value.current_trade ??
+    value.currentTrade ??
+    value.pending_trade ??
+    value.pendingTrade ??
+    value.operation ??
+    value.last_trade ??
+    value.lastTrade;
+  const tradeValue = asRecord(tradeInput);
   return {
     enabled: normalizeBoolean(value.enabled),
     status: normalizeText(value.status, "STOPPED").toUpperCase(),
@@ -26,16 +34,25 @@ export function normalizeRobotState(input: unknown): RobotState {
       normalizeNumber(
         value.expiration_seconds ??
           value.expirationSeconds ??
+          value.seconds_until_expiration ??
+          value.secondsUntilExpiration ??
+          value.expires_in ??
+          value.expiresIn ??
           tradeValue.expiration_seconds ??
-          tradeValue.expirationSeconds,
+          tradeValue.expirationSeconds ??
+          tradeValue.seconds_until_expiration ??
+          tradeValue.secondsUntilExpiration ??
+          tradeValue.expires_in ??
+          tradeValue.expiresIn,
       ) ?? 0,
     ),
     entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
     operation_in_progress: normalizeBoolean(
       value.operation_in_progress ?? value.operationInProgress,
     ),
+    pending_signal: normalizeSignal(value.pending_signal ?? value.pendingSignal),
     last_signal: normalizeSignal(value.last_signal ?? value.lastSignal),
-    last_trade: normalizeTrade(value.last_trade ?? value.lastTrade),
+    last_trade: normalizeTrade(tradeInput),
     wins: Math.max(0, normalizeNumber(value.wins) ?? 0),
     losses: Math.max(0, normalizeNumber(value.losses) ?? 0),
     profit: normalizeNumber(value.profit) ?? 0,

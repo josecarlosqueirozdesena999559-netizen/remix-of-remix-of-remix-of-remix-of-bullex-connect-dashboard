@@ -42,6 +42,7 @@ export type RobotState = {
   expiration_seconds: number;
   entry_window_open: boolean;
   operation_in_progress: boolean;
+  pending_signal: RobotSignal | null;
   last_signal: RobotSignal | null;
   last_trade: RobotTrade | null;
   wins: number;
@@ -100,6 +101,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     expiration_seconds: 0,
     entry_window_open: false,
     operation_in_progress: false,
+    pending_signal: null,
     last_signal: null,
     last_trade: null,
     wins: 0,

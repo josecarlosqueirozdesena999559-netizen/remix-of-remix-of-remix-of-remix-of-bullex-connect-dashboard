@@ -30,6 +30,7 @@ export function getRobotPresentation(
   }
 
   const trade = robotState.last_trade;
+  const signal = robotState.pending_signal ?? robotState.last_signal;
   const operationInProgress =
     robotState.operation_in_progress ||
     robotState.status === "PENDING_RESULT" ||
@@ -51,8 +52,8 @@ export function getRobotPresentation(
   if (robotState.entry_window_open) {
     return {
       ...createPresentation("entry", "Entrada liberada", "Enviando ordem..."),
-      signal: robotState.last_signal,
-      direction: robotState.last_signal?.direction ?? null,
+      signal,
+      direction: signal?.direction ?? null,
     };
   }
 
@@ -67,17 +68,25 @@ export function getRobotPresentation(
   }
 
   if (robotState.status === "WAITING_ENTRY_WINDOW") {
+    if (!signal) {
+      return createPresentation("analyzing", "Analisando...", "Nenhum sinal confirmado ainda");
+    }
+
     const remainingSeconds = getRemainingSeconds(
       robotState.seconds_until_entry_window,
       robotState.fetched_at,
       now,
     );
-    return createPresentation(
-      "analyzing",
-      "Sinal encontrado",
-      "Aguardando janela de entrada",
-      `Entrada em ${formatDuration(remainingSeconds)}`,
-    );
+    return {
+      ...createPresentation(
+        "analyzing",
+        "Sinal encontrado",
+        null,
+        `Entrada em ${formatDuration(remainingSeconds)}`,
+      ),
+      signal,
+      direction: signal.direction,
+    };
   }
 
   if (robotState.status === "WAITING_NEXT_CYCLE") {

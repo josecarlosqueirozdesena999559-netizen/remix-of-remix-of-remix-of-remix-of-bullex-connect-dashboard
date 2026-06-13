@@ -247,9 +247,9 @@ function getOverlayContent(
 function TradeIdentity({ active, direction }: { active: string; direction: RobotDirection }) {
   return (
     <>
-      <span>{active}</span>
+      <span>Ativo: {active}</span>
       <span className={direction === "CALL" ? "text-emerald-300" : "text-red-300"}>
-        {direction}
+        Direção: {direction}
       </span>
     </>
   );
