@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Power, Bot, Plug, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import {
@@ -29,6 +29,7 @@ type Config = {
 const FIXED_CYCLE_MINUTES = 10;
 const FIXED_MIN_CONFIDENCE = 80;
 const FIXED_MIN_PAYOUT = 80;
+const ROBOT_START_AUDIO_SRC = "/robot-start.mp3";
 
 const DEFAULT: Config = {
   allowReal: false,
@@ -43,6 +44,7 @@ function RobotPage() {
   const [cfg, setCfg] = useState<Config>(DEFAULT);
   const [robotActionPending, setRobotActionPending] = useState(false);
   const [robotActionError, setRobotActionError] = useState<string | null>(null);
+  const robotStartAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const update = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
 
@@ -84,6 +86,15 @@ function RobotPage() {
       allowReal: authorized,
       confirmReal: authorized,
     }));
+  }
+
+  function playRobotStartAudio() {
+    if (typeof Audio === "undefined") return;
+
+    const audio = robotStartAudioRef.current ?? new Audio(ROBOT_START_AUDIO_SRC);
+    robotStartAudioRef.current = audio;
+    audio.currentTime = 0;
+    void audio.play().catch(() => undefined);
   }
 
   async function handleToggle() {
@@ -131,6 +142,7 @@ function RobotPage() {
           }),
         );
         unwrapApiResult(await robotStart());
+        playRobotStartAudio();
       }
 
       await robotState.refetch();

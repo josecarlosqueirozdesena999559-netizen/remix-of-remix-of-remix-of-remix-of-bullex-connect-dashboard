@@ -7,9 +7,9 @@ export const Route = createFileRoute("/_authenticated/payments")({
 });
 
 const PLANS = [
-  { name: "Mensal", price: 49.9, period: "/mês", features: ["Acesso ao robô", "Suporte por e-mail", "1 conta BullEx"] },
-  { name: "Trimestral", price: 129.9, period: "/3 meses", features: ["Tudo do mensal", "Economia de 13%", "Suporte prioritário"], highlight: true },
-  { name: "Anual", price: 449.9, period: "/ano", features: ["Tudo do trimestral", "Economia de 25%", "Sinais VIP"] },
+  { name: "Mensal", price: 147.9, period: "/mês", features: ["Acesso ao robô", "Suporte por e-mail", "1 conta BullEx"] },
+  { name: "Semestral", price: 667, period: "/6 meses", features: ["Tudo do mensal", "Economia de 25%", "Suporte prioritário"], highlight: true },
+  { name: "Anual", price: 1447.9, period: "/ano", features: ["Tudo do semestral", "Economia anual", "Sinais VIP"] },
 ];
 
 function PaymentsPage() {
@@ -30,7 +30,7 @@ function PaymentsPage() {
           >
             <div className="text-sm font-medium text-muted-foreground">{p.name}</div>
             <div className="mt-2 mb-4">
-              <span className="text-3xl font-bold">R$ {p.price.toFixed(2)}</span>
+              <span className="text-3xl font-bold">{formatCurrency(p.price)}</span>
               <span className="text-sm text-muted-foreground">{p.period}</span>
             </div>
             <ul className="space-y-2 mb-6 text-sm flex-1">
@@ -57,4 +57,11 @@ function PaymentsPage() {
       </div>
     </div>
   );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
 }
