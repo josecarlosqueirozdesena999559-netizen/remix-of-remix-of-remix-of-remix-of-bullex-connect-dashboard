@@ -27,7 +27,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       <button
         type="button"
         onClick={() => setOverlayVisible(true)}
-        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-primary/40 bg-background/90 px-3 py-2 text-xs font-semibold text-foreground shadow-xl backdrop-blur transition hover:bg-accent"
+        className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-full border border-primary/40 bg-background/90 px-3 py-2 text-xs font-semibold text-foreground shadow-xl backdrop-blur transition hover:bg-accent"
       >
         <Bot className="h-4 w-4 text-primary" />
         Mostrar robô
