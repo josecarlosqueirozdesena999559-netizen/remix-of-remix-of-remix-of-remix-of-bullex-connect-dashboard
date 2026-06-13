@@ -63,6 +63,10 @@ function RobotPage() {
   const hasBackend = !!apiConfig.BASE_URL;
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
+  const robotRealSelected = robotState.data?.account_mode === "REAL";
+  const needsRealConfirmation =
+    robotState.data?.real_block_reason?.toLowerCase().includes("confirm_real") === true;
+  const showRealAuthorization = realSelected || robotRealSelected || needsRealConfirmation;
   const realConfirmed = cfg.allowReal && cfg.confirmReal;
 
   async function selectAccountType(mode: "PRACTICE" | "REAL") {
@@ -359,7 +363,7 @@ function RobotPage() {
                 : "Falha ao alterar o modo da conta BullEx."}
             </p>
           ) : null}
-          {realSelected ? (
+          {showRealAuthorization ? (
             <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
               <label className="flex cursor-pointer items-start gap-3 text-sm font-medium">
                 <input
