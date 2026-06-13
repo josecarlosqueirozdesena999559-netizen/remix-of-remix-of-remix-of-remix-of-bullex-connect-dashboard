@@ -100,6 +100,10 @@ export interface BullexAccount {
 }
 
 export type BullexAccountMode = "PRACTICE" | "REAL";
+export type ChangeBullexModePayload = {
+  mode: BullexAccountMode;
+  confirm_real?: boolean;
+};
 
 export type RobotConfigPayload = {
   enabled: boolean;
@@ -137,10 +141,10 @@ export const bullexApi = {
     }),
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),
-  changeMode: (mode: BullexAccountMode) =>
+  changeMode: (payload: BullexAccountMode | ChangeBullexModePayload) =>
     apiRequest<{ ok: boolean }>("/bullex/change-mode", {
       method: "POST",
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify(typeof payload === "string" ? { mode: payload } : payload),
     }),
   status: () => apiRequest<{ status: string }>("/bullex/status"),
   account: () => apiRequest<BullexAccount>("/bullex/account"),

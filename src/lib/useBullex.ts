@@ -4,7 +4,7 @@ import { BULLEX_ACCOUNT_QUERY_KEY, getDisconnectedState } from "@/hooks/useBullE
 import {
   ApiError,
   type ApiResult,
-  type BullexAccountMode,
+  type ChangeBullexModePayload,
   bullexApi,
   isKnownApiError,
 } from "./api";
@@ -80,7 +80,8 @@ export function useReconnectBullex() {
 export function useChangeBullexMode() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (mode: BullexAccountMode) => unwrap(await bullexApi.changeMode(mode)),
+    mutationFn: async (payload: ChangeBullexModePayload) =>
+      unwrap(await bullexApi.changeMode(payload)),
     onSuccess: async () => {
       await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
     },

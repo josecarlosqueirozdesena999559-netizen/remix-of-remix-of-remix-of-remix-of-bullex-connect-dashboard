@@ -44,6 +44,9 @@ function RobotPage() {
   const [cfg, setCfg] = useState<Config>(DEFAULT);
   const [robotActionPending, setRobotActionPending] = useState(false);
   const [robotActionError, setRobotActionError] = useState<string | null>(null);
+  const [realModeConfirmOpen, setRealModeConfirmOpen] = useState(false);
+  const [realModeConfirmed, setRealModeConfirmed] = useState(false);
+  const [realModeError, setRealModeError] = useState<string | null>(null);
   const robotStartAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const update = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
@@ -71,15 +74,48 @@ function RobotPage() {
 
   async function selectAccountType(mode: "PRACTICE" | "REAL") {
     setRobotActionError(null);
+    setRealModeError(null);
+
+    if (mode === "REAL") {
+      setRealModeConfirmOpen(true);
+      setRealModeConfirmed(false);
+      return;
+    }
+
     if (mode === "PRACTICE") {
       setCfg((current) => ({ ...current, allowReal: false, confirmReal: false }));
+      setRealModeConfirmOpen(false);
+      setRealModeConfirmed(false);
     }
 
     try {
-      await changeMode.mutateAsync(mode);
+      await changeMode.mutateAsync({ mode: "PRACTICE" });
+      await account.refetch();
+      await robotState.refetch();
     } catch (error) {
       setRobotActionError(
         error instanceof Error ? error.message : "Falha ao alterar o modo da conta BullEx.",
+      );
+    }
+  }
+
+  async function confirmRealAccountMode() {
+    if (!realModeConfirmed || changeMode.isPending) return;
+    setRobotActionError(null);
+    setRealModeError(null);
+
+    try {
+      await changeMode.mutateAsync({ mode: "REAL", confirm_real: true });
+      setCfg((current) => ({ ...current, allowReal: true, confirmReal: true }));
+      setRealModeConfirmOpen(false);
+      setRealModeConfirmed(false);
+      await account.refetch();
+      await robotState.refetch();
+    } catch (error) {
+      setRealModeError(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel confirmar a conta REAL. Tente novamente.",
       );
     }
   }
@@ -356,6 +392,47 @@ function RobotPage() {
               </button>
             ))}
           </div>
+          {realModeConfirmOpen ? (
+            <div className="space-y-4 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
+              <p className="text-sm font-medium">
+                Entendo que estou mudando para CONTA REAL. As operaÃ§Ãµes usarÃ£o saldo real e
+                podem gerar perdas.
+              </p>
+              <label className="flex cursor-pointer items-start gap-3 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={realModeConfirmed}
+                  onChange={(event) => setRealModeConfirmed(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-destructive"
+                />
+                <span>Confirmo que quero operar em conta REAL.</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void confirmRealAccountMode()}
+                  disabled={!realModeConfirmed || changeMode.isPending}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {changeMode.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Confirmar conta REAL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealModeConfirmOpen(false);
+                    setRealModeConfirmed(false);
+                    setRealModeError(null);
+                  }}
+                  disabled={changeMode.isPending}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+              {realModeError ? <p className="text-sm text-destructive">{realModeError}</p> : null}
+            </div>
+          ) : null}
           {changeMode.isError ? (
             <p className="text-sm text-destructive">
               {changeMode.error instanceof Error
