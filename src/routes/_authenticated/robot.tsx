@@ -24,11 +24,11 @@ type Config = {
   stopWin: number;
   stopLoss: number;
   entry: number;
-  cycleMinutes: number;
-  minConfidence: number;
-  minPayout: number;
-  martingale: number;
 };
+
+const FIXED_CYCLE_MINUTES = 10;
+const FIXED_MIN_CONFIDENCE = 80;
+const FIXED_MIN_PAYOUT = 80;
 
 const DEFAULT: Config = {
   allowReal: false,
@@ -36,10 +36,6 @@ const DEFAULT: Config = {
   stopWin: 50,
   stopLoss: 30,
   entry: 2,
-  cycleMinutes: 10,
-  minConfidence: 80,
-  minPayout: 80,
-  martingale: 1,
 };
 
 function RobotPage() {
@@ -127,9 +123,9 @@ function RobotPage() {
             allow_real: realSelected ? cfg.allowReal : false,
             confirm_real: realSelected ? cfg.confirmReal : false,
             entry_value: cfg.entry,
-            cycle_minutes: cfg.cycleMinutes,
-            min_confidence: cfg.minConfidence,
-            min_payout: cfg.minPayout,
+            cycle_minutes: FIXED_CYCLE_MINUTES,
+            min_confidence: FIXED_MIN_CONFIDENCE,
+            min_payout: FIXED_MIN_PAYOUT,
             stop_win: cfg.stopWin,
             stop_loss: cfg.stopLoss,
           }),
@@ -393,45 +389,11 @@ function RobotPage() {
             onChange={(v) => update("stopLoss", v)}
           />
           <NumField
-            label="Entrada inicial (USD)"
+            label="Valor por entrada (USD)"
             value={cfg.entry}
             onChange={(v) => update("entry", v)}
             step={0.5}
           />
-          <NumField
-            label="Ciclo (minutos)"
-            value={cfg.cycleMinutes}
-            onChange={(v) => update("cycleMinutes", v)}
-            min={1}
-          />
-          <NumField
-            label="Confiança mínima (%)"
-            value={cfg.minConfidence}
-            onChange={(v) => update("minConfidence", v)}
-            min={0}
-            max={100}
-          />
-          <NumField
-            label="Payout mínimo (%)"
-            value={cfg.minPayout}
-            onChange={(v) => update("minPayout", v)}
-            min={0}
-            max={100}
-          />
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Martingale (Gales)</label>
-            <select
-              value={cfg.martingale}
-              onChange={(e) => update("martingale", Number(e.target.value))}
-              className="w-full rounded-lg border border-border bg-input px-3 py-2"
-            >
-              {[0, 1, 2, 3].map((g) => (
-                <option key={g} value={g}>
-                  {g === 0 ? "Sem gale" : `G${g}`}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 
