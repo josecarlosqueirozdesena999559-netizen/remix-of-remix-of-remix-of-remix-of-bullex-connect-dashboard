@@ -16,6 +16,11 @@ export function normalizeRobotState(input: unknown): RobotState {
       0,
       normalizeNumber(value.seconds_until_next_cycle ?? value.secondsUntilNextCycle) ?? 0,
     ),
+    seconds_until_entry_window: Math.max(
+      0,
+      normalizeNumber(value.seconds_until_entry_window ?? value.secondsUntilEntryWindow) ?? 0,
+    ),
+    entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
     operation_in_progress: normalizeBoolean(
       value.operation_in_progress ?? value.operationInProgress,
     ),

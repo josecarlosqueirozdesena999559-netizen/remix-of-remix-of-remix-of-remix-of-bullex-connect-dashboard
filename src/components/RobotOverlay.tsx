@@ -154,7 +154,7 @@ export function RobotOverlay({
         <Score label="LOSS" value={robotState?.losses ?? 0} tone="loss" />
       </div>
 
-      <div className="-mt-1 max-w-[92vw] text-center text-white [text-shadow:0_2px_5px_#000,0_0_10px_#000] sm:-mt-2">
+      <div className="-mt-1 w-[274px] max-w-[92vw] text-center text-white [text-shadow:0_2px_5px_#000,0_0_10px_#000] sm:-mt-2 sm:w-[386px]">
         {account?.connected ? (
           <p className="mb-1 text-[11px] font-semibold sm:text-xs">
             {account.mode ?? "-"}
@@ -163,7 +163,11 @@ export function RobotOverlay({
               : ""}
           </p>
         ) : null}
-        <p className={`text-sm font-bold sm:text-base ${content.tone}`}>{content.title}</p>
+        <p
+          className={`whitespace-normal break-words text-sm font-bold leading-tight sm:text-base ${content.tone}`}
+        >
+          {content.title}
+        </p>
         {content.details ? (
           <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-semibold sm:text-xs">
             {content.details}

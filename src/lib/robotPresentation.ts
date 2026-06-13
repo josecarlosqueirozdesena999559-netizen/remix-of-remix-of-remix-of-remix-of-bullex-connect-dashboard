@@ -50,6 +50,10 @@ export function getRobotPresentation(
     };
   }
 
+  if (robotState.entry_window_open) {
+    return createPresentation("analyzing", "Janela de entrada aberta", robotState.rejection_reason);
+  }
+
   if (robotState.status === "ERROR") {
     return createPresentation(
       "analyzing",
@@ -68,12 +72,28 @@ export function getRobotPresentation(
   }
 
   if (robotState.status === "WAITING_NEXT_CYCLE") {
-    const remainingSeconds = getCycleRemainingSeconds(robotState, now);
+    const remainingSeconds = getRemainingSeconds(
+      robotState.seconds_until_next_cycle,
+      robotState.fetched_at,
+      now,
+    );
     return createPresentation(
       "analyzing",
-      remainingSeconds > 0 ? "Aguardando próxima análise" : "Analisando...",
-      null,
-      remainingSeconds > 0 ? `Próxima entrada em ${formatDuration(remainingSeconds)}` : null,
+      `Próxima análise em ${formatDuration(remainingSeconds)}`,
+      robotState.rejection_reason,
+    );
+  }
+
+  if (robotState.status === "WAITING_ENTRY_WINDOW") {
+    const remainingSeconds = getRemainingSeconds(
+      robotState.seconds_until_entry_window,
+      robotState.fetched_at,
+      now,
+    );
+    return createPresentation(
+      "analyzing",
+      `Entrada em ${formatDuration(remainingSeconds)}`,
+      robotState.rejection_reason,
     );
   }
 
@@ -96,6 +116,11 @@ export function getCycleRemainingSeconds(robotState: RobotState, now: number) {
 
   const elapsed = Math.floor((now - robotState.fetched_at) / 1000);
   return Math.max(0, Math.ceil(robotState.seconds_until_next_cycle - elapsed));
+}
+
+function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
+  const elapsed = Math.floor((now - fetchedAt) / 1000);
+  return Math.max(0, Math.ceil(seconds - elapsed));
 }
 
 export function formatDuration(totalSeconds: number) {
