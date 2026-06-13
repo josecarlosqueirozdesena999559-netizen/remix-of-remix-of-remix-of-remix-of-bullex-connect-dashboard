@@ -95,6 +95,7 @@ function normalizeTrade(input: unknown): RobotTrade | null {
     payout: normalizePercentage(value.payout),
     result: normalizeText(value.result, "PENDING_RESULT").toUpperCase(),
     sent_at: normalizeOptionalText(value.sent_at ?? value.sentAt),
+    finished_at: normalizeOptionalText(value.finished_at ?? value.finishedAt),
     profit: normalizeNumber(value.profit ?? value.pnl ?? value.result_amount ?? value.resultAmount),
   };
 }

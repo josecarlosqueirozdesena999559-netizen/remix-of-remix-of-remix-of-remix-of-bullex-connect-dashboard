@@ -24,6 +24,7 @@ export type RobotTrade = {
   payout: number | null;
   result: string;
   sent_at: string | null;
+  finished_at: string | null;
   profit: number | null;
 };
 

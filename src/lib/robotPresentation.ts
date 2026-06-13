@@ -1,6 +1,7 @@
 import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
 
 type RobotResult = "WIN" | "LOSS" | null;
+const RESULT_DISPLAY_MS = 5000;
 
 export type RobotPresentation = {
   kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "result";
@@ -58,7 +59,7 @@ export function getRobotPresentation(
   }
 
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
-  if (trade && result) {
+  if (trade && result && isRecentResult(trade.finished_at, now)) {
     return {
       ...createPresentation("result", result),
       trade,
@@ -90,16 +91,11 @@ export function getRobotPresentation(
   }
 
   if (robotState.status === "WAITING_NEXT_CYCLE") {
-    const remainingSeconds = getRemainingSeconds(
-      robotState.seconds_until_next_cycle,
-      robotState.fetched_at,
-      now,
-    );
-    return createPresentation(
-      "analyzing",
-      "Analisando...",
-      `Próxima análise em ${formatDuration(remainingSeconds)}`,
-    );
+    return createNextCyclePresentation(robotState, now);
+  }
+
+  if (trade && result) {
+    return createNextCyclePresentation(robotState, now);
   }
 
   if (robotState.status === "ERROR") {
@@ -123,6 +119,33 @@ export function formatDuration(totalSeconds: number) {
 function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
   const elapsed = Math.floor((now - fetchedAt) / 1000);
   return Math.max(0, Math.ceil(seconds - elapsed));
+}
+
+function createNextCyclePresentation(robotState: RobotState, now: number) {
+  const remainingSeconds = getRemainingSeconds(
+    robotState.seconds_until_next_cycle,
+    robotState.fetched_at,
+    now,
+  );
+  return createPresentation(
+    "analyzing",
+    "Analisando...",
+    `Próxima entrada em ${formatDuration(remainingSeconds)}`,
+  );
+}
+
+function isRecentResult(finishedAt: string | null, now: number) {
+  const finishedAtTime = parseDate(finishedAt);
+  if (finishedAtTime == null) return false;
+  const age = now - finishedAtTime;
+  return age >= 0 && age < RESULT_DISPLAY_MS;
+}
+
+function parseDate(value: string | null) {
+  if (!value) return null;
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const parsed = Date.parse(hasTimezone ? value : `${value}Z`);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function createPresentation(
