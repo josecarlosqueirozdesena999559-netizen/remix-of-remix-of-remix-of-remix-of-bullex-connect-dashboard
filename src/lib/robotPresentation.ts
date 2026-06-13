@@ -33,6 +33,7 @@ export function getRobotPresentation(
   const status = robotState.status;
   const trade = robotState.last_trade;
   const signal = robotState.pending_signal ?? robotState.last_signal;
+  const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
 
   if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
     return {
@@ -57,18 +58,35 @@ export function getRobotPresentation(
   }
 
   const operationInProgress =
-    robotState.operation_in_progress ||
-    status === "PENDING_RESULT" ||
-    trade?.result === "PENDING_RESULT";
+    !result &&
+    (robotState.operation_in_progress ||
+      status === "PENDING_RESULT" ||
+      trade?.result === "PENDING_RESULT");
+  const resultWaiting = !result && (robotState.result_waiting || operationInProgress);
 
   if (operationInProgress) {
+    const remainingSeconds = getRemainingSeconds(
+      robotState.expiration_seconds,
+      robotState.fetched_at,
+      now,
+    );
+
     return {
       ...createPresentation(
         "operation",
-        "Operação em andamento",
+        remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
         null,
-        `Expira em ${formatDuration(getRemainingSeconds(robotState.expiration_seconds, robotState.fetched_at, now))}`,
+        remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
       ),
+      trade,
+      signal: trade ? null : signal,
+      direction: trade?.direction ?? signal?.direction ?? null,
+    };
+  }
+
+  if (resultWaiting) {
+    return {
+      ...createPresentation("operation", "Aguardando resultado..."),
       trade,
       signal: trade ? null : signal,
       direction: trade?.direction ?? signal?.direction ?? null,
@@ -83,7 +101,6 @@ export function getRobotPresentation(
     };
   }
 
-  const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
   if (trade && result && isRecentResult(trade.finished_at, now)) {
     return {
       ...createPresentation("result", result),

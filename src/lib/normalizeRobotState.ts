@@ -50,6 +50,7 @@ export function normalizeRobotState(input: unknown): RobotState {
     operation_in_progress: normalizeBoolean(
       value.operation_in_progress ?? value.operationInProgress,
     ),
+    result_waiting: normalizeBoolean(value.result_waiting ?? value.resultWaiting),
     pending_signal: normalizeSignal(value.pending_signal ?? value.pendingSignal),
     last_signal: normalizeSignal(value.last_signal ?? value.lastSignal),
     last_trade: normalizeTrade(tradeInput),
@@ -146,7 +147,12 @@ function unwrapRobotState(input: unknown): Record<string, unknown> {
   let value = asRecord(input);
 
   for (let depth = 0; depth < 3; depth += 1) {
-    if ("enabled" in value || "status" in value || "operation_in_progress" in value) {
+    if (
+      "enabled" in value ||
+      "status" in value ||
+      "operation_in_progress" in value ||
+      "result_waiting" in value
+    ) {
       return value;
     }
 
