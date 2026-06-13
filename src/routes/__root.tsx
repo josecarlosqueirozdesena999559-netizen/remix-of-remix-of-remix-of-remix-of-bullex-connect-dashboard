@@ -78,13 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "BullEx AutoBot" },
       {
         name: "description",
-        content: "Painel de controle do BullEx AutoBot para operacoes automaticas.",
+        content: "Painel de controle do BullEx AutoBot para operações automáticas.",
       },
       { name: "author", content: "BullEx" },
       { property: "og:title", content: "BullEx AutoBot" },
       {
         property: "og:description",
-        content: "Painel de controle do BullEx AutoBot para operacoes automaticas.",
+        content: "Painel de controle do BullEx AutoBot para operações automáticas.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

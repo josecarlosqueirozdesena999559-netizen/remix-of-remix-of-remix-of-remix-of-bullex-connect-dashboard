@@ -14,7 +14,7 @@ import { useRobotState } from "@/hooks/useRobotState";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 
 export const Route = createFileRoute("/_authenticated/robot")({
-  head: () => ({ meta: [{ title: "Robo - BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
   component: RobotPage,
 });
 
@@ -115,7 +115,7 @@ function RobotPage() {
       setRealModeError(
         error instanceof Error
           ? error.message
-          : "Nao foi possivel confirmar a conta REAL. Tente novamente.",
+          : "Não foi possível confirmar a conta REAL. Tente novamente.",
       );
     }
   }
@@ -198,7 +198,7 @@ function RobotPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <Bot className="h-6 w-6" /> Robo
+            <Bot className="h-6 w-6" /> Robô
           </h1>
           <p className="text-sm text-muted-foreground">Controle da sua conta BullEx conectada.</p>
           {user?.id && (
@@ -236,13 +236,13 @@ function RobotPage() {
 
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          <strong>Backend nao configurado.</strong> Defina{" "}
+          <strong>Backend não configurado.</strong> Defina{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
           e{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">
             VITE_PANEL_API_KEY
           </code>{" "}
-          no ambiente para controlar o robo.
+          no ambiente para controlar o robô.
         </div>
       )}
 
@@ -394,10 +394,6 @@ function RobotPage() {
           </div>
           {realModeConfirmOpen ? (
             <div className="space-y-4 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
-              <p className="text-sm font-medium">
-                Entendo que estou mudando para CONTA REAL. As operaÃ§Ãµes usarÃ£o saldo real e
-                podem gerar perdas.
-              </p>
               <label className="flex cursor-pointer items-start gap-3 text-sm font-medium">
                 <input
                   type="checkbox"
@@ -405,7 +401,7 @@ function RobotPage() {
                   onChange={(event) => setRealModeConfirmed(event.target.checked)}
                   className="mt-0.5 h-4 w-4 accent-destructive"
                 />
-                <span>Confirmo que quero operar em conta REAL.</span>
+                <span>Confirmar uso da conta REAL.</span>
               </label>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -491,7 +487,7 @@ function RobotPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        Dados de mercado ficam disponiveis na tela Grafico.
+        Dados de mercado ficam disponíveis na tela Gráfico.
       </div>
     </div>
   );

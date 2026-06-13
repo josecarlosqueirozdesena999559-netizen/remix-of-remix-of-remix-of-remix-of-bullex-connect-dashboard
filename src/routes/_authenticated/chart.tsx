@@ -16,7 +16,7 @@ import { useMarketData } from "@/hooks/useMarketData";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chart")({
-  head: () => ({ meta: [{ title: "Grafico em tempo real - BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Gráfico em tempo real - BullEx AutoBot" }] }),
   component: MarketPage,
 });
 

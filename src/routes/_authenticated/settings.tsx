@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/useAuth";
 import { apiConfig } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Configuracoes - BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Configurações - BullEx AutoBot" }] }),
   component: SettingsPage,
 });
 
@@ -50,7 +50,7 @@ function SettingsPage() {
         ? { type: "error", text: error.message }
         : {
             type: "success",
-            text: "Solicitacao enviada. Confira o novo email para confirmar a alteracao.",
+            text: "Solicitação enviada. Confira o novo email para confirmar a alteração.",
           },
     );
   }
@@ -65,7 +65,7 @@ function SettingsPage() {
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordMessage({ type: "error", text: "As senhas nao coincidem." });
+      setPasswordMessage({ type: "error", text: "As senhas não coincidem." });
       return;
     }
 
@@ -86,14 +86,14 @@ function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Configuracoes</h1>
+        <h1 className="text-2xl font-semibold">Configurações</h1>
         <p className="text-sm text-muted-foreground">Sua conta e ambiente.</p>
       </header>
 
       <div className="space-y-5 rounded-2xl border border-border bg-card p-6">
         <h2 className="font-semibold">Conta</h2>
         <Field label="Email atual" value={user?.email ?? "-"} />
-        <Field label="ID do usuario" value={user?.id ?? "-"} mono />
+        <Field label="ID do usuário" value={user?.id ?? "-"} mono />
 
         <form onSubmit={updateEmail} className="space-y-3 border-t border-border pt-5">
           <div className="flex items-center gap-2 font-medium">
@@ -157,13 +157,13 @@ function SettingsPage() {
 
       <div className="space-y-4 rounded-2xl border border-border bg-card p-6">
         <h2 className="font-semibold">Backend</h2>
-        <Field label="VITE_API_BASE_URL" value={apiConfig.BASE_URL || "nao configurada"} mono />
+        <Field label="VITE_API_BASE_URL" value={apiConfig.BASE_URL || "não configurada"} mono />
         <Field
           label="VITE_PANEL_API_KEY"
-          value={apiConfig.hasKey ? "configurada" : "nao configurada"}
+          value={apiConfig.hasKey ? "configurada" : "não configurada"}
         />
         <p className="text-xs text-muted-foreground">
-          Defina essas variaveis no ambiente para conectar o painel ao backend BullEx.
+          Defina essas variáveis no ambiente para conectar o painel ao backend BullEx.
         </p>
       </div>
     </div>
