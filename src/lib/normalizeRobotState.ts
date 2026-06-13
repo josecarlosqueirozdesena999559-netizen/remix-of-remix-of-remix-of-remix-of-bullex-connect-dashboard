@@ -2,6 +2,7 @@ import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hook
 
 export function normalizeRobotState(input: unknown): RobotState {
   const value = unwrapRobotState(input);
+  const tradeValue = asRecord(value.last_trade ?? value.lastTrade);
   return {
     enabled: normalizeBoolean(value.enabled),
     status: normalizeText(value.status, "STOPPED").toUpperCase(),
@@ -19,6 +20,15 @@ export function normalizeRobotState(input: unknown): RobotState {
     seconds_until_entry_window: Math.max(
       0,
       normalizeNumber(value.seconds_until_entry_window ?? value.secondsUntilEntryWindow) ?? 0,
+    ),
+    expiration_seconds: Math.max(
+      0,
+      normalizeNumber(
+        value.expiration_seconds ??
+          value.expirationSeconds ??
+          tradeValue.expiration_seconds ??
+          tradeValue.expirationSeconds,
+      ) ?? 0,
     ),
     entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
     operation_in_progress: normalizeBoolean(

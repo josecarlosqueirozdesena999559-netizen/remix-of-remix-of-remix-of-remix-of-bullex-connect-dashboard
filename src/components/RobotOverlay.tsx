@@ -8,8 +8,7 @@ import {
 import { Settings, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
-import { useRecentRobotResult } from "@/hooks/useRecentRobotResult";
-import { formatDuration, getRobotPresentation } from "@/lib/robotPresentation";
+import { getRobotPresentation } from "@/lib/robotPresentation";
 
 type RobotOverlayProps = {
   robotState?: RobotState;
@@ -45,8 +44,7 @@ export function RobotOverlay({
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const now = useCurrentTime();
-  const recentResult = useRecentRobotResult(robotState);
-  const content = getOverlayContent(robotState, recentResult, now);
+  const content = getOverlayContent(robotState, now);
 
   useEffect(() => {
     const savedPosition = readPosition(storageKey);
@@ -107,7 +105,7 @@ export function RobotOverlay({
     <div
       ref={overlayRef}
       style={position ? { left: position.x, top: position.y } : { visibility: "hidden" }}
-      className={`fixed z-50 flex max-w-[calc(100vw-24px)] touch-none select-none flex-col items-center ${
+      className={`fixed z-50 flex max-w-[calc(100vw-24px)] touch-none select-none flex-col items-center pb-1 ${
         dragging ? "cursor-grabbing" : "cursor-grab"
       }`}
       onPointerDown={handlePointerDown}
@@ -154,7 +152,7 @@ export function RobotOverlay({
         <Score label="LOSS" value={robotState?.losses ?? 0} tone="loss" />
       </div>
 
-      <div className="-mt-1 w-[274px] max-w-[92vw] text-center text-white [text-shadow:0_2px_5px_#000,0_0_10px_#000] sm:-mt-2 sm:w-[386px]">
+      <div className="-mt-1 w-[290px] max-w-[92vw] px-1 text-center text-white [text-shadow:0_2px_5px_#000,0_0_10px_#000] sm:-mt-2 sm:w-[410px]">
         {account?.connected ? (
           <p className="mb-1 text-[11px] font-semibold sm:text-xs">
             {account.mode ?? "-"}
@@ -164,12 +162,12 @@ export function RobotOverlay({
           </p>
         ) : null}
         <p
-          className={`whitespace-normal break-words text-sm font-bold leading-tight sm:text-base ${content.tone}`}
+          className={`whitespace-normal break-words text-[13px] font-bold leading-snug sm:text-base ${content.tone}`}
         >
           {content.title}
         </p>
         {content.details ? (
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-semibold sm:text-xs">
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 break-words text-[10px] font-semibold leading-snug sm:text-xs">
             {content.details}
           </div>
         ) : null}
@@ -194,15 +192,14 @@ function useCurrentTime() {
 
 function getOverlayContent(
   robotState: RobotState | undefined,
-  recentResult: "WIN" | "LOSS" | null,
   now: number,
 ): OverlayContent {
-  const presentation = getRobotPresentation(robotState, recentResult, now);
+  const presentation = getRobotPresentation(robotState, now);
   const trade = presentation.trade;
   const signal = presentation.signal;
   const tone =
     presentation.kind === "result"
-      ? recentResult === "WIN"
+      ? presentation.result === "WIN"
         ? "text-emerald-300"
         : "text-red-300"
       : presentation.kind === "operation"
@@ -215,10 +212,15 @@ function getOverlayContent(
     details = (
       <>
         <TradeIdentity active={trade.active} direction={trade.direction} />
-        {trade.amount != null ? <span>Entrada: {formatEntryAmount(trade.amount)}</span> : null}
-        {trade.order_id ? <span>Ordem: {trade.order_id}</span> : null}
+        {presentation.kind === "operation" && trade.amount != null ? (
+          <span>Valor: {formatEntryAmount(trade.amount)}</span>
+        ) : null}
         {presentation.kind === "result" && trade.profit != null ? (
-          <span>Resultado: {formatMoney(trade.profit)}</span>
+          <span>
+            {presentation.result === "WIN" ? "Lucro" : "Prejuízo"}: {formatMoney(
+              presentation.result === "LOSS" ? Math.abs(trade.profit) : trade.profit,
+            )}
+          </span>
         ) : null}
       </>
     );
@@ -238,10 +240,7 @@ function getOverlayContent(
     title: presentation.title,
     tone,
     details,
-    footer:
-      presentation.kind === "operation" && trade?.sent_at
-        ? `Expira em: ${formatDuration(getTradeRemainingSeconds(trade.sent_at, now))}`
-        : presentation.footer,
+    footer: presentation.footer,
   };
 }
 
@@ -254,19 +253,6 @@ function TradeIdentity({ active, direction }: { active: string; direction: Robot
       </span>
     </>
   );
-}
-
-function getTradeRemainingSeconds(sentAt: string | null, now: number) {
-  const sentAtTime = parseDate(sentAt);
-  if (sentAtTime == null) return 0;
-  return Math.max(0, Math.ceil(60 - (now - sentAtTime) / 1000));
-}
-
-function parseDate(value: string | null) {
-  if (!value) return null;
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  const parsed = Date.parse(hasTimezone ? value : `${value}Z`);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function Score({
@@ -292,8 +278,8 @@ function Score({
 }
 
 function getDefaultPosition(): Position {
-  const estimatedWidth = window.innerWidth < 640 ? 274 : 386;
-  const estimatedHeight = window.innerWidth < 640 ? 175 : 240;
+  const estimatedWidth = window.innerWidth < 640 ? 290 : 410;
+  const estimatedHeight = window.innerWidth < 640 ? 210 : 270;
   const bounds = getViewportBounds();
   return {
     x: Math.max(bounds.minX, bounds.minX + (window.innerWidth - bounds.minX - estimatedWidth) / 2),
@@ -302,8 +288,8 @@ function getDefaultPosition(): Position {
 }
 
 function clampPosition(position: Position, element: HTMLDivElement | null): Position {
-  const width = element?.offsetWidth ?? (window.innerWidth < 640 ? 274 : 386);
-  const height = element?.offsetHeight ?? (window.innerWidth < 640 ? 175 : 240);
+  const width = element?.offsetWidth ?? (window.innerWidth < 640 ? 290 : 410);
+  const height = element?.offsetHeight ?? (window.innerWidth < 640 ? 210 : 270);
   const bounds = getViewportBounds();
   return {
     x: Math.min(

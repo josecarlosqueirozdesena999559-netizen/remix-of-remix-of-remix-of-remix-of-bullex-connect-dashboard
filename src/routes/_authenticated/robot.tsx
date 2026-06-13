@@ -11,7 +11,6 @@ import {
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
-import { useRecentRobotResult } from "@/hooks/useRecentRobotResult";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 
 export const Route = createFileRoute("/_authenticated/robot")({
@@ -57,8 +56,7 @@ function RobotPage() {
   const reconnect = useReconnectBullex();
   const changeMode = useChangeBullexMode();
   const robotState = useRobotState(user?.id);
-  const recentResult = useRecentRobotResult(robotState.data);
-  const robotPresentation = getRobotPresentation(robotState.data, recentResult, Date.now());
+  const robotPresentation = getRobotPresentation(robotState.data, Date.now());
 
   const connected = account.data?.connected === true;
   const robotEnabled = robotState.data?.enabled === true && robotState.data.status !== "STOPPED";
@@ -231,7 +229,7 @@ function RobotPage() {
             ) : null}
           </div>
           <span className="rounded-md bg-muted px-3 py-1 text-xs font-medium">
-            {robotState.data?.status ?? "CARREGANDO"}
+            {robotEnabled ? "Robô ativo" : "Robô parado"}
           </span>
         </div>
 

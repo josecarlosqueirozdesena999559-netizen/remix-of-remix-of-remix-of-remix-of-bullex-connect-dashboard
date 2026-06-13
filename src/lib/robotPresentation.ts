@@ -1,19 +1,20 @@
 import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
-import type { RecentRobotResult } from "@/hooks/useRecentRobotResult";
+
+type RobotResult = "WIN" | "LOSS" | null;
 
 export type RobotPresentation = {
-  kind: "loading" | "stopped" | "analyzing" | "operation" | "result";
+  kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "result";
   title: string;
   detail: string | null;
   footer: string | null;
   signal: RobotSignal | null;
   trade: RobotTrade | null;
   direction: RobotDirection | null;
+  result: RobotResult;
 };
 
 export function getRobotPresentation(
   robotState: RobotState | undefined,
-  recentResult: RecentRobotResult,
   now: number,
 ): RobotPresentation {
   if (!robotState) {
@@ -29,45 +30,53 @@ export function getRobotPresentation(
   }
 
   const trade = robotState.last_trade;
-
-  if (trade && recentResult) {
-    return {
-      ...createPresentation("result", recentResult === "WIN" ? "WIN ✅" : "LOSS ❌"),
-      trade,
-      direction: trade.direction,
-    };
-  }
-
-  if (
+  const operationInProgress =
     robotState.operation_in_progress ||
     robotState.status === "PENDING_RESULT" ||
-    robotState.last_trade?.result === "PENDING_RESULT"
-  ) {
+    trade?.result === "PENDING_RESULT";
+
+  if (operationInProgress) {
     return {
-      ...createPresentation("operation", "Operação em andamento"),
+      ...createPresentation(
+        "operation",
+        "Operação em andamento",
+        null,
+        `Expira em ${formatDuration(getRemainingSeconds(robotState.expiration_seconds, robotState.fetched_at, now))}`,
+      ),
       trade,
       direction: trade?.direction ?? null,
     };
   }
 
   if (robotState.entry_window_open) {
-    return createPresentation("analyzing", "Janela de entrada aberta", robotState.rejection_reason);
+    return {
+      ...createPresentation("entry", "Entrada liberada", "Enviando ordem..."),
+      signal: robotState.last_signal,
+      direction: robotState.last_signal?.direction ?? null,
+    };
   }
 
-  if (robotState.status === "ERROR") {
-    return createPresentation(
-      "analyzing",
-      "Erro no robô",
-      robotState.rejection_reason ?? "Não foi possível concluir o ciclo.",
+  const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+  if (trade && result) {
+    return {
+      ...createPresentation("result", result),
+      trade,
+      direction: trade.direction,
+      result,
+    };
+  }
+
+  if (robotState.status === "WAITING_ENTRY_WINDOW") {
+    const remainingSeconds = getRemainingSeconds(
+      robotState.seconds_until_entry_window,
+      robotState.fetched_at,
+      now,
     );
-  }
-
-  if (robotState.status === "SIGNAL_REJECTED") {
     return createPresentation(
       "analyzing",
-      "Analisando...",
-      robotState.rejection_reason ? `Motivo: ${robotState.rejection_reason}` : null,
-      getNextCycleFooter(robotState, now),
+      "Sinal encontrado",
+      "Aguardando janela de entrada",
+      `Entrada em ${formatDuration(remainingSeconds)}`,
     );
   }
 
@@ -79,48 +88,20 @@ export function getRobotPresentation(
     );
     return createPresentation(
       "analyzing",
+      "Analisando...",
       `Próxima análise em ${formatDuration(remainingSeconds)}`,
-      robotState.rejection_reason,
     );
   }
 
-  if (robotState.status === "WAITING_ENTRY_WINDOW") {
-    const remainingSeconds = getRemainingSeconds(
-      robotState.seconds_until_entry_window,
-      robotState.fetched_at,
-      now,
-    );
+  if (robotState.status === "ERROR") {
     return createPresentation(
       "analyzing",
-      `Entrada em ${formatDuration(remainingSeconds)}`,
-      robotState.rejection_reason,
+      "Erro no robô",
+      robotState.rejection_reason ?? "Não foi possível concluir o ciclo.",
     );
   }
 
-  if (robotState.status === "SIGNAL_SELECTED" && robotState.last_signal) {
-    return {
-      ...createPresentation("analyzing", "Analisando sinal..."),
-      signal: robotState.last_signal,
-      direction: robotState.last_signal.direction,
-    };
-  }
-
-  return createPresentation("analyzing", "Analisando...");
-}
-
-export function getCycleRemainingSeconds(robotState: RobotState, now: number) {
-  const nextCycleAt = parseDate(robotState.next_cycle_at);
-  if (nextCycleAt != null) {
-    return Math.max(0, Math.ceil((nextCycleAt - now) / 1000));
-  }
-
-  const elapsed = Math.floor((now - robotState.fetched_at) / 1000);
-  return Math.max(0, Math.ceil(robotState.seconds_until_next_cycle - elapsed));
-}
-
-function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
-  const elapsed = Math.floor((now - fetchedAt) / 1000);
-  return Math.max(0, Math.ceil(seconds - elapsed));
+  return createPresentation("analyzing", "Analisando...", "Nenhum sinal confirmado ainda");
 }
 
 export function formatDuration(totalSeconds: number) {
@@ -128,6 +109,11 @@ export function formatDuration(totalSeconds: number) {
   const minutesPart = Math.floor(seconds / 60);
   const secondsPart = seconds % 60;
   return `${String(minutesPart).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
+}
+
+function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
+  const elapsed = Math.floor((now - fetchedAt) / 1000);
+  return Math.max(0, Math.ceil(seconds - elapsed));
 }
 
 function createPresentation(
@@ -144,17 +130,6 @@ function createPresentation(
     signal: null,
     trade: null,
     direction: null,
+    result: null,
   };
-}
-
-function getNextCycleFooter(robotState: RobotState, now: number) {
-  const remainingSeconds = getCycleRemainingSeconds(robotState, now);
-  return remainingSeconds > 0 ? `Próxima entrada em ${formatDuration(remainingSeconds)}` : null;
-}
-
-function parseDate(value: string | null) {
-  if (!value) return null;
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  const parsed = Date.parse(hasTimezone ? value : `${value}Z`);
-  return Number.isFinite(parsed) ? parsed : null;
 }
