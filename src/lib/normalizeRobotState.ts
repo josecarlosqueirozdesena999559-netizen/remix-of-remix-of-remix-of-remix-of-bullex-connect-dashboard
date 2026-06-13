@@ -5,6 +5,12 @@ export function normalizeRobotState(input: unknown): RobotState {
   return {
     enabled: normalizeBoolean(value.enabled),
     status: normalizeText(value.status, "STOPPED").toUpperCase(),
+    allow_real: normalizeBoolean(value.allow_real ?? value.allowReal),
+    confirm_real: normalizeBoolean(value.confirm_real ?? value.confirmReal),
+    account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode),
+    active_mode: normalizeOptionalText(value.active_mode ?? value.activeMode),
+    real_ready: normalizeBoolean(value.real_ready ?? value.realReady),
+    real_block_reason: normalizeOptionalText(value.real_block_reason ?? value.realBlockReason),
     next_cycle_at: normalizeOptionalText(value.next_cycle_at ?? value.nextCycleAt),
     seconds_until_next_cycle: Math.max(
       0,
@@ -22,6 +28,10 @@ export function normalizeRobotState(input: unknown): RobotState {
     disconnected: false,
     fetched_at: Date.now(),
   };
+}
+
+function normalizeAccountMode(input: unknown): "DEMO" | "REAL" {
+  return normalizeText(input).toUpperCase() === "REAL" ? "REAL" : "DEMO";
 }
 
 function normalizeSignal(input: unknown): RobotSignal | null {

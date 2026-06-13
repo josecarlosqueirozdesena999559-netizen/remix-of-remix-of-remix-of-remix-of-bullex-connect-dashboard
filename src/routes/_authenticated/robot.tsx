@@ -16,6 +16,8 @@ export const Route = createFileRoute("/_authenticated/robot")({
 
 type Config = {
   accountType: "REAL" | "DEMO";
+  allowReal: boolean;
+  confirmReal: boolean;
   stopWin: number;
   stopLoss: number;
   entry: number;
@@ -27,6 +29,8 @@ type Config = {
 
 const DEFAULT: Config = {
   accountType: "DEMO",
+  allowReal: false,
+  confirmReal: false,
   stopWin: 50,
   stopLoss: 30,
   entry: 2,
@@ -56,6 +60,24 @@ function RobotPage() {
   const robotEnabled = robotState.data?.enabled === true && robotState.data.status !== "STOPPED";
   const isToggling = connect.isPending || disconnect.isPending || reconnect.isPending;
   const hasBackend = !!apiConfig.BASE_URL;
+  const realSelected = cfg.accountType === "REAL";
+  const realConfirmed = cfg.allowReal && cfg.confirmReal;
+
+  function selectAccountType(accountType: Config["accountType"]) {
+    setCfg((current) => ({
+      ...current,
+      accountType,
+      ...(accountType === "DEMO" ? { allowReal: false, confirmReal: false } : {}),
+    }));
+  }
+
+  function setRealAuthorization(authorized: boolean) {
+    setCfg((current) => ({
+      ...current,
+      allowReal: authorized,
+      confirmReal: authorized,
+    }));
+  }
 
   async function handleToggle() {
     if (!hasBackend) return;
@@ -75,6 +97,13 @@ function RobotPage() {
       return;
     }
 
+    if (!robotEnabled && realSelected && !realConfirmed) {
+      setRobotActionError(
+        "Confirme explicitamente as entradas automáticas antes de iniciar na conta REAL.",
+      );
+      return;
+    }
+
     setRobotActionPending(true);
     try {
       if (robotEnabled) {
@@ -84,6 +113,8 @@ function RobotPage() {
           await robotConfig({
             enabled: true,
             account_mode: cfg.accountType,
+            allow_real: realSelected ? cfg.allowReal : false,
+            confirm_real: realSelected ? cfg.confirmReal : false,
             entry_value: cfg.entry,
             cycle_minutes: cfg.cycleMinutes,
             min_confidence: cfg.minConfidence,
@@ -278,7 +309,8 @@ function RobotPage() {
             {(["DEMO", "REAL"] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => update("accountType", t)}
+                type="button"
+                onClick={() => selectAccountType(t)}
                 className={`rounded-lg border py-3 font-medium transition ${
                   cfg.accountType === t
                     ? t === "REAL"
@@ -291,6 +323,33 @@ function RobotPage() {
               </button>
             ))}
           </div>
+          {realSelected ? (
+            <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
+              <label className="flex cursor-pointer items-start gap-3 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={realConfirmed}
+                  onChange={(event) => setRealAuthorization(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-destructive"
+                />
+                <span>Iniciar entradas automáticas na conta real</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Esta autorização é obrigatória e confirma o envio de ordens com saldo real.
+              </p>
+              {robotState.data?.account_mode === "REAL" ? (
+                <p
+                  className={`text-xs font-medium ${
+                    robotState.data.real_ready ? "text-success" : "text-destructive"
+                  }`}
+                >
+                  {robotState.data.real_ready
+                    ? `Conta real pronta${robotState.data.active_mode ? ` (${robotState.data.active_mode})` : ""}.`
+                    : robotState.data.real_block_reason || "Conta real ainda não está pronta."}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">

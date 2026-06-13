@@ -102,6 +102,8 @@ export interface BullexAccount {
 export type RobotConfigPayload = {
   enabled: boolean;
   account_mode?: "DEMO" | "REAL";
+  allow_real?: boolean;
+  confirm_real?: boolean;
   entry_value?: number;
   cycle_minutes?: number;
   min_confidence?: number;
