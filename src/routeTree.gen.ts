@@ -16,6 +16,7 @@ import { Route as AuthenticatedWelcomeTrialRouteImport } from './routes/_authent
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedRobotRouteImport } from './routes/_authenticated/robot'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
 
@@ -54,6 +55,11 @@ const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/chart': typeof AuthenticatedChartRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/robot': typeof AuthenticatedRobotRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/chart': typeof AuthenticatedChartRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/robot': typeof AuthenticatedRobotRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/chart': typeof AuthenticatedChartRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/robot': typeof AuthenticatedRobotRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/chart'
     | '/dashboard'
+    | '/history'
     | '/payments'
     | '/robot'
     | '/settings'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/chart'
     | '/dashboard'
+    | '/history'
     | '/payments'
     | '/robot'
     | '/settings'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/chart'
     | '/_authenticated/dashboard'
+    | '/_authenticated/history'
     | '/_authenticated/payments'
     | '/_authenticated/robot'
     | '/_authenticated/settings'
@@ -188,6 +200,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -208,6 +227,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedChartRoute: typeof AuthenticatedChartRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedRobotRoute: typeof AuthenticatedRobotRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -217,6 +237,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChartRoute: AuthenticatedChartRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedRobotRoute: AuthenticatedRobotRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

@@ -1,7 +1,15 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
-import { LayoutDashboard, CandlestickChart, Bot, CreditCard, Settings, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  CandlestickChart,
+  Bot,
+  History,
+  CreditCard,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
 import { FloatingRobot } from "@/components/FloatingRobot";
 
@@ -9,6 +17,7 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { to: "/chart", label: "Gráfico", Icon: CandlestickChart },
   { to: "/robot", label: "Robô", Icon: Bot },
+  { to: "/history", label: "Histórico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
   { to: "/settings", label: "Configurações", Icon: Settings },
 ] as const;
