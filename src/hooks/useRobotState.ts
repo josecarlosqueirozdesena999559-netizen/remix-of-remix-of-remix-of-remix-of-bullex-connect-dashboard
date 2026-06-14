@@ -55,6 +55,7 @@ export type RobotState = {
   profit: number;
   rejection_reason: string | null;
   last_rejection_reason: string | null;
+  rejected_at: string | null;
   disconnected: boolean;
   fetched_at: number;
 };
@@ -117,6 +118,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     profit: 0,
     rejection_reason: disconnected ? "Conta BullEx desconectada" : null,
     last_rejection_reason: disconnected ? "Conta BullEx desconectada" : null,
+    rejected_at: null,
     disconnected,
     fetched_at: Date.now(),
   };

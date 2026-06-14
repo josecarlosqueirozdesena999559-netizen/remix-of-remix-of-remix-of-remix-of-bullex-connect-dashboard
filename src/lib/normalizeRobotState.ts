@@ -81,6 +81,7 @@ export function normalizeRobotState(input: unknown): RobotState {
         value.rejection_reason ??
         value.rejectionReason,
     ),
+    rejected_at: normalizeOptionalText(value.rejected_at ?? value.rejectedAt),
     disconnected,
     fetched_at: Date.now(),
   };

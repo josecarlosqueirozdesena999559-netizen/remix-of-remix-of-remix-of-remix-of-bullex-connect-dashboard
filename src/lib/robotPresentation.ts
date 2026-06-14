@@ -2,6 +2,9 @@ import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hook
 
 type RobotResult = "WIN" | "LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
+const REJECTION_DISPLAY_MS = 5000;
+let observedStatus: string | null = null;
+let localRejectedAt: number | null = null;
 
 export type RobotPresentation = {
   kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "rejected" | "result";
@@ -39,7 +42,17 @@ export function getRobotPresentation(
   const signal = robotState.pending_signal;
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
 
+  if (status !== "SIGNAL_REJECTED" && observedStatus !== status) {
+    observedStatus = status;
+    localRejectedAt = null;
+  }
+
   if (status === "SIGNAL_REJECTED") {
+    const rejectedAt = getRejectedAt(robotState, now);
+    if (now - rejectedAt >= REJECTION_DISPLAY_MS) {
+      return createNextCyclePresentation(robotState, now);
+    }
+
     return createPresentation(
       "rejected",
       "Sinal bloqueado",
@@ -176,6 +189,22 @@ function isDisconnected(robotState: RobotState) {
     robotState.disconnected ||
     robotState.status === "ACCOUNT_DISCONNECTED"
   );
+}
+
+function getRejectedAt(robotState: RobotState, now: number) {
+  const rejectedAt = parseDate(robotState.rejected_at);
+  if (rejectedAt != null) return rejectedAt;
+
+  if (observedStatus !== robotState.status) {
+    observedStatus = robotState.status;
+    localRejectedAt = robotState.status === "SIGNAL_REJECTED" ? now : null;
+  }
+
+  if (localRejectedAt == null) {
+    localRejectedAt = now;
+  }
+
+  return localRejectedAt;
 }
 
 function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
