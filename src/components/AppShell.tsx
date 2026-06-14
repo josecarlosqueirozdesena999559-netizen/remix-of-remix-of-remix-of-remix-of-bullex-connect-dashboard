@@ -10,6 +10,7 @@ import {
   LogOut,
   Plug,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
 import { FloatingRobot } from "@/components/FloatingRobot";
@@ -21,6 +22,7 @@ const nav = [
   { to: "/robot", label: "Robo", Icon: Bot },
   { to: "/history", label: "Historico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
+  { to: "/admin", label: "Admin", Icon: ShieldCheck },
   { to: "/settings", label: "Configuracoes", Icon: Settings },
 ] as const;
 

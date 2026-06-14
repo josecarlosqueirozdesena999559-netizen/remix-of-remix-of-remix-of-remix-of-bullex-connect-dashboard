@@ -25,6 +25,7 @@ export type RobotTrade = {
   confidence: number | null;
   payout: number | null;
   result: string;
+  expires_at: string | null;
   sent_at: string | null;
   finished_at: string | null;
   profit: number | null;
@@ -44,6 +45,7 @@ export type RobotState = {
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
   expiration_seconds: number;
+  expires_at: string | null;
   entry_window_open: boolean;
   operation_in_progress: boolean;
   result_waiting: boolean;
@@ -107,6 +109,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
     expiration_seconds: 0,
+    expires_at: null,
     entry_window_open: false,
     operation_in_progress: false,
     result_waiting: false,

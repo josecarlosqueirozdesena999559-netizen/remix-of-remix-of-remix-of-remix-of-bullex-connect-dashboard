@@ -18,6 +18,16 @@ export function normalizeRobotState(input: unknown): RobotState {
     status === "ACCOUNT_DISCONNECTED" ||
     normalizeBoolean(value.disconnected ?? value.account_disconnected ?? value.accountDisconnected);
 
+  const expiresAt = normalizeOptionalText(
+    value.expires_at ??
+      value.expiresAt ??
+      value.expiration_at ??
+      value.expirationAt ??
+      tradeValue.expires_at ??
+      tradeValue.expiresAt ??
+      tradeValue.expiration_at ??
+      tradeValue.expirationAt,
+  );
   const expirationSeconds =
     normalizeNumber(
       value.expiration_seconds ??
@@ -32,15 +42,6 @@ export function normalizeRobotState(input: unknown): RobotState {
         tradeValue.secondsUntilExpiration ??
         tradeValue.expires_in ??
         tradeValue.expiresIn,
-    ) ?? normalizeSecondsUntilDate(
-      value.expiration_at ??
-        value.expirationAt ??
-        value.expires_at ??
-        value.expiresAt ??
-        tradeValue.expiration_at ??
-        tradeValue.expirationAt ??
-        tradeValue.expires_at ??
-        tradeValue.expiresAt,
     ) ?? 0;
 
   return {
@@ -63,6 +64,7 @@ export function normalizeRobotState(input: unknown): RobotState {
       normalizeNumber(value.seconds_until_entry_window ?? value.secondsUntilEntryWindow) ?? 0,
     ),
     expiration_seconds: Math.max(0, expirationSeconds),
+    expires_at: expiresAt,
     entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
     operation_in_progress: normalizeBoolean(
       value.operation_in_progress ?? value.operationInProgress,
@@ -102,7 +104,7 @@ function normalizeSignal(input: unknown): RobotSignal | null {
     direction,
     confidence: normalizePercentage(value.confidence ?? value.score ?? value.probability),
     payout: normalizePercentage(value.payout),
-    reason: normalizeOptionalText(value.reason ?? value.motive ?? value.explanation),
+    reason: normalizeReason(value.reason ?? value.reasons ?? value.motive ?? value.explanation),
     created_at: normalizeOptionalText(value.created_at ?? value.createdAt ?? value.timestamp),
   };
 }
@@ -121,6 +123,9 @@ function normalizeTrade(input: unknown): RobotTrade | null {
     confidence: normalizePercentage(value.confidence),
     payout: normalizePercentage(value.payout),
     result: normalizeText(value.result, "PENDING_RESULT").toUpperCase(),
+    expires_at: normalizeOptionalText(
+      value.expires_at ?? value.expiresAt ?? value.expiration_at ?? value.expirationAt,
+    ),
     sent_at: normalizeOptionalText(value.sent_at ?? value.sentAt),
     finished_at: normalizeOptionalText(value.finished_at ?? value.finishedAt),
     profit: normalizeNumber(value.profit ?? value.pnl ?? value.result_amount ?? value.resultAmount),
@@ -143,14 +148,6 @@ function normalizeNumber(input: unknown): number | null {
   if (typeof input !== "string") return null;
   const number = Number(input.replace(",", "."));
   return Number.isFinite(number) ? number : null;
-}
-
-function normalizeSecondsUntilDate(input: unknown): number | null {
-  const value = normalizeOptionalText(input);
-  if (!value) return null;
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) return null;
-  return Math.ceil((parsed - Date.now()) / 1000);
 }
 
 function normalizeBoolean(input: unknown) {
@@ -182,6 +179,15 @@ function normalizeText(input: unknown, fallback = "") {
 function normalizeOptionalText(input: unknown) {
   const value = normalizeText(input);
   return value || null;
+}
+
+function normalizeReason(input: unknown) {
+  if (Array.isArray(input)) {
+    const lines = input.map((item) => normalizeText(item)).filter(Boolean);
+    return lines.length > 0 ? lines.join("\n") : null;
+  }
+
+  return normalizeOptionalText(input);
 }
 
 function asRecord(input: unknown): Record<string, unknown> {

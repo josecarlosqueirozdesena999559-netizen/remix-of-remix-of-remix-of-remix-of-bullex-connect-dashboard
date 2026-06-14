@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
-import { getRobotPresentation } from "@/lib/robotPresentation";
+import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
 import { readRobotSettings } from "@/lib/robotSettings";
 
 export const Route = createFileRoute("/_authenticated/robot")({
@@ -17,7 +17,6 @@ export const Route = createFileRoute("/_authenticated/robot")({
 const FIXED_CYCLE_MINUTES = 10;
 const FIXED_MIN_CONFIDENCE = 80;
 const FIXED_MIN_PAYOUT = 80;
-const ROBOT_START_AUDIO_SRC = "/robot-start.mp3";
 
 function RobotPage() {
   const { user } = useAuth();
@@ -27,27 +26,18 @@ function RobotPage() {
   const [modeActionError, setModeActionError] = useState<string | null>(null);
   const [showRealConfirm, setShowRealConfirm] = useState(false);
   const [realConfirmed, setRealConfirmed] = useState(false);
-  const robotStartAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
   const { settings, setSettings } = useRobotSettings();
   const robotPresentation = getRobotPresentation(robotState.data, Date.now());
+  const signalReasonLines = formatSignalReasonLines(robotPresentation.signal?.reason);
 
   const connected = account.data?.connected === true;
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
   const robotEnabled = robotState.data?.enabled === true && robotState.data.status !== "STOPPED";
   const hasBackend = !!apiConfig.BASE_URL;
-
-  function playRobotStartAudio() {
-    if (typeof Audio === "undefined") return;
-
-    const audio = robotStartAudioRef.current ?? new Audio(ROBOT_START_AUDIO_SRC);
-    robotStartAudioRef.current = audio;
-    audio.currentTime = 0;
-    void audio.play().catch(() => undefined);
-  }
 
   async function refreshAccountAndRobot() {
     await account.refetch();
@@ -123,7 +113,6 @@ function RobotPage() {
           }),
         );
         unwrapApiResult(await robotStart());
-        playRobotStartAudio();
       }
 
       await robotState.refetch();
@@ -249,11 +238,25 @@ function RobotPage() {
         ) : null}
 
         {robotPresentation.signal ? (
-          <div className="mt-5 flex flex-wrap gap-2 text-sm">
+          <div className="mt-5 space-y-3 text-sm">
+            <div className="flex flex-wrap gap-2">
             <Pill label="Sinal" value={robotPresentation.signal.symbol} />
             <Pill label="Direção" value={robotPresentation.signal.direction} />
             {robotPresentation.signal.confidence != null ? (
               <Pill label="Confiança" value={`${Math.round(robotPresentation.signal.confidence)}%`} />
+            ) : null}
+            </div>
+            {signalReasonLines.length > 0 ? (
+              <div className="rounded-lg border border-border bg-background/35 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Motivo
+                </p>
+                <ul className="mt-2 space-y-1 text-muted-foreground">
+                  {signalReasonLines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </div>
         ) : null}

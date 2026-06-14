@@ -8,7 +8,7 @@ import {
 import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
-import { getRobotPresentation } from "@/lib/robotPresentation";
+import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
 import { readRobotSettings, saveRobotSettings, type RobotSettings } from "@/lib/robotSettings";
 
 type RobotOverlayProps = {
@@ -270,6 +270,7 @@ function getOverlayContent(
       </>
     );
   } else if (signal) {
+    const reasonLines = formatSignalReasonLines(signal.reason);
     details = (
       <>
         {presentation.detail ? <span>{presentation.detail}</span> : null}
@@ -278,6 +279,7 @@ function getOverlayContent(
           <span>Confiança: {formatPercentage(signal.confidence)}%</span>
         ) : null}
         {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
+        {reasonLines.length > 0 ? <span>Motivo: {reasonLines.join(", ")}</span> : null}
       </>
     );
   }

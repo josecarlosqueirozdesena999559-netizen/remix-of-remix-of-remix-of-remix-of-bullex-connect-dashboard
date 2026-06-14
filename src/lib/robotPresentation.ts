@@ -90,9 +90,8 @@ export function getRobotPresentation(
   const resultWaiting = !result && (robotState.result_waiting || operationInProgress);
 
   if (operationInProgress) {
-    const remainingSeconds = getRemainingSeconds(
-      robotState.expiration_seconds,
-      robotState.fetched_at,
+    const remainingSeconds = getExpirationRemainingSeconds(
+      trade?.expires_at ?? robotState.expires_at,
       now,
     );
 
@@ -101,7 +100,7 @@ export function getRobotPresentation(
         "operation",
         remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
         null,
-        remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
+        `Expira em ${formatDuration(remainingSeconds)}`,
       ),
       trade,
       signal: trade ? null : signal,
@@ -110,8 +109,18 @@ export function getRobotPresentation(
   }
 
   if (resultWaiting) {
+    const remainingSeconds = getExpirationRemainingSeconds(
+      trade?.expires_at ?? robotState.expires_at,
+      now,
+    );
+
     return {
-      ...createPresentation("operation", "Aguardando resultado..."),
+      ...createPresentation(
+        "operation",
+        "Aguardando resultado...",
+        null,
+        `Expira em ${formatDuration(remainingSeconds)}`,
+      ),
       trade,
       signal: trade ? null : signal,
       direction: trade?.direction ?? signal?.direction ?? null,
@@ -183,6 +192,14 @@ export function formatDuration(totalSeconds: number) {
   return `${String(minutesPart).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
 }
 
+export function formatSignalReasonLines(reason: string | null | undefined) {
+  if (!reason) return [];
+  return reason
+    .split(/\r?\n|;|\|/)
+    .map((line) => line.replace(/_/g, " ").trim())
+    .filter(Boolean);
+}
+
 function isDisconnected(robotState: RobotState) {
   return (
     robotState.connected === false ||
@@ -212,15 +229,20 @@ function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
   return Math.max(0, Math.ceil(seconds - elapsed));
 }
 
+function getExpirationRemainingSeconds(expiresAt: string | null, now: number) {
+  const expiresAtTime = parseDate(expiresAt);
+  if (expiresAtTime == null) return 0;
+  return Math.max(0, Math.ceil((expiresAtTime - now) / 1000));
+}
+
 function createNextCyclePresentation(
   robotState: RobotState,
   now: number,
   title = "Analisando...",
   fallbackSeconds = 0,
 ) {
-  const baseSeconds =
+  const remainingSeconds =
     robotState.seconds_until_next_cycle > 0 ? robotState.seconds_until_next_cycle : fallbackSeconds;
-  const remainingSeconds = getRemainingSeconds(baseSeconds, robotState.fetched_at, now);
 
   return createPresentation(
     "analyzing",

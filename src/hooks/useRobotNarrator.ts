@@ -70,6 +70,20 @@ function getNarrationEvents(robotState: RobotState): NarrationEvent[] {
   const signalCreatedAt = signal?.created_at ?? "-";
   const result = getTradeResult(trade);
 
+  if (
+    !signal &&
+    !trade &&
+    robotState.connected !== false &&
+    status !== "STOPPED" &&
+    status !== "ACCOUNT_DISCONNECTED" &&
+    status !== "SIGNAL_REJECTED"
+  ) {
+    events.push({
+      key: createEventKey("ROBOT_ANALYSIS_STARTED", "-", "-", null),
+      text: "Robô conectado. Vou começar as análises do mercado agora.",
+    });
+  }
+
   if (status === "WAITING_ENTRY_WINDOW" && signal) {
     events.push({
       key: createEventKey(status, orderId, signalCreatedAt, signal),
@@ -221,8 +235,7 @@ function formatSpokenReason(reason: string | null | undefined) {
 }
 
 function getRemainingNextCycleSeconds(robotState: RobotState) {
-  const elapsed = Math.floor((Date.now() - robotState.fetched_at) / 1000);
-  return Math.max(0, Math.ceil(robotState.seconds_until_next_cycle - elapsed));
+  return Math.max(0, Math.ceil(robotState.seconds_until_next_cycle));
 }
 
 function formatSpokenDuration(totalSeconds: number) {
