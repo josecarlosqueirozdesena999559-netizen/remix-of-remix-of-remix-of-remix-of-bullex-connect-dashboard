@@ -116,7 +116,12 @@ function normalizeSignal(input: unknown): RobotSignal | null {
   return {
     symbol,
     direction,
-    confidence: normalizePercentage(value.confidence ?? value.score ?? value.probability),
+    confidence: normalizePercentage(value.confidence ?? value.probability),
+    strategy_score: normalizeNumber(
+      value.strategy_score ??
+        value.strategyScore ??
+        value.score,
+    ),
     payout: normalizePercentage(value.payout),
     reason: normalizeReason(value.reason ?? value.reasons ?? value.motive ?? value.explanation),
     created_at: normalizeOptionalText(value.created_at ?? value.createdAt ?? value.timestamp),

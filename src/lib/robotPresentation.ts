@@ -3,17 +3,19 @@ import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hook
 type RobotResult = "WIN" | "LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
-let observedStatus: string | null = null;
-let localRejectedAt: number | null = null;
 let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
+let signalRejectionSnapshot: SignalRejectionSnapshot | null = null;
 
 type OrderRejectionSnapshot = {
   key: string;
   reason: string;
   observedAt: number;
-  trade: RobotTrade | null;
-  signal: RobotSignal | null;
-  direction: RobotDirection | null;
+};
+
+type SignalRejectionSnapshot = {
+  key: string;
+  reason: string;
+  observedAt: number;
 };
 
 type RobotPresentationOptions = {
@@ -59,23 +61,39 @@ export function getRobotPresentation(
   const signal = robotState.pending_signal;
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
 
-  if (status !== "SIGNAL_REJECTED" && observedStatus !== status) {
-    observedStatus = status;
-    localRejectedAt = null;
+  if (status === "SIGNAL_REJECTED") {
+    const reason = getSignalRejectionReason(robotState);
+    const key = [
+      robotState.rejected_at ?? "-",
+      robotState.last_signal?.created_at ?? "-",
+      reason,
+    ].join("|");
+
+    if (signalRejectionSnapshot?.key !== key) {
+      signalRejectionSnapshot = {
+        key,
+        reason,
+        observedAt: now,
+      };
+    }
+  }
+
+  if (
+    signalRejectionSnapshot &&
+    now - signalRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS
+  ) {
+    return createPresentation(
+      "rejected",
+      "Nenhum sinal aprovado",
+      `Motivo: ${formatFriendlyRobotText(signalRejectionSnapshot.reason)}`,
+    );
   }
 
   if (status === "SIGNAL_REJECTED") {
-    const rejectedAt = getRejectedAt(robotState, now);
-    if (now - rejectedAt >= REJECTION_DISPLAY_MS) {
-      return createNextCyclePresentation(robotState, now, options);
-    }
-
-    return createPresentation(
-      "rejected",
-      "Sinal bloqueado",
-      `Motivo: ${robotState.last_rejection_reason ?? robotState.rejection_reason ?? "Sinal insuficiente."}`,
-    );
+    return createNextCyclePresentation(robotState, now, options);
   }
+
+  signalRejectionSnapshot = null;
 
   const orderRejected = status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED";
   if (orderRejected) {
@@ -92,9 +110,6 @@ export function getRobotPresentation(
         key,
         reason,
         observedAt: now,
-        trade,
-        signal,
-        direction: trade?.direction ?? signal?.direction ?? null,
       };
     }
   }
@@ -103,16 +118,11 @@ export function getRobotPresentation(
     orderRejectionSnapshot &&
     now - orderRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS
   ) {
-    return {
-      ...createPresentation(
-        "rejected",
-        "Entrada rejeitada",
-        `Motivo: ${orderRejectionSnapshot.reason}`,
-      ),
-      trade: orderRejectionSnapshot.trade,
-      signal: orderRejectionSnapshot.signal,
-      direction: orderRejectionSnapshot.direction,
-    };
+    return createPresentation(
+      "rejected",
+      "Entrada rejeitada",
+      `Motivo: ${formatFriendlyRobotText(orderRejectionSnapshot.reason)}`,
+    );
   }
 
   if (orderRejected) {
@@ -222,7 +232,9 @@ export function getRobotPresentation(
     return createPresentation(
       "analyzing",
       "Erro no robô",
-      robotState.rejection_reason ?? "Não foi possível concluir o ciclo.",
+      formatFriendlyRobotText(
+        robotState.rejection_reason ?? "Não foi possível concluir o ciclo.",
+      ),
     );
   }
 
@@ -240,14 +252,32 @@ export function formatSignalReasonLines(reason: string | null | undefined) {
   if (!reason) return [];
   return reason
     .split(/\r?\n|;|\|/)
-    .map((line) => line.replace(/_/g, " ").trim())
+    .map((line) => formatFriendlyRobotText(line))
     .filter(Boolean);
 }
 
+export function formatFriendlyRobotText(value: string | null | undefined) {
+  if (!value) return "Motivo não informado.";
+
+  const replacements: Record<string, string> = {
+    TREND_CLEAR: "Tendência clara",
+    SIDEWAYS: "Mercado lateral",
+    WAITING_NEXT_CYCLE: "Aguardando próxima análise",
+    SIGNAL_REJECTED: "Nenhum sinal aprovado",
+  };
+
+  return value
+    .replace(
+      /\b(TREND_CLEAR|SIDEWAYS|WAITING_NEXT_CYCLE|SIGNAL_REJECTED)\b/gi,
+      (code) => replacements[code.toUpperCase()],
+    )
+    .replace(/_/g, " ")
+    .trim();
+}
+
 export function resetRobotPresentationState() {
-  observedStatus = null;
-  localRejectedAt = null;
   orderRejectionSnapshot = null;
+  signalRejectionSnapshot = null;
 }
 
 function isDisconnected(robotState: RobotState) {
@@ -258,27 +288,19 @@ function isDisconnected(robotState: RobotState) {
   );
 }
 
-function getRejectedAt(robotState: RobotState, now: number) {
-  const rejectedAt = parseDate(robotState.rejected_at);
-  if (rejectedAt != null) return rejectedAt;
-
-  if (observedStatus !== robotState.status) {
-    observedStatus = robotState.status;
-    localRejectedAt = robotState.status === "SIGNAL_REJECTED" ? now : null;
-  }
-
-  if (localRejectedAt == null) {
-    localRejectedAt = now;
-  }
-
-  return localRejectedAt;
-}
-
 function getOrderRejectionReason(robotState: RobotState) {
   return (
     robotState.last_order_error ??
     robotState.rejection_reason ??
     "Ordem recusada pela corretora."
+  );
+}
+
+function getSignalRejectionReason(robotState: RobotState) {
+  return (
+    robotState.last_rejection_reason ??
+    robotState.rejection_reason ??
+    "Nenhum sinal atingiu os critérios da estratégia."
   );
 }
 

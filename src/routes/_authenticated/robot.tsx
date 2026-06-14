@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
@@ -30,6 +30,7 @@ function RobotPage() {
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
   const { settings, setSettings } = useRobotSettings(user?.id);
+  const now = useCurrentTime();
   const smoothNextCycleSeconds = useSmoothCountdown(
     robotState.data?.seconds_until_next_cycle,
     getCountdownResetKey(robotState.data),
@@ -54,7 +55,7 @@ function RobotPage() {
     ),
     robotState.data?.fetched_at,
   );
-  const robotPresentation = getRobotPresentation(robotState.data, Date.now(), {
+  const robotPresentation = getRobotPresentation(robotState.data, now, {
     nextCycleSeconds: smoothNextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
@@ -267,11 +268,23 @@ function RobotPage() {
         {robotPresentation.signal ? (
           <div className="mt-5 space-y-3 text-sm">
             <div className="flex flex-wrap gap-2">
-            <Pill label="Sinal" value={robotPresentation.signal.symbol} />
-            <Pill label="Direção" value={robotPresentation.signal.direction} />
-            {robotPresentation.signal.confidence != null ? (
-              <Pill label="Confiança" value={`${Math.round(robotPresentation.signal.confidence)}%`} />
-            ) : null}
+              <Pill label="Ativo" value={robotPresentation.signal.symbol} />
+              <Pill label="Direção" value={robotPresentation.signal.direction} />
+              {robotPresentation.signal.confidence != null ? (
+                <Pill
+                  label="Confiança"
+                  value={`${Math.round(robotPresentation.signal.confidence)}%`}
+                />
+              ) : null}
+              {robotPresentation.signal.strategy_score != null ? (
+                <Pill
+                  label="Score"
+                  value={formatScore(robotPresentation.signal.strategy_score)}
+                />
+              ) : null}
+              {robotPresentation.signal.payout != null ? (
+                <Pill label="Payout" value={`${Math.round(robotPresentation.signal.payout)}%`} />
+              ) : null}
             </div>
             {signalReasonLines.length > 0 ? (
               <div className="rounded-lg border border-border bg-background/35 p-3">
@@ -402,8 +415,23 @@ function Pill({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatScore(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function formatAmount(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function useCurrentTime() {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return now;
 }
 
 function getCountdownResetKey(robotState: RobotState | undefined) {

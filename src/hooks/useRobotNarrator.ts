@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
+import type { RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
+import { formatFriendlyRobotText } from "@/lib/robotPresentation";
 
 type NarrationEvent = {
   key: string;
@@ -114,11 +115,11 @@ function getNarrationEvents(
   if (status === "WAITING_ENTRY_WINDOW" && signal) {
     events.push({
       key: createEventKey(status, orderId, signalCreatedAt, signal),
-      text: `Sinal encontrado em ${formatSpokenActive(signal.symbol)}. Direção ${translateDirection(
-        signal.direction,
-      )}. Confiança ${formatPercent(signal.confidence)} por cento. Motivo: ${
-        formatSpokenReason(signal.reason)
-      }. Aguardando janela de entrada.`,
+      text: `Encontramos uma oportunidade em ${formatSpokenActive(signal.symbol)}. Direção ${
+        signal.direction
+      }. Confiança ${formatPercent(signal.confidence)} por cento. Motivo: ${
+        formatNarrationReason(formatFriendlyRobotText(signal.reason))
+      }.`,
     });
   }
 
@@ -152,7 +153,7 @@ function getNarrationEvents(
         signal,
         reason,
       ),
-      text: `Sinal bloqueado. Motivo: ${formatNarrationReason(reason)}.`,
+      text: "Nenhum sinal aprovado nesta análise.",
     });
   }
 
@@ -253,12 +254,6 @@ function getStopLimit(robotState: RobotState): "STOP_WIN" | "STOP_LOSS" | null {
   return null;
 }
 
-function translateDirection(direction: RobotDirection) {
-  if (direction === "CALL") return "compra";
-  if (direction === "PUT") return "venda";
-  return "aguardar";
-}
-
 function getPortugueseVoice() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -311,7 +306,7 @@ function formatSpokenReason(reason: string | null | undefined) {
 }
 
 function formatNarrationReason(reason: string) {
-  return formatSpokenReason(reason).replace(/[.!?]+$/, "");
+  return formatSpokenReason(formatFriendlyRobotText(reason)).replace(/[.!?]+$/, "");
 }
 
 function getRemainingNextCycleSeconds(robotState: RobotState) {

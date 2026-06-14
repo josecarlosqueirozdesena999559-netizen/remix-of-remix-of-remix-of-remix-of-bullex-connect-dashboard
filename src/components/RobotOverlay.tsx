@@ -346,8 +346,16 @@ function getOverlayContent(
         {signal.confidence != null ? (
           <span>Confiança: {formatPercentage(signal.confidence)}%</span>
         ) : null}
+        {signal.strategy_score != null ? (
+          <span>Score: {formatScore(signal.strategy_score)}</span>
+        ) : null}
         {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
-        {reasonLines.length > 0 ? <span>Motivo: {reasonLines.join(", ")}</span> : null}
+        {reasonLines.length > 0 ? (
+          <>
+            <span className="basis-full">Motivo:</span>
+            <span className="basis-full">{reasonLines.join(", ")}</span>
+          </>
+        ) : null}
       </>
     );
   }
@@ -527,6 +535,10 @@ function getViewportBounds() {
 
 function formatPercentage(value: number) {
   return Math.round(value);
+}
+
+function formatScore(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatMoney(value: number) {

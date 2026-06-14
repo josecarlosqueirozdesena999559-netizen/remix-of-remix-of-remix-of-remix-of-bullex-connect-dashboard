@@ -12,6 +12,7 @@ export type RobotSignal = {
   symbol: string;
   direction: RobotDirection;
   confidence: number | null;
+  strategy_score: number | null;
   payout: number | null;
   reason: string | null;
   created_at: string | null;
