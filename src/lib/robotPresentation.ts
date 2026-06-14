@@ -57,6 +57,7 @@ export function getRobotPresentation(
   const status = robotState.status;
   const trade = robotState.last_trade;
   const signal = robotState.pending_signal;
+  const bestCandidate = robotState.best_candidate;
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
 
   if (status === "RESULT_RECEIVED" && trade && result) {
@@ -178,8 +179,8 @@ export function getRobotPresentation(
   if (robotState.entry_window_open) {
     return {
       ...createPresentation("entry", "Entrada liberada", "Enviando ordem..."),
-      signal,
-      direction: signal?.direction ?? null,
+      signal: signal ?? bestCandidate,
+      direction: signal?.direction ?? bestCandidate?.direction ?? null,
     };
   }
 
@@ -202,7 +203,11 @@ export function getRobotPresentation(
   }
 
   if (status === "ANALYZING") {
-    return createPresentation("analyzing", "Analisando mercado...", "Escolhendo melhor ativo...");
+    return {
+      ...createPresentation("analyzing", "Analisando mercado...", "Escolhendo melhor ativo..."),
+      signal: bestCandidate,
+      direction: bestCandidate?.direction ?? null,
+    };
   }
 
   if (status === "WAITING_ANALYSIS_WINDOW") {
@@ -211,15 +216,20 @@ export function getRobotPresentation(
       Math.ceil(options.analysisWindowSeconds ?? robotState.seconds_until_analysis_window),
     );
 
-    return createPresentation(
-      "analyzing",
-      "Aguardando próxima vela",
-      remainingSeconds > 0 ? `Análise em ${formatDuration(remainingSeconds)}` : "Análise em 00:00",
-    );
+    return {
+      ...createPresentation(
+        "analyzing",
+        "Analisando mercado...",
+        bestCandidate ? `Melhor ativo: ${bestCandidate.symbol}` : "Escolhendo melhor ativo...",
+        remainingSeconds > 0 ? `Analise em ${formatDuration(remainingSeconds)}` : "Analise em 00:00",
+      ),
+      signal: bestCandidate,
+      direction: bestCandidate?.direction ?? null,
+    };
   }
 
   if (status === "WAITING_NEXT_CYCLE") {
-    return createNextCyclePresentation(robotState, now, options, "Próxima entrada em");
+    return createWaitingNextCyclePresentation(robotState, options);
   }
 
   if (trade && result) {
@@ -343,6 +353,42 @@ function createNextCyclePresentation(
     title,
     `Próxima entrada em ${formatDuration(remainingSeconds)}`,
   );
+}
+
+function createWaitingNextCyclePresentation(
+  robotState: RobotState,
+  options: RobotPresentationOptions = {},
+) {
+  const remainingSeconds = Math.max(
+    0,
+    Math.ceil(
+      options.nextCycleSeconds ??
+        robotState.display_countdown_seconds ??
+        robotState.seconds_until_next_cycle,
+    ),
+  );
+  const bestCandidate = robotState.best_candidate;
+
+  if (remainingSeconds <= 0) {
+    return {
+      ...createPresentation("entry", "Entrada liberada", "Enviando ordem..."),
+      signal: bestCandidate,
+      direction: bestCandidate?.direction ?? null,
+    };
+  }
+
+  const label = robotState.display_countdown_label?.trim() || "Entrada em";
+
+  return {
+    ...createPresentation(
+      "analyzing",
+      "Analisando mercado...",
+      bestCandidate ? `Melhor ativo: ${bestCandidate.symbol}` : null,
+      `${label} ${formatDuration(remainingSeconds)}`,
+    ),
+    signal: bestCandidate,
+    direction: bestCandidate?.direction ?? null,
+  };
 }
 
 function resolveNextCycleSeconds(

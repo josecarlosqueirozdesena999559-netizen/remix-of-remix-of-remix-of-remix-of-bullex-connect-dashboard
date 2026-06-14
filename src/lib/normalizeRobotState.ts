@@ -55,6 +55,7 @@ export function normalizeRobotState(input: unknown): RobotState {
         tradeValue.expires_in ??
         tradeValue.expiresIn,
     ) ?? 0;
+  const bestCandidate = normalizeSignal(value.best_candidate ?? value.bestCandidate);
   const pendingSignal =
     status === "WAITING_ENTRY_WINDOW"
       ? normalizeSignal(
@@ -135,6 +136,12 @@ export function normalizeRobotState(input: unknown): RobotState {
       0,
       normalizeNumber(value.seconds_until_entry_window ?? value.secondsUntilEntryWindow) ?? 0,
     ),
+    display_countdown_label: normalizeOptionalText(
+      value.display_countdown_label ?? value.displayCountdownLabel,
+    ),
+    display_countdown_seconds: normalizeNumber(
+      value.display_countdown_seconds ?? value.displayCountdownSeconds,
+    ),
     expiration_seconds: Math.max(0, expirationSeconds),
     expires_at: expiresAt,
     entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
@@ -143,6 +150,7 @@ export function normalizeRobotState(input: unknown): RobotState {
     ),
     result_waiting: normalizeBoolean(value.result_waiting ?? value.resultWaiting),
     pending_signal: pendingSignal,
+    best_candidate: bestCandidate,
     last_signal: normalizeSignal(value.last_signal ?? value.lastSignal),
     last_trade: normalizeTrade(tradeInput),
     wins: Math.max(0, normalizeNumber(value.wins) ?? 0),

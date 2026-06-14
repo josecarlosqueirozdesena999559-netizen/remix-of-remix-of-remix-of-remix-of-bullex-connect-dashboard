@@ -63,9 +63,12 @@ export function RobotOverlay({
     robotState?.fetched_at,
   );
   const nextCycleSeconds = useSmoothCountdown(
-    robotState?.seconds_until_next_cycle,
+    robotState?.display_countdown_seconds ?? robotState?.seconds_until_next_cycle,
     getNextCycleResetKey(robotState),
-    Boolean(robotState?.enabled && robotState.seconds_until_next_cycle > 0),
+    Boolean(
+      robotState?.enabled &&
+        ((robotState.display_countdown_seconds ?? robotState.seconds_until_next_cycle) > 0),
+    ),
     robotState?.fetched_at,
   );
   const smoothEntryWindowSeconds = useSmoothCountdown(
@@ -288,6 +291,7 @@ function getNextCycleResetKey(robotState: RobotState | undefined) {
   return [
     robotState.status,
     robotState.next_cycle_at ?? "-",
+    robotState.display_countdown_label ?? "-",
     robotState.last_trade?.finished_at ?? "-",
   ].join("|");
 }
@@ -375,7 +379,7 @@ function getOverlayContent(
           <span>Confiança: {formatPercentage(signal.confidence)}%</span>
         ) : null}
         {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
-        <span>Estratégias usadas: {usedStrategies.join(", ")}</span>
+        <span>Estratégia: {usedStrategies.join(", ")}</span>
       </>
     );
   }

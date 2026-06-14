@@ -57,12 +57,15 @@ export type RobotState = {
   seconds_until_analysis_window: number;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
+  display_countdown_label: string | null;
+  display_countdown_seconds: number | null;
   expiration_seconds: number;
   expires_at: string | null;
   entry_window_open: boolean;
   operation_in_progress: boolean;
   result_waiting: boolean;
   pending_signal: RobotSignal | null;
+  best_candidate: RobotSignal | null;
   last_signal: RobotSignal | null;
   last_trade: RobotTrade | null;
   wins: number;
@@ -139,12 +142,15 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
+    display_countdown_label: null,
+    display_countdown_seconds: null,
     expiration_seconds: 0,
     expires_at: null,
     entry_window_open: false,
     operation_in_progress: false,
     result_waiting: false,
     pending_signal: null,
+    best_candidate: null,
     last_signal: null,
     last_trade: null,
     wins: 0,

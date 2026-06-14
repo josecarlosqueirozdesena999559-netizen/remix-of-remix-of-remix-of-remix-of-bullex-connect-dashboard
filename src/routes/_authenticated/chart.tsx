@@ -13,6 +13,7 @@ import {
 import { BarChart3, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useMarketData } from "@/hooks/useMarketData";
+import { useRobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
@@ -40,6 +41,9 @@ function MarketPage() {
   const [followPrice, setFollowPrice] = useState(true);
   const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
   const account = useBullExAccount();
+  const robotState = useRobotState(user?.id);
+  const bestCandidate = robotState.data?.best_candidate ?? null;
+  const chartSymbol = bestCandidate?.symbol ?? selectedSymbol;
 
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ChartApi | null>(null);
@@ -72,7 +76,7 @@ function MarketPage() {
   });
 
   const assets = assetsQuery.data ?? EMPTY_ASSETS;
-  const selected = assets.find((asset) => asset.symbol === selectedSymbol) ?? null;
+  const selected = assets.find((asset) => asset.symbol === chartSymbol) ?? null;
   const {
     candles,
     candlesError,
@@ -84,10 +88,11 @@ function MarketPage() {
     payoutError,
     pollingStatus,
     selectedPayout,
-  } = useMarketData(selectedSymbol || null);
+  } = useMarketData(chartSymbol || null);
 
   useEffect(() => {
     if (assets.length === 0) return;
+    if (bestCandidate?.symbol) return;
     if (assets.some((asset) => asset.symbol === selectedSymbol)) return;
 
     const defaultAsset = assets.find((asset) => asset.symbol === "EURUSD-OTC") ?? assets[0];
@@ -95,7 +100,7 @@ function MarketPage() {
     if (defaultAsset?.symbol) {
       setSelectedSymbol(defaultAsset.symbol);
     }
-  }, [assets, selectedSymbol]);
+  }, [assets, bestCandidate?.symbol, selectedSymbol]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -224,7 +229,7 @@ function MarketPage() {
     if (!chart || !series) return;
 
     series.applyOptions({
-      priceFormat: buildPriceFormat(selectedSymbol, lastPrice),
+      priceFormat: buildPriceFormat(chartSymbol, lastPrice),
     });
     if (candles.length > 0) {
       series.setData(candles);
@@ -237,21 +242,21 @@ function MarketPage() {
       visible: true,
     });
 
-    const symbolChanged = prevSymbolRef.current !== selectedSymbol;
+    const symbolChanged = prevSymbolRef.current !== chartSymbol;
     console.log("[CHART UPDATE]", {
-      symbol: selectedSymbol,
+      symbol: chartSymbol,
       candles: candles.length,
       symbolChanged,
     });
 
     if (symbolChanged) {
       chart.timeScale().fitContent();
-      prevSymbolRef.current = selectedSymbol;
+      prevSymbolRef.current = chartSymbol;
     } else if (followPrice && candles.length > 0) {
       chart.timeScale().scrollToRealTime();
-      console.log("[CHART FOLLOW PRICE]", { symbol: selectedSymbol, enabled: true });
+      console.log("[CHART FOLLOW PRICE]", { symbol: chartSymbol, enabled: true });
     }
-  }, [candles, followPrice, lastPrice, selectedSymbol]);
+  }, [candles, chartSymbol, followPrice, lastPrice]);
 
   const sessionMissing =
     isSessionError(account.error) ||
@@ -304,9 +309,9 @@ function MarketPage() {
               Ativo
             </label>
             <select
-              value={selectedSymbol}
+              value={chartSymbol}
               onChange={(event) => setSelectedSymbol(event.target.value)}
-              disabled={assetsQuery.isLoading || assets.length === 0}
+              disabled={Boolean(bestCandidate) || assetsQuery.isLoading || assets.length === 0}
               className="w-full rounded-lg border border-border bg-input px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
             >
               <option value="">
@@ -316,15 +321,21 @@ function MarketPage() {
                     ? "Nenhum ativo binário disponível no momento."
                     : "Selecione um ativo"}
               </option>
+              {bestCandidate && !assets.some((asset) => asset.symbol === bestCandidate.symbol) ? (
+                <option value={bestCandidate.symbol}>
+                  {`${bestCandidate.symbol} | Melhor ativo`}
+                </option>
+              ) : null}
               {assets.map((asset) => (
                 <option key={`${asset.symbol}-${asset.active_id}`} value={asset.symbol}>
-                  {`${asset.symbol} | ID ${asset.active_id} | ${formatPayoutValue(getAssetPayout(asset, selectedSymbol, selectedPayout))}`}
+                  {`${asset.symbol} | ID ${asset.active_id} | ${formatPayoutValue(getAssetPayout(asset, chartSymbol, selectedPayout))}`}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {bestCandidate ? <BadgeLabel label="Melhor ativo" value={bestCandidate.symbol} /> : null}
             <BadgeLabel
               label="Payout"
               value={isPayoutLoading ? "..." : formatPayoutValue(selectedPayout)}
@@ -375,7 +386,7 @@ function MarketPage() {
               onClick={() => {
                 setFollowPrice((current) => {
                   const next = !current;
-                  console.log("[CHART FOLLOW PRICE]", { symbol: selectedSymbol, enabled: next });
+                  console.log("[CHART FOLLOW PRICE]", { symbol: chartSymbol, enabled: next });
                   if (next) {
                     chartRef.current?.timeScale().scrollToRealTime();
                   }
@@ -437,13 +448,13 @@ function MarketPage() {
             </div>
           )}
 
-          {selectedSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
+          {chartSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
             <div className="mt-4 flex items-center justify-center text-sm text-muted-foreground">
               Nenhum candle normalizado retornado
             </div>
           )}
 
-          {!selectedSymbol && (
+          {!chartSymbol && (
             <div className="mt-4 flex items-center justify-center text-sm text-muted-foreground">
               Selecione um ativo para abrir o grafico.
             </div>
@@ -476,14 +487,14 @@ function MarketPage() {
                   <td className="px-5 py-3 font-mono">{formatNumber(candle.close)}</td>
                 </tr>
               ))}
-              {selectedSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
+              {chartSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
                 <tr>
                   <td className="px-5 py-6 text-muted-foreground" colSpan={5}>
                     Nenhum candle normalizado retornado
                   </td>
                 </tr>
               )}
-              {!selectedSymbol && (
+              {!chartSymbol && (
                 <tr>
                   <td className="px-5 py-6 text-muted-foreground" colSpan={5}>
                     Selecione um ativo para buscar candles.

@@ -75,8 +75,8 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
   assert.equal(received.title, "WIN");
   assert.equal(received.kind, "result");
   assert.equal(beforeTimeout.title, "WIN");
-  assert.equal(afterTimeout.title, "Próxima entrada em 00:42");
-  assert.equal(afterTimeout.detail, null);
+  assert.equal(afterTimeout.title, "Analisando mercado...");
+  assert.equal(afterTimeout.footer, "Entrada em 00:42");
 });
 
 test("polling acelera enquanto aguarda resultado", () => {
@@ -127,12 +127,15 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
+    display_countdown_label: null,
+    display_countdown_seconds: null,
     expiration_seconds: 0,
     expires_at: null,
     entry_window_open: false,
     operation_in_progress: false,
     result_waiting: false,
     pending_signal: null,
+    best_candidate: null,
     last_signal: null,
     last_trade: null,
     wins: 0,

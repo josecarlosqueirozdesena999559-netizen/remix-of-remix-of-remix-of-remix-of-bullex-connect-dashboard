@@ -19,9 +19,13 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   });
   const { settings, saveSettings } = useRobotSettings(userId);
   const nextCycleSeconds = useSmoothCountdown(
-    effectiveRobotState?.seconds_until_next_cycle,
+    effectiveRobotState?.display_countdown_seconds ?? effectiveRobotState?.seconds_until_next_cycle,
     getNextCycleResetKey(effectiveRobotState),
-    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_next_cycle > 0),
+    Boolean(
+      effectiveRobotState?.enabled &&
+        ((effectiveRobotState.display_countdown_seconds ??
+          effectiveRobotState.seconds_until_next_cycle) > 0),
+    ),
     effectiveRobotState?.fetched_at,
   );
   const narrator = useRobotNarrator(
@@ -72,6 +76,7 @@ function getNextCycleResetKey(robotState: RobotState | undefined) {
   return [
     robotState.status,
     robotState.next_cycle_at ?? "-",
+    robotState.display_countdown_label ?? "-",
     robotState.last_trade?.finished_at ?? "-",
   ].join("|");
 }
