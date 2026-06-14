@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -9,9 +9,17 @@ import {
   Users,
 } from "lucide-react";
 import { ApiError, apiRequest } from "@/lib/api";
+import { isAdminUser } from "@/lib/adminAccess";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin - BullEx AutoBot" }] }),
+  beforeLoad: async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !isAdminUser(data.session?.user)) {
+      throw redirect({ to: "/dashboard", replace: true });
+    }
+  },
   component: AdminPage,
 });
 
@@ -88,11 +96,7 @@ function AdminPage() {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <AdminStat
-          label="Usuários"
-          value={formatNumber(overview.stats.users)}
-          Icon={Users}
-        />
+        <AdminStat label="Usuários" value={formatNumber(overview.stats.users)} Icon={Users} />
         <AdminStat
           label="Planos ativos"
           value={formatNumber(overview.stats.activePlans)}
@@ -225,10 +229,15 @@ function PlanList({ title, users, empty }: { title: string; users: AdminUser[]; 
       <h2 className="font-semibold">{title}</h2>
       <div className="mt-4 space-y-3">
         {users.slice(0, 6).map((user) => (
-          <div key={`${title}-${user.id}`} className="rounded-lg border border-border bg-background/40 p-3">
+          <div
+            key={`${title}-${user.id}`}
+            className="rounded-lg border border-border bg-background/40 p-3"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{user.name || user.email || user.id}</div>
+                <div className="truncate text-sm font-semibold">
+                  {user.name || user.email || user.id}
+                </div>
                 <div className="truncate text-xs text-muted-foreground">{user.plan}</div>
               </div>
               <div className="text-right text-xs font-semibold">
@@ -268,7 +277,9 @@ function normalizeAdminOverview(input: unknown): AdminOverview {
 
   return {
     stats: {
-      users: normalizeNumber(statsValue.users ?? statsValue.total_users ?? statsValue.totalUsers) ?? users.length,
+      users:
+        normalizeNumber(statsValue.users ?? statsValue.total_users ?? statsValue.totalUsers) ??
+        users.length,
       activePlans:
         normalizeNumber(statsValue.active_plans ?? statsValue.activePlans) ??
         users.filter((user) => user.status === "active").length,
@@ -279,8 +290,9 @@ function normalizeAdminOverview(input: unknown): AdminOverview {
         normalizeNumber(statsValue.active_trials ?? statsValue.activeTrials) ??
         users.filter((user) => user.status === "trial").length,
       totalRevenue:
-        normalizeNumber(statsValue.total_revenue ?? statsValue.totalRevenue ?? statsValue.real_value) ??
-        users.reduce((sum, user) => sum + (user.status === "active" ? user.amount : 0), 0),
+        normalizeNumber(
+          statsValue.total_revenue ?? statsValue.totalRevenue ?? statsValue.real_value,
+        ) ?? users.reduce((sum, user) => sum + (user.status === "active" ? user.amount : 0), 0),
       currency,
     },
     users,
@@ -293,7 +305,9 @@ function normalizeAdminUser(input: unknown): AdminUser | null {
   if (!id) return null;
 
   const planValue = asRecord(value.plan ?? value.subscription);
-  const status = normalizeStatus(value.status ?? value.plan_status ?? value.planStatus ?? planValue.status);
+  const status = normalizeStatus(
+    value.status ?? value.plan_status ?? value.planStatus ?? planValue.status,
+  );
   const currency = normalizeText(value.currency ?? planValue.currency, "BRL");
 
   return {
@@ -302,7 +316,8 @@ function normalizeAdminUser(input: unknown): AdminUser | null {
     email: normalizeText(value.email),
     plan: normalizeText(value.plan_name ?? value.planName ?? planValue.name ?? value.plan, "-"),
     status,
-    amount: normalizeNumber(value.amount ?? value.price ?? planValue.amount ?? planValue.price) ?? 0,
+    amount:
+      normalizeNumber(value.amount ?? value.price ?? planValue.amount ?? planValue.price) ?? 0,
     currency,
     startedAt: normalizeOptionalText(value.started_at ?? value.startedAt ?? planValue.started_at),
     expiresAt: normalizeOptionalText(value.expires_at ?? value.expiresAt ?? planValue.expires_at),

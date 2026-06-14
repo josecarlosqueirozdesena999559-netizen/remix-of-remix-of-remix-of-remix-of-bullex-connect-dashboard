@@ -15,6 +15,8 @@ export function useRobotNarrator(
   const spokenKeysRef = useRef<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState(false);
   const [speechCycle, setSpeechCycle] = useState(0);
+  const previousStatusRef = useRef<string | null>(null);
+  const analysisSequenceRef = useRef(0);
   const supported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
@@ -29,14 +31,23 @@ export function useRobotNarrator(
 
   useEffect(() => {
     if (!supported || !enabled || !robotState) return;
+    if (previousStatusRef.current !== robotState.status) {
+      if (robotState.status === "ANALYZING") {
+        analysisSequenceRef.current += 1;
+      }
+      previousStatusRef.current = robotState.status;
+    }
+
     const stopLimit = getStopLimit(robotState);
     if ((!robotState.enabled || robotState.status === "STOPPED") && !stopLimit) return;
     if (document.visibilityState !== "visible") return;
     if (speaking || window.speechSynthesis.speaking || window.speechSynthesis.pending) return;
 
-    const event = getNarrationEvents(robotState, nextCycleSeconds).find(
-      (nextEvent) => !spokenKeysRef.current.has(nextEvent.key),
-    );
+    const event = getNarrationEvents(
+      robotState,
+      nextCycleSeconds,
+      analysisSequenceRef.current,
+    ).find((nextEvent) => !spokenKeysRef.current.has(nextEvent.key));
     if (!event || spokenKeysRef.current.has(event.key)) return;
 
     const utterance = new SpeechSynthesisUtterance(event.text);
@@ -79,6 +90,7 @@ export function useRobotNarrator(
 function getNarrationEvents(
   robotState: RobotState,
   nextCycleSeconds: number | null,
+  analysisSequence: number,
 ): NarrationEvent[] {
   const events: NarrationEvent[] = [];
   const status = robotState.status;
@@ -88,6 +100,12 @@ function getNarrationEvents(
   const signalCreatedAt = signal?.created_at ?? "-";
   const result = getTradeResult(trade);
   const stopLimit = getStopLimit(robotState);
+  const operationOpen =
+    robotState.operation_in_progress ||
+    robotState.result_waiting ||
+    status === "SENDING_ORDER" ||
+    status === "PENDING_RESULT" ||
+    trade?.result === "PENDING_RESULT";
 
   if (stopLimit) {
     events.push({
@@ -121,17 +139,10 @@ function getNarrationEvents(
     });
   }
 
-  if (
-    !signal &&
-    !trade &&
-    robotState.connected !== false &&
-    status !== "STOPPED" &&
-    status !== "ACCOUNT_DISCONNECTED" &&
-    status !== "SIGNAL_REJECTED"
-  ) {
+  if (status === "ANALYZING" && !operationOpen) {
     events.push({
-      key: createEventKey("ROBOT_ANALYSIS_STARTED", "-", "-", null),
-      text: "Robô conectado. Vou começar as análises do mercado agora.",
+      key: `ANALYSIS_STARTED|${analysisSequence}`,
+      text: "Iniciando nova análise de mercado.",
     });
   }
 
@@ -186,26 +197,14 @@ function getNarrationEvents(
 
   if (status === "WAITING_NEXT_CYCLE") {
     const remainingSeconds = nextCycleSeconds ?? getRemainingNextCycleSeconds(robotState);
-    if (remainingSeconds <= 0) {
+    if (remainingSeconds > 0) {
       events.push({
-        key: createEventKey(
-          "NEXT_CYCLE_STARTED",
-          orderId,
-          signalCreatedAt,
-          signal,
-          robotState.next_cycle_at,
-        ),
-        text: "Iniciando nova análise de mercado.",
+        key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
+        text: `Robô vai analisar o mercado. A próxima entrada está prevista para daqui a ${formatSpokenDuration(
+          remainingSeconds,
+        )}.`,
       });
-      return events;
     }
-
-    events.push({
-      key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
-      text: `Robô vai analisar o mercado. A próxima entrada está prevista para daqui a ${formatSpokenDuration(
-        remainingSeconds,
-      )}.`,
-    });
   }
 
   return events;

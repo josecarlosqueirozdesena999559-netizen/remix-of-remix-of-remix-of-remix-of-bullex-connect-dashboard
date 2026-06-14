@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
 import { FloatingRobot } from "@/components/FloatingRobot";
+import { isAdminUser } from "@/lib/adminAccess";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -22,14 +23,16 @@ const nav = [
   { to: "/robot", label: "Robo", Icon: Bot },
   { to: "/history", label: "Historico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
-  { to: "/admin", label: "Admin", Icon: ShieldCheck },
   { to: "/settings", label: "Configuracoes", Icon: Settings },
 ] as const;
+
+const adminNav = { to: "/admin", label: "Admin", Icon: ShieldCheck } as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { user } = useAuth();
+  const visibleNav = isAdminUser(user) ? [...nav.slice(0, -1), adminNav, nav.at(-1)!] : nav;
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -49,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex md:flex-col gap-1 p-3 flex-1 overflow-x-auto">
-          {nav.map(({ to, label, Icon }) => {
+          {visibleNav.map(({ to, label, Icon }) => {
             const active = pathname === to || pathname.startsWith(to + "/");
             return (
               <Link

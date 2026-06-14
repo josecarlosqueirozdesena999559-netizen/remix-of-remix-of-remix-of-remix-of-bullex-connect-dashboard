@@ -140,7 +140,7 @@ export function getRobotPresentation(
     return {
       ...createPresentation(
         "operation",
-        "Operação em andamento",
+        remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
         null,
         remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
       ),
