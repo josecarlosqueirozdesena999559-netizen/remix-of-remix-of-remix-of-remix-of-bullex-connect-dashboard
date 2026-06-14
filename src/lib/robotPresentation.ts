@@ -128,19 +128,29 @@ export function getRobotPresentation(
   }
 
   if (status === "SENDING_ORDER") {
+    return createPresentation("operation", "Entrada liberada", "Enviando ordem...");
+  }
+
+  if (status === "PENDING_RESULT") {
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil(options.expirationSeconds ?? robotState.expiration_seconds),
+    );
+
     return {
-      ...createPresentation("operation", "Entrada liberada", "Enviando ordem..."),
+      ...createPresentation(
+        "operation",
+        "Operação em andamento",
+        null,
+        remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
+      ),
       trade,
-      signal,
-      direction: trade?.direction ?? signal?.direction ?? null,
+      direction: trade?.direction ?? null,
     };
   }
 
   const operationInProgress =
-    !result &&
-    (robotState.operation_in_progress ||
-      status === "PENDING_RESULT" ||
-      trade?.result === "PENDING_RESULT");
+    !result && (robotState.operation_in_progress || trade?.result === "PENDING_RESULT");
   const resultWaiting = !result && robotState.result_waiting;
 
   if (resultWaiting) {
@@ -166,8 +176,7 @@ export function getRobotPresentation(
         remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
       ),
       trade,
-      signal: trade ? null : signal,
-      direction: trade?.direction ?? signal?.direction ?? null,
+      direction: trade?.direction ?? null,
     };
   }
 
@@ -188,7 +197,7 @@ export function getRobotPresentation(
     };
   }
 
-  if (signal && status !== "SIGNAL_REJECTED") {
+  if (signal && status === "WAITING_ENTRY_WINDOW") {
     const remainingSeconds = Math.max(
       0,
       Math.ceil(options.entryWindowSeconds ?? robotState.seconds_until_entry_window),

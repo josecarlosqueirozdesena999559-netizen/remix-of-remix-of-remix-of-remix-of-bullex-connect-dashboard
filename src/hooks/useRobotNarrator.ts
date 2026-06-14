@@ -42,7 +42,7 @@ export function useRobotNarrator(
     const utterance = new SpeechSynthesisUtterance(event.text);
     utterance.lang = "pt-BR";
     utterance.voice = getPortugueseVoice();
-    utterance.rate = 0.92;
+    utterance.rate = 0.78;
     utterance.pitch = 1;
     utterance.onstart = () => {
       spokenKeysRef.current.add(event.key);
@@ -106,14 +106,14 @@ function getNarrationEvents(
     return events;
   }
 
-  if (signal && status !== "SIGNAL_REJECTED" && status !== "ORDER_REJECTED") {
+  if (signal && status === "WAITING_ENTRY_WINDOW") {
     events.push({
       key: createSignalEventKey(signal),
       text: `Sinal encontrado em ${formatSpokenActive(signal.symbol)}. Direção ${
         signal.direction
-      }. Estratégia usada: ${formatNarrationReason(
+      }. Estratégia usada. ${formatSpokenStrategy(
         signal.strategy_name ?? "não informada",
-      )}. Motivo: ${formatNarrationReason(
+      )}. Motivo. ${formatNarrationReason(
         signal.strategy_reason ?? signal.reason ?? "não informado",
       )}. Confiança ${formatPercent(signal.confidence)} por cento. Payout ${formatPercent(
         signal.payout,
@@ -143,7 +143,7 @@ function getNarrationEvents(
   }
 
   if (!result && (status === "PENDING_RESULT" || robotState.operation_in_progress)) {
-    const active = trade?.active ?? signal?.symbol;
+    const active = trade?.active;
     if (active) {
       events.push({
         key: createEventKey("PENDING_RESULT", orderId, signalCreatedAt, signal),
@@ -312,7 +312,28 @@ function formatSpokenReason(reason: string | null | undefined) {
 }
 
 function formatNarrationReason(reason: string) {
-  return formatSpokenReason(formatFriendlyRobotText(reason)).replace(/[.!?]+$/, "");
+  return formatTechnicalSpeech(formatSpokenReason(formatFriendlyRobotText(reason))).replace(
+    /[.!?]+$/,
+    "",
+  );
+}
+
+function formatSpokenStrategy(strategy: string) {
+  return formatTechnicalSpeech(formatFriendlyRobotText(strategy)).replace(/[.!?]+$/, "");
+}
+
+function formatTechnicalSpeech(value: string) {
+  return value
+    .replace(/([a-zà-öø-ÿ])([A-Z])/g, "$1 $2")
+    .replace(/[_/\\-]+/g, " ")
+    .replace(/\bRSI\b/gi, "R S I")
+    .replace(/\bMACD\b/gi, "M A C D")
+    .replace(/\bEMA\b/gi, "E M A")
+    .replace(/\bSMA\b/gi, "S M A")
+    .replace(/\bADX\b/gi, "A D X")
+    .replace(/\bOTC\b/gi, "O T C")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getRemainingNextCycleSeconds(robotState: RobotState) {
