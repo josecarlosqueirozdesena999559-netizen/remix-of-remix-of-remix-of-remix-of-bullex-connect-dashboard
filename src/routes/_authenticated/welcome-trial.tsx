@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Sparkles, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import { initTrial, TRIAL_DAYS, TRIAL_DISCOUNT } from "@/lib/trial";
 
 export const Route = createFileRoute("/_authenticated/welcome-trial")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Bem-vindo — Período grátis" }] }),
+  head: () => ({ meta: [{ title: "Bem-vindo - Periodo gratis" }] }),
   component: WelcomeTrial,
 });
 
@@ -18,39 +18,39 @@ function WelcomeTrial() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
-      <div className="max-w-lg w-full bg-card border border-border rounded-2xl p-8 text-center shadow-sm">
-        <div className="w-16 h-16 rounded-2xl bg-primary/15 mx-auto flex items-center justify-center mb-4">
-          <Sparkles className="w-8 h-8 text-primary" />
+      <div className="max-w-lg w-full rounded-2xl border border-border bg-card p-8 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <Sparkles className="h-8 w-8" />
         </div>
-        <h1 className="text-2xl font-bold mb-2">Seu teste grátis começou! 🎉</h1>
-        <p className="text-muted-foreground mb-6">
-          Você tem <strong>{TRIAL_DAYS} dias</strong> de acesso total ao BullEx AutoBot, sem
+        <h1 className="mb-2 text-2xl font-bold">Seu teste gratis comecou!</h1>
+        <p className="mb-6 text-muted-foreground">
+          Voce tem <strong>{TRIAL_DAYS} dias</strong> de acesso total ao BullEx AutoBot, sem
           compromisso.
         </p>
 
-        <ul className="text-left space-y-2 mb-6">
+        <ul className="mb-6 space-y-2 text-left">
           {[
-            "Robô de operações automáticas",
-            "Gráficos em tempo real",
-            "Configurações de Stop Win/Loss e Martingale",
-          ].map((t) => (
-            <li key={t} className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-              {t}
+            "Robo de operacoes automaticas",
+            "Graficos em tempo real",
+            "Configuracoes de Stop Win/Loss e Martingale",
+          ].map((text) => (
+            <li key={text} className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+              {text}
             </li>
           ))}
         </ul>
 
-        <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-3 mb-6 text-sm">
+        <div className="mb-6 rounded-lg border border-border bg-background/40 px-4 py-3 text-sm">
           Assine agora e ganhe{" "}
-          <span className="font-bold text-primary">-{TRIAL_DISCOUNT}% de desconto</span>.
+          <span className="font-bold text-foreground">-{TRIAL_DISCOUNT}% de desconto</span>.
         </div>
 
         <button
           onClick={() => navigate({ to: "/dashboard", replace: true })}
-          className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold shadow-sm hover:opacity-90 transition"
+          className="w-full rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition hover:opacity-90"
         >
-          Começar agora
+          Comecar agora
         </button>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult } from "@/
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
 import { getRobotPresentation } from "@/lib/robotPresentation";
+import { readRobotSettings } from "@/lib/robotSettings";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
@@ -16,12 +17,6 @@ const FIXED_CYCLE_MINUTES = 10;
 const FIXED_MIN_CONFIDENCE = 80;
 const FIXED_MIN_PAYOUT = 80;
 const ROBOT_START_AUDIO_SRC = "/robot-start.mp3";
-
-const DEFAULT_CONFIG = {
-  stopWin: 50,
-  stopLoss: 30,
-  entry: 2,
-};
 
 function RobotPage() {
   const { user } = useAuth();
@@ -62,18 +57,21 @@ function RobotPage() {
       if (robotEnabled) {
         unwrapApiResult(await robotConfig({ enabled: false }));
       } else {
+        const settings = readRobotSettings();
         unwrapApiResult(
           await robotConfig({
             enabled: true,
             account_mode: realSelected ? "REAL" : "DEMO",
             allow_real: realSelected,
             confirm_real: realSelected,
-            entry_value: DEFAULT_CONFIG.entry,
+            entry_value: settings.entryValue,
+            martingale_g1: settings.g1,
+            g1: settings.g1,
             cycle_minutes: FIXED_CYCLE_MINUTES,
             min_confidence: FIXED_MIN_CONFIDENCE,
             min_payout: FIXED_MIN_PAYOUT,
-            stop_win: DEFAULT_CONFIG.stopWin,
-            stop_loss: DEFAULT_CONFIG.stopLoss,
+            stop_win: settings.stopWin,
+            stop_loss: settings.stopLoss,
           }),
         );
         unwrapApiResult(await robotStart());

@@ -37,28 +37,26 @@
 
 :root {
   --radius: 0.75rem;
-  /* Dark fintech / trading - based on #1d1d1d background */
-  --background: #1d1d1d;
-  --foreground: #f0f0f0;
+  --background: #000020;
+  --foreground: #ffffff;
 
-  --card: #242424;
-  --card-foreground: #f0f0f0;
+  --card: #03032c;
+  --card-foreground: #ffffff;
 
-  --popover: #242424;
-  --popover-foreground: #f0f0f0;
+  --popover: #050532;
+  --popover-foreground: #ffffff;
 
-  /* Avocado green */
-  --primary: oklch(0.72 0.17 138);
-  --primary-foreground: oklch(0.12 0.03 150);
+  --primary: #ffffff;
+  --primary-foreground: #000020;
 
-  --secondary: #2a2a2a;
-  --secondary-foreground: #e0e0e0;
+  --secondary: #09093d;
+  --secondary-foreground: #ffffff;
 
-  --muted: #2a2a2a;
-  --muted-foreground: #a0a0a0;
+  --muted: #09093d;
+  --muted-foreground: #c3c6e8;
 
-  --accent: #2e2e2e;
-  --accent-foreground: #e8e8e8;
+  --accent: #10104b;
+  --accent-foreground: #ffffff;
 
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.99 0 0);
@@ -69,9 +67,9 @@
   --warning: oklch(0.78 0.15 75);
   --warning-foreground: oklch(0.2 0.03 80);
 
-  --border: #333333;
-  --input: #2a2a2a;
-  --ring: oklch(0.72 0.17 138);
+  --border: #20205d;
+  --input: #050532;
+  --ring: #ffffff;
 }
 
 @layer base {
@@ -81,5 +79,10 @@
     background: var(--color-background);
     color: var(--color-foreground);
     min-height: 100vh;
+  }
+
+  ::selection {
+    background: #ffffff;
+    color: #000020;
   }
 }

@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Bot } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { initTrial } from "@/lib/trial";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Entrar — BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Entrar - BullEx AutoBot" }] }),
   component: AuthPage,
 });
 
@@ -52,63 +53,61 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 text-foreground">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-2xl shadow-md">
-              🤖
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Bot className="h-6 w-6" />
             </div>
             <div className="text-left">
-              <div className="font-bold text-xl leading-tight">BullEx AutoBot</div>
-              <div className="text-xs text-muted-foreground">Painel de operações</div>
+              <div className="text-xl font-bold leading-tight">BullEx AutoBot</div>
+              <div className="text-xs text-muted-foreground">Painel de operacoes</div>
             </div>
           </div>
         </div>
 
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-          <h1 className="text-xl font-semibold mb-1">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h1 className="mb-1 text-xl font-semibold">
             {mode === "login" ? "Entrar" : "Criar conta"}
           </h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            Acesse sua plataforma de operações.
-          </p>
+          <p className="mb-6 text-sm text-muted-foreground">Acesse sua plataforma de operacoes.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Email</label>
+              <label className="mb-1.5 block text-sm font-medium">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="voce@email.com"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-input border border-border focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none transition"
+                className="w-full rounded-lg border border-border bg-input px-3.5 py-2.5 outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Senha</label>
+              <label className="mb-1.5 block text-sm font-medium">Senha</label>
               <input
                 type="password"
                 required
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-input border border-border focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none transition"
+                placeholder="********"
+                className="w-full rounded-lg border border-border bg-input px-3.5 py-2.5 outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
             </div>
 
-            {error && (
-              <div className="text-sm p-3 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
+            {error ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
               </div>
-            )}
+            ) : null}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:opacity-90 transition disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Cadastrar"}
             </button>
@@ -121,9 +120,9 @@ function AuthPage() {
                 setMode(mode === "login" ? "signup" : "login");
                 setError(null);
               }}
-              className="text-primary hover:underline font-medium"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              {mode === "login" ? "Criar uma conta" : "Já tenho conta — entrar"}
+              {mode === "login" ? "Criar uma conta" : "Ja tenho conta - entrar"}
             </button>
           </div>
         </div>

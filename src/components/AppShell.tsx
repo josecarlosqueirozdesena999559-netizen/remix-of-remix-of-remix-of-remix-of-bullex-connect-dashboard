@@ -1,27 +1,27 @@
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import {
-  LayoutDashboard,
-  CandlestickChart,
   Bot,
-  Plug,
-  History,
+  CandlestickChart,
   CreditCard,
-  Settings,
+  History,
+  LayoutDashboard,
   LogOut,
+  Plug,
+  Settings,
 } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
 import { FloatingRobot } from "@/components/FloatingRobot";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { to: "/chart", label: "Gráfico", Icon: CandlestickChart },
+  { to: "/chart", label: "Grafico", Icon: CandlestickChart },
   { to: "/bullex", label: "BullEx", Icon: Plug },
-  { to: "/robot", label: "Robô", Icon: Bot },
-  { to: "/history", label: "Histórico", Icon: History },
+  { to: "/robot", label: "Robo", Icon: Bot },
+  { to: "/history", label: "Historico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
-  { to: "/settings", label: "Configurações", Icon: Settings },
+  { to: "/settings", label: "Configuracoes", Icon: Settings },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -35,11 +35,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row w-full">
+    <div className="min-h-screen flex flex-col md:flex-row w-full bg-background text-foreground">
       <aside className="md:w-64 md:min-h-screen bg-card border-r border-border flex md:flex-col">
-        <div className="p-6 flex items-center gap-2 border-b border-border">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-xl">
-            🤖
+        <div className="p-6 flex items-center gap-3 border-b border-border">
+          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+            <Bot className="h-5 w-5" />
           </div>
           <div>
             <div className="font-bold leading-tight">BullEx</div>
@@ -56,8 +56,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 preload="render"
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                   active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground hover:bg-accent"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="text-xs text-muted-foreground truncate mb-2">{user?.email}</div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 text-sm py-2 px-3 rounded-lg border border-border hover:bg-accent transition-colors"
+            className="w-full flex items-center justify-center gap-2 text-sm py-2 px-3 rounded-lg border border-border bg-background/40 hover:bg-accent transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sair
           </button>
