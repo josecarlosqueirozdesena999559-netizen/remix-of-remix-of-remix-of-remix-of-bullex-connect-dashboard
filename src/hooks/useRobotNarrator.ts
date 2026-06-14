@@ -6,7 +6,11 @@ type NarrationEvent = {
   text: string;
 };
 
-export function useRobotNarrator(robotState: RobotState | undefined, enabled: boolean) {
+export function useRobotNarrator(
+  robotState: RobotState | undefined,
+  enabled: boolean,
+  nextCycleSeconds: number | null = null,
+) {
   const spokenKeysRef = useRef<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState(false);
   const [speechCycle, setSpeechCycle] = useState(0);
@@ -25,7 +29,7 @@ export function useRobotNarrator(robotState: RobotState | undefined, enabled: bo
     if (document.visibilityState !== "visible") return;
     if (speaking || window.speechSynthesis.speaking || window.speechSynthesis.pending) return;
 
-    const event = getNarrationEvents(robotState).find(
+    const event = getNarrationEvents(robotState, nextCycleSeconds).find(
       (nextEvent) => !spokenKeysRef.current.has(nextEvent.key),
     );
     if (!event || spokenKeysRef.current.has(event.key)) return;
@@ -52,7 +56,7 @@ export function useRobotNarrator(robotState: RobotState | undefined, enabled: bo
     } catch {
       setSpeaking(false);
     }
-  }, [enabled, robotState, speaking, speechCycle, supported]);
+  }, [enabled, nextCycleSeconds, robotState, speaking, speechCycle, supported]);
 
   function silence() {
     if (!supported) return;
@@ -63,7 +67,10 @@ export function useRobotNarrator(robotState: RobotState | undefined, enabled: bo
   return { speaking, supported, silence };
 }
 
-function getNarrationEvents(robotState: RobotState): NarrationEvent[] {
+function getNarrationEvents(
+  robotState: RobotState,
+  nextCycleSeconds: number | null,
+): NarrationEvent[] {
   const events: NarrationEvent[] = [];
   const status = robotState.status;
   const signal = robotState.pending_signal;
@@ -169,7 +176,15 @@ function getNarrationEvents(robotState: RobotState): NarrationEvent[] {
   }
 
   if (status === "WAITING_NEXT_CYCLE") {
-    const remainingSeconds = getRemainingNextCycleSeconds(robotState);
+    const remainingSeconds = nextCycleSeconds ?? getRemainingNextCycleSeconds(robotState);
+    if (remainingSeconds <= 0) {
+      events.push({
+        key: createEventKey("NEXT_CYCLE_STARTED", orderId, signalCreatedAt, signal, robotState.next_cycle_at),
+        text: "Iniciando nova análise de mercado.",
+      });
+      return events;
+    }
+
     events.push({
       key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
       text: `Robô vai analisar o mercado. A próxima entrada está prevista para daqui a ${formatSpokenDuration(

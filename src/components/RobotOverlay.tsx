@@ -58,8 +58,31 @@ export function RobotOverlay({
     robotState?.seconds_until_next_cycle,
     getCountdownResetKey(robotState),
     Boolean(robotState?.enabled && robotState.seconds_until_next_cycle > 0),
+    robotState?.fetched_at,
   );
-  const content = getOverlayContent(robotState, now, smoothNextCycleSeconds);
+  const smoothEntryWindowSeconds = useSmoothCountdown(
+    robotState?.seconds_until_entry_window,
+    getEntryWindowResetKey(robotState),
+    Boolean(robotState?.enabled && robotState.seconds_until_entry_window > 0),
+    robotState?.fetched_at,
+  );
+  const smoothExpirationSeconds = useSmoothCountdown(
+    robotState?.expiration_seconds,
+    getExpirationResetKey(robotState),
+    Boolean(
+      robotState?.enabled &&
+        (robotState.operation_in_progress ||
+          robotState.status === "PENDING_RESULT" ||
+          robotState.last_trade?.result === "PENDING_RESULT") &&
+        robotState.expiration_seconds > 0,
+    ),
+    robotState?.fetched_at,
+  );
+  const content = getOverlayContent(robotState, now, {
+    nextCycleSeconds: smoothNextCycleSeconds,
+    entryWindowSeconds: smoothEntryWindowSeconds,
+    expirationSeconds: smoothExpirationSeconds,
+  });
 
   useEffect(() => {
     const savedPosition = readPosition(storageKey);
@@ -247,13 +270,39 @@ function getCountdownResetKey(robotState: RobotState | undefined) {
   ].join("|");
 }
 
+function getEntryWindowResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.pending_signal?.created_at ?? "-",
+    robotState.pending_signal?.symbol ?? "-",
+    robotState.pending_signal?.direction ?? "-",
+  ].join("|");
+}
+
+function getExpirationResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.last_trade?.order_id ?? "-",
+    robotState.last_trade?.sent_at ?? "-",
+    robotState.last_trade?.expires_at ?? robotState.expires_at ?? "-",
+  ].join("|");
+}
+
 function getOverlayContent(
   robotState: RobotState | undefined,
   now: number,
-  smoothNextCycleSeconds: number | null,
+  countdowns: {
+    nextCycleSeconds: number | null;
+    entryWindowSeconds: number | null;
+    expirationSeconds: number | null;
+  },
 ): OverlayContent {
   const presentation = getRobotPresentation(robotState, now, {
-    nextCycleSeconds: smoothNextCycleSeconds,
+    nextCycleSeconds: countdowns.nextCycleSeconds,
+    entryWindowSeconds: countdowns.entryWindowSeconds,
+    expirationSeconds: countdowns.expirationSeconds,
   });
   const trade = presentation.trade;
   const signal = presentation.signal;

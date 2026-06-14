@@ -8,6 +8,8 @@ let localRejectedAt: number | null = null;
 
 type RobotPresentationOptions = {
   nextCycleSeconds?: number | null;
+  entryWindowSeconds?: number | null;
+  expirationSeconds?: number | null;
 };
 
 export type RobotPresentation = {
@@ -104,7 +106,10 @@ export function getRobotPresentation(
   }
 
   if (operationInProgress) {
-    const remainingSeconds = Math.max(0, Math.ceil(robotState.expiration_seconds));
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil(options.expirationSeconds ?? robotState.expiration_seconds),
+    );
 
     return {
       ...createPresentation(
@@ -141,11 +146,15 @@ export function getRobotPresentation(
       return createPresentation("analyzing", "Analisando...", "Nenhum sinal confirmado ainda");
     }
 
-    const remainingSeconds = getRemainingSeconds(
-      robotState.seconds_until_entry_window,
-      robotState.fetched_at,
-      now,
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil(options.entryWindowSeconds ?? robotState.seconds_until_entry_window),
     );
+
+    if (remainingSeconds <= 0) {
+      return createPresentation("analyzing", "Analisando mercado...");
+    }
+
     return {
       ...createPresentation(
         "analyzing",
@@ -216,11 +225,6 @@ function getRejectedAt(robotState: RobotState, now: number) {
   return localRejectedAt;
 }
 
-function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
-  const elapsed = Math.floor((now - fetchedAt) / 1000);
-  return Math.max(0, Math.ceil(seconds - elapsed));
-}
-
 function createNextCyclePresentation(
   robotState: RobotState,
   now: number,
@@ -231,6 +235,10 @@ function createNextCyclePresentation(
   const remainingSeconds =
     options.nextCycleSeconds ??
     (robotState.seconds_until_next_cycle > 0 ? robotState.seconds_until_next_cycle : fallbackSeconds);
+
+  if (remainingSeconds <= 0) {
+    return createPresentation("analyzing", "Analisando mercado...");
+  }
 
   return createPresentation(
     "analyzing",

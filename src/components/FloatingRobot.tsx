@@ -4,7 +4,8 @@ import { RobotOverlay } from "@/components/RobotOverlay";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useRobotNarrator } from "@/hooks/useRobotNarrator";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
-import { useRobotState } from "@/hooks/useRobotState";
+import { useRobotState, type RobotState } from "@/hooks/useRobotState";
+import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
   const visibilityKey = `robot-overlay-visible:${userId ?? "anonymous"}`;
@@ -13,7 +14,17 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const robotState = useRobotState(userId);
   const account = useBullExAccount();
   const { settings } = useRobotSettings();
-  const narrator = useRobotNarrator(robotState.data, settings.narratorEnabled);
+  const smoothNextCycleSeconds = useSmoothCountdown(
+    robotState.data?.seconds_until_next_cycle,
+    getCountdownResetKey(robotState.data),
+    Boolean(robotState.data?.enabled && robotState.data.seconds_until_next_cycle > 0),
+    robotState.data?.fetched_at,
+  );
+  const narrator = useRobotNarrator(
+    robotState.data,
+    settings.narratorEnabled,
+    smoothNextCycleSeconds,
+  );
 
   useEffect(() => {
     setVisible(readVisibility(visibilityKey));
@@ -54,4 +65,13 @@ export function FloatingRobot({ userId }: { userId?: string }) {
 function readVisibility(storageKey: string) {
   if (typeof window === "undefined") return true;
   return localStorage.getItem(storageKey) !== "false";
+}
+
+function getCountdownResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.next_cycle_at ?? "-",
+    robotState.last_trade?.finished_at ?? "-",
+  ].join("|");
 }

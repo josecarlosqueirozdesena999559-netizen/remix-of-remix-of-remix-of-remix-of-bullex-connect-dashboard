@@ -35,9 +35,30 @@ function RobotPage() {
     robotState.data?.seconds_until_next_cycle,
     getCountdownResetKey(robotState.data),
     Boolean(robotState.data?.enabled && robotState.data.seconds_until_next_cycle > 0),
+    robotState.data?.fetched_at,
+  );
+  const smoothEntryWindowSeconds = useSmoothCountdown(
+    robotState.data?.seconds_until_entry_window,
+    getEntryWindowResetKey(robotState.data),
+    Boolean(robotState.data?.enabled && robotState.data.seconds_until_entry_window > 0),
+    robotState.data?.fetched_at,
+  );
+  const smoothExpirationSeconds = useSmoothCountdown(
+    robotState.data?.expiration_seconds,
+    getExpirationResetKey(robotState.data),
+    Boolean(
+      robotState.data?.enabled &&
+        (robotState.data.operation_in_progress ||
+          robotState.data.status === "PENDING_RESULT" ||
+          robotState.data.last_trade?.result === "PENDING_RESULT") &&
+        robotState.data.expiration_seconds > 0,
+    ),
+    robotState.data?.fetched_at,
   );
   const robotPresentation = getRobotPresentation(robotState.data, Date.now(), {
     nextCycleSeconds: smoothNextCycleSeconds,
+    entryWindowSeconds: smoothEntryWindowSeconds,
+    expirationSeconds: smoothExpirationSeconds,
   });
   const signalReasonLines = formatSignalReasonLines(robotPresentation.signal?.reason);
 
@@ -393,6 +414,26 @@ function getCountdownResetKey(robotState: RobotState | undefined) {
     robotState.status,
     robotState.next_cycle_at ?? "-",
     robotState.last_trade?.finished_at ?? "-",
+  ].join("|");
+}
+
+function getEntryWindowResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.pending_signal?.created_at ?? "-",
+    robotState.pending_signal?.symbol ?? "-",
+    robotState.pending_signal?.direction ?? "-",
+  ].join("|");
+}
+
+function getExpirationResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.last_trade?.order_id ?? "-",
+    robotState.last_trade?.sent_at ?? "-",
+    robotState.last_trade?.expires_at ?? robotState.expires_at ?? "-",
   ].join("|");
 }
 
