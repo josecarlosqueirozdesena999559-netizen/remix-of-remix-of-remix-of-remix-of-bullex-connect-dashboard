@@ -22,25 +22,37 @@ export function getRobotPresentation(
     return createPresentation("loading", "Consultando robô...");
   }
 
-  if (!robotState.enabled || robotState.status === "STOPPED") {
+  if (isDisconnected(robotState)) {
     return createPresentation(
       "stopped",
-      "Robô parado",
-      robotState.disconnected ? "Conta BullEx desconectada" : null,
+      "Conta BullEx desconectada",
+      "Reconecte para o robô operar",
     );
+  }
+
+  if (!robotState.enabled || robotState.status === "STOPPED") {
+    return createPresentation("stopped", "Robô parado");
   }
 
   const status = robotState.status;
   const trade = robotState.last_trade;
-  const signal = robotState.pending_signal ?? robotState.last_signal;
+  const signal = robotState.pending_signal;
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+
+  if (status === "SIGNAL_REJECTED") {
+    return createPresentation(
+      "rejected",
+      "Sinal bloqueado",
+      `Motivo: ${robotState.last_rejection_reason ?? robotState.rejection_reason ?? "Sinal insuficiente."}`,
+    );
+  }
 
   if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
     return {
       ...createPresentation(
         "rejected",
         "Entrada rejeitada",
-        `Motivo: ${robotState.rejection_reason ?? "Ordem recusada pela corretora."}`,
+        `Motivo: ${robotState.rejection_reason ?? robotState.last_rejection_reason ?? "Ordem recusada pela corretora."}`,
       ),
       trade,
       signal,
@@ -110,7 +122,7 @@ export function getRobotPresentation(
     };
   }
 
-  if (robotState.status === "WAITING_ENTRY_WINDOW") {
+  if (status === "WAITING_ENTRY_WINDOW") {
     if (!signal) {
       return createPresentation("analyzing", "Analisando...", "Nenhum sinal confirmado ainda");
     }
@@ -132,7 +144,7 @@ export function getRobotPresentation(
     };
   }
 
-  if (robotState.status === "WAITING_NEXT_CYCLE") {
+  if (status === "WAITING_NEXT_CYCLE") {
     return createNextCyclePresentation(robotState, now);
   }
 
@@ -140,7 +152,7 @@ export function getRobotPresentation(
     return createNextCyclePresentation(robotState, now);
   }
 
-  if (robotState.status === "ERROR") {
+  if (status === "ERROR") {
     return createPresentation(
       "analyzing",
       "Erro no robô",
@@ -148,7 +160,7 @@ export function getRobotPresentation(
     );
   }
 
-  return createPresentation("analyzing", "Analisando...", "Nenhum sinal confirmado ainda");
+  return createNextCyclePresentation(robotState, now, "Robô ativo", 600);
 }
 
 export function formatDuration(totalSeconds: number) {
@@ -158,20 +170,32 @@ export function formatDuration(totalSeconds: number) {
   return `${String(minutesPart).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
 }
 
+function isDisconnected(robotState: RobotState) {
+  return (
+    robotState.connected === false ||
+    robotState.disconnected ||
+    robotState.status === "ACCOUNT_DISCONNECTED"
+  );
+}
+
 function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
   const elapsed = Math.floor((now - fetchedAt) / 1000);
   return Math.max(0, Math.ceil(seconds - elapsed));
 }
 
-function createNextCyclePresentation(robotState: RobotState, now: number) {
-  const remainingSeconds = getRemainingSeconds(
-    robotState.seconds_until_next_cycle,
-    robotState.fetched_at,
-    now,
-  );
+function createNextCyclePresentation(
+  robotState: RobotState,
+  now: number,
+  title = "Analisando...",
+  fallbackSeconds = 0,
+) {
+  const baseSeconds =
+    robotState.seconds_until_next_cycle > 0 ? robotState.seconds_until_next_cycle : fallbackSeconds;
+  const remainingSeconds = getRemainingSeconds(baseSeconds, robotState.fetched_at, now);
+
   return createPresentation(
     "analyzing",
-    "Analisando...",
+    title,
     `Próxima entrada em ${formatDuration(remainingSeconds)}`,
   );
 }

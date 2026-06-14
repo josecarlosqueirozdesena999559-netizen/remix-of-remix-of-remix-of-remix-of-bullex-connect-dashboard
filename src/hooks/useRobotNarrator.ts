@@ -98,6 +98,13 @@ function getNarrationEvents(robotState: RobotState): NarrationEvent[] {
     }
   }
 
+  if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
+    events.push({
+      key: createEventKey("ORDER_REJECTED", orderId, signalCreatedAt, signal, robotState.rejection_reason ?? ""),
+      text: "Vamos fazer mais uma análise, pois o sinal encontrado não era bom o suficiente.",
+    });
+  }
+
   if (result === "WIN") {
     events.push({
       key: createResultKey("WIN", trade),

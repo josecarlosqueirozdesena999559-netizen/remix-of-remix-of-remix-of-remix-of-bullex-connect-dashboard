@@ -11,9 +11,42 @@ export function normalizeRobotState(input: unknown): RobotState {
     value.last_trade ??
     value.lastTrade;
   const tradeValue = asRecord(tradeInput);
+  const status = normalizeText(value.status, "STOPPED").toUpperCase();
+  const connected = normalizeConnected(value.connected ?? value.account_connected ?? value.accountConnected);
+  const disconnected =
+    connected === false ||
+    status === "ACCOUNT_DISCONNECTED" ||
+    normalizeBoolean(value.disconnected ?? value.account_disconnected ?? value.accountDisconnected);
+
+  const expirationSeconds =
+    normalizeNumber(
+      value.expiration_seconds ??
+        value.expirationSeconds ??
+        value.seconds_until_expiration ??
+        value.secondsUntilExpiration ??
+        value.expires_in ??
+        value.expiresIn ??
+        tradeValue.expiration_seconds ??
+        tradeValue.expirationSeconds ??
+        tradeValue.seconds_until_expiration ??
+        tradeValue.secondsUntilExpiration ??
+        tradeValue.expires_in ??
+        tradeValue.expiresIn,
+    ) ?? normalizeSecondsUntilDate(
+      value.expiration_at ??
+        value.expirationAt ??
+        value.expires_at ??
+        value.expiresAt ??
+        tradeValue.expiration_at ??
+        tradeValue.expirationAt ??
+        tradeValue.expires_at ??
+        tradeValue.expiresAt,
+    ) ?? 0;
+
   return {
     enabled: normalizeBoolean(value.enabled),
-    status: normalizeText(value.status, "STOPPED").toUpperCase(),
+    connected: !disconnected,
+    status,
     allow_real: normalizeBoolean(value.allow_real ?? value.allowReal),
     confirm_real: normalizeBoolean(value.confirm_real ?? value.confirmReal),
     account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode),
@@ -29,23 +62,7 @@ export function normalizeRobotState(input: unknown): RobotState {
       0,
       normalizeNumber(value.seconds_until_entry_window ?? value.secondsUntilEntryWindow) ?? 0,
     ),
-    expiration_seconds: Math.max(
-      0,
-      normalizeNumber(
-        value.expiration_seconds ??
-          value.expirationSeconds ??
-          value.seconds_until_expiration ??
-          value.secondsUntilExpiration ??
-          value.expires_in ??
-          value.expiresIn ??
-          tradeValue.expiration_seconds ??
-          tradeValue.expirationSeconds ??
-          tradeValue.seconds_until_expiration ??
-          tradeValue.secondsUntilExpiration ??
-          tradeValue.expires_in ??
-          tradeValue.expiresIn,
-      ) ?? 0,
-    ),
+    expiration_seconds: Math.max(0, expirationSeconds),
     entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
     operation_in_progress: normalizeBoolean(
       value.operation_in_progress ?? value.operationInProgress,
@@ -58,7 +75,13 @@ export function normalizeRobotState(input: unknown): RobotState {
     losses: Math.max(0, normalizeNumber(value.losses) ?? 0),
     profit: normalizeNumber(value.profit) ?? 0,
     rejection_reason: normalizeOptionalText(value.rejection_reason ?? value.rejectionReason),
-    disconnected: false,
+    last_rejection_reason: normalizeOptionalText(
+      value.last_rejection_reason ??
+        value.lastRejectionReason ??
+        value.rejection_reason ??
+        value.rejectionReason,
+    ),
+    disconnected,
     fetched_at: Date.now(),
   };
 }
@@ -121,10 +144,29 @@ function normalizeNumber(input: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+function normalizeSecondsUntilDate(input: unknown): number | null {
+  const value = normalizeOptionalText(input);
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.ceil((parsed - Date.now()) / 1000);
+}
+
 function normalizeBoolean(input: unknown) {
   if (input === true || input === 1) return true;
   if (typeof input !== "string") return false;
   return input.trim().toLowerCase() === "true" || input.trim() === "1";
+}
+
+function normalizeConnected(input: unknown): boolean | null {
+  if (input == null) return null;
+  if (input === true || input === 1) return true;
+  if (input === false || input === 0) return false;
+  if (typeof input !== "string") return null;
+  const normalized = input.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "connected") return true;
+  if (normalized === "false" || normalized === "0" || normalized === "disconnected") return false;
+  return null;
 }
 
 function normalizeIdentifier(input: unknown) {

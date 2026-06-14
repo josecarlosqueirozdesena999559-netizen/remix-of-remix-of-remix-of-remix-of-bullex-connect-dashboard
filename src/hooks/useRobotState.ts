@@ -32,6 +32,7 @@ export type RobotTrade = {
 
 export type RobotState = {
   enabled: boolean;
+  connected: boolean;
   status: string;
   allow_real: boolean;
   confirm_real: boolean;
@@ -53,6 +54,7 @@ export type RobotState = {
   losses: number;
   profit: number;
   rejection_reason: string | null;
+  last_rejection_reason: string | null;
   disconnected: boolean;
   fetched_at: number;
 };
@@ -92,6 +94,7 @@ export function useRobotState(userId?: string) {
 export function createStoppedRobotState(disconnected = false): RobotState {
   return {
     enabled: false,
+    connected: !disconnected,
     status: "STOPPED",
     allow_real: false,
     confirm_real: false,
@@ -113,6 +116,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     losses: 0,
     profit: 0,
     rejection_reason: disconnected ? "Conta BullEx desconectada" : null,
+    last_rejection_reason: disconnected ? "Conta BullEx desconectada" : null,
     disconnected,
     fetched_at: Date.now(),
   };
