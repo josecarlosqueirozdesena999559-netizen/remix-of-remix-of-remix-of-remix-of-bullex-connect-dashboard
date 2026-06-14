@@ -185,7 +185,7 @@ export function RobotOverlay({
         <video
           src="/robo-wink.webm"
           aria-label="Robô analisando o mercado"
-          className="pointer-events-none h-auto w-[110px] object-contain [filter:grayscale(1)_brightness(1.38)_contrast(1.28)_drop-shadow(0_0_10px_rgba(0,0,32,0.95))_drop-shadow(0_0_6px_rgba(255,255,255,0.45))] sm:w-[170px]"
+          className="pointer-events-none h-auto w-[110px] object-contain [filter:sepia(1)_saturate(7)_hue-rotate(190deg)_brightness(0.72)_contrast(1.45)_drop-shadow(0_0_10px_rgba(0,0,42,0.95))_drop-shadow(0_0_5px_rgba(255,255,255,0.28))] sm:w-[170px]"
           autoPlay
           loop
           muted

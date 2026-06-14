@@ -36,8 +36,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row w-full bg-background text-foreground">
-      <aside className="md:w-64 md:min-h-screen bg-background border-r border-border flex md:flex-col">
-        <div className="p-6 flex items-center gap-3 border-b border-border">
+      <aside className="md:w-64 md:min-h-screen bg-background flex md:flex-col">
+        <div className="p-6 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
             <Bot className="h-5 w-5" />
           </div>
@@ -66,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="hidden md:block p-3 border-t border-border">
+        <div className="hidden md:block p-3">
           <div className="text-xs text-muted-foreground truncate mb-2">{user?.email}</div>
           <button
             onClick={handleLogout}
