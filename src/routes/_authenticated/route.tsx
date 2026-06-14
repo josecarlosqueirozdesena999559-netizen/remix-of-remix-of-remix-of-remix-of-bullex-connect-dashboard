@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -10,9 +11,16 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !user) throw redirect({ to: "/login" });
     return { user };
   },
-  component: () => (
-    <AppShell>
+  component: AuthenticatedLayout,
+});
+
+function AuthenticatedLayout() {
+  const { user, loading } = useAuth();
+  if (loading || !user) return null;
+
+  return (
+    <AppShell key={user.id}>
       <Outlet />
     </AppShell>
-  ),
-});
+  );
+}

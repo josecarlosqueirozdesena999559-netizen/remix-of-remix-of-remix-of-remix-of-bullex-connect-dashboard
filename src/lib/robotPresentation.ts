@@ -244,6 +244,12 @@ export function formatSignalReasonLines(reason: string | null | undefined) {
     .filter(Boolean);
 }
 
+export function resetRobotPresentationState() {
+  observedStatus = null;
+  localRejectedAt = null;
+  orderRejectionSnapshot = null;
+}
+
 function isDisconnected(robotState: RobotState) {
   return (
     robotState.connected === false ||

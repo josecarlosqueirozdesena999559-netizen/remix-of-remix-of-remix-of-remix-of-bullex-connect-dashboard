@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, type BullexAccount, bullexApi } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 export const BULLEX_ACCOUNT_QUERY_KEY = ["bullex-account"] as const;
 
@@ -14,8 +15,10 @@ export type BullExAccountState = {
 };
 
 export function useBullExAccount() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: BULLEX_ACCOUNT_QUERY_KEY,
+    queryKey: [...BULLEX_ACCOUNT_QUERY_KEY, user?.id],
     queryFn: async () => {
       console.log("[BULLEX ACCOUNT FETCH]");
 
@@ -36,6 +39,7 @@ export function useBullExAccount() {
       console.log("[BULLEX ACCOUNT UPDATED]", nextState);
       return nextState;
     },
+    enabled: Boolean(user?.id),
     refetchInterval: 5000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,

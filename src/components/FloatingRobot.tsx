@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
@@ -8,12 +8,10 @@ import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
-  const visibilityKey = `robot-overlay-visible:${userId ?? "anonymous"}`;
-  const positionKey = `robot-overlay-position:${userId ?? "anonymous"}`;
-  const [visible, setVisible] = useState(() => readVisibility(visibilityKey));
+  const [visible, setVisible] = useState(true);
   const robotState = useRobotState(userId);
   const account = useBullExAccount();
-  const { settings } = useRobotSettings();
+  const { settings, setSettings } = useRobotSettings(userId);
   const smoothNextCycleSeconds = useSmoothCountdown(
     robotState.data?.seconds_until_next_cycle,
     getCountdownResetKey(robotState.data),
@@ -26,13 +24,8 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     smoothNextCycleSeconds,
   );
 
-  useEffect(() => {
-    setVisible(readVisibility(visibilityKey));
-  }, [visibilityKey]);
-
   function setOverlayVisible(nextVisible: boolean) {
     setVisible(nextVisible);
-    localStorage.setItem(visibilityKey, String(nextVisible));
   }
 
   if (!visible) {
@@ -55,16 +48,12 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       narratorEnabled={settings.narratorEnabled}
       narratorSpeaking={narrator.speaking}
       onSilenceNarrator={narrator.silence}
-      storageKey={positionKey}
+      settings={settings}
+      onSettingsChange={setSettings}
       onClose={() => setOverlayVisible(false)}
       showConfig
     />
   );
-}
-
-function readVisibility(storageKey: string) {
-  if (typeof window === "undefined") return true;
-  return localStorage.getItem(storageKey) !== "false";
 }
 
 function getCountdownResetKey(robotState: RobotState | undefined) {

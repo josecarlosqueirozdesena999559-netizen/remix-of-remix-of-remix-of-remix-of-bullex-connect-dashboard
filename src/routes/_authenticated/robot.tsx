@@ -8,7 +8,6 @@ import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
-import { readRobotSettings } from "@/lib/robotSettings";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
@@ -30,7 +29,7 @@ function RobotPage() {
 
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
-  const { settings, setSettings } = useRobotSettings();
+  const { settings, setSettings } = useRobotSettings(user?.id);
   const smoothNextCycleSeconds = useSmoothCountdown(
     robotState.data?.seconds_until_next_cycle,
     getCountdownResetKey(robotState.data),
@@ -126,7 +125,6 @@ function RobotPage() {
       if (robotEnabled) {
         unwrapApiResult(await robotConfig({ enabled: false }));
       } else {
-        const settings = readRobotSettings();
         unwrapApiResult(
           await robotConfig({
             enabled: true,

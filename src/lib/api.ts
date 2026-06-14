@@ -36,13 +36,20 @@ async function getUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  expectedUserId?: string,
+): Promise<ApiResult<T>> {
   if (!API_BASE_URL) {
     return { ok: false, error: "VITE_API_BASE_URL não configurada", code: "NO_BACKEND" };
   }
 
   const userId = await getUserId();
   if (!userId) return { ok: false, error: "Não autenticado", code: "NO_AUTH" };
+  if (expectedUserId && expectedUserId !== userId) {
+    return { ok: false, error: "Sessão de usuário alterada", code: "AUTH_USER_CHANGED" };
+  }
 
   if (path === "/bullex/connect") {
     console.log("[BULLEX CONNECT USER_ID]", userId);
@@ -129,8 +136,8 @@ export function robotStart() {
   return apiRequest<unknown>("/robot/start", { method: "POST" });
 }
 
-export function robotState() {
-  return apiRequest<unknown>("/robot/state");
+export function robotState(userId: string) {
+  return apiRequest<unknown>("/robot/state", {}, userId);
 }
 
 export const bullexApi = {

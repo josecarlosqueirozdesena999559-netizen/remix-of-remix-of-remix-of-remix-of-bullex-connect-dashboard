@@ -68,8 +68,9 @@ export function useRobotState(userId?: string) {
   return useQuery({
     queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
     queryFn: async () => {
-      console.log("[ROBOT STATE FETCH]");
-      const response = await robotState();
+      if (!userId) throw new ApiError("Não autenticado", "NO_AUTH");
+      console.log(`[ROBOT STATE FETCH user_id=${userId}]`);
+      const response = await robotState(userId);
 
       if (!response.ok) {
         if (response.code === "SESSION_NOT_FOUND" || response.code === "SESSION_DISCONNECTED") {

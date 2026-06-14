@@ -14,6 +14,7 @@ import { BarChart3, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useMarketData } from "@/hooks/useMarketData";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({ meta: [{ title: "Gráfico em tempo real - BullEx AutoBot" }] }),
@@ -33,6 +34,7 @@ type ChartApi = ReturnType<typeof createChart>;
 type CandlestickSeriesApi = ReturnType<ChartApi["addSeries"]>;
 
 function MarketPage() {
+  const { user } = useAuth();
   const [selectedSymbol, setSelectedSymbol] = useState("");
   const [followPrice, setFollowPrice] = useState(true);
   const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
@@ -44,7 +46,7 @@ function MarketPage() {
   const prevSymbolRef = useRef<string>("");
 
   const assetsQuery = useQuery({
-    queryKey: ["bullex", "assets"],
+    queryKey: ["bullex", user?.id, "assets"],
     queryFn: async () => {
       try {
         const assetsResponse = await apiRequest<unknown>("/bullex/assets");
@@ -60,6 +62,7 @@ function MarketPage() {
         throw error;
       }
     },
+    enabled: Boolean(user?.id),
     retry: 1,
     staleTime: 30000,
   });

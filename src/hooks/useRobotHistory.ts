@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 export type RobotHistoryDays = 1 | 7 | 30;
 
@@ -47,13 +48,16 @@ const EMPTY_STATS: RobotStats = {
 };
 
 export function useRobotHistory(days: RobotHistoryDays) {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["robot-history", days],
+    queryKey: ["robot-history", user?.id, days],
     queryFn: async () => {
       const response = await apiRequest<unknown>(`/robot/history?days=${days}`);
       if (!response.ok) throw new ApiError(response.error, response.code);
       return normalizeHistory(response.data);
     },
+    enabled: Boolean(user?.id),
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -63,13 +67,16 @@ export function useRobotHistory(days: RobotHistoryDays) {
 }
 
 export function useRobotStats(days: RobotHistoryDays) {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["robot-stats", days],
+    queryKey: ["robot-stats", user?.id, days],
     queryFn: async () => {
       const response = await apiRequest<unknown>(`/robot/stats?days=${days}`);
       if (!response.ok) throw new ApiError(response.error, response.code);
       return normalizeStats(response.data);
     },
+    enabled: Boolean(user?.id),
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,

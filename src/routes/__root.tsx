@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -7,9 +7,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
+import { resetRobotPresentationState } from "@/lib/robotPresentation";
+import { resetRobotSettings } from "@/lib/robotSettings";
+import { useAuth } from "@/lib/useAuth";
 
 import appCss from "../styles.css?url";
 
@@ -127,10 +130,48 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthStateBoundary>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </AuthStateBoundary>
       <WhatsAppButton />
       <Toaster />
     </QueryClientProvider>
   );
+}
+
+function AuthStateBoundary({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const { user, loading } = useAuth();
+  const previousUserIdRef = useRef<string | null | undefined>(undefined);
+  const [readyUserId, setReadyUserId] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const nextUserId = user?.id ?? null;
+    if (previousUserIdRef.current === nextUserId) {
+      setReadyUserId(nextUserId);
+      return;
+    }
+
+    const previousUserId = previousUserIdRef.current ?? null;
+    previousUserIdRef.current = nextUserId;
+    setReadyUserId(undefined);
+    console.log("[AUTH USER CHANGED]", {
+      previous_user_id: previousUserId,
+      user_id: nextUserId,
+    });
+
+    void queryClient.cancelQueries().then(() => {
+      queryClient.clear();
+      resetRobotSettings();
+      resetRobotPresentationState();
+      console.log("[ROBOT STATE RESET]");
+      setReadyUserId(nextUserId);
+    });
+  }, [loading, queryClient, user?.id]);
+
+  if (loading || readyUserId !== (user?.id ?? null)) return null;
+  return children;
 }

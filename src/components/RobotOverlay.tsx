@@ -10,7 +10,7 @@ import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
-import { readRobotSettings, saveRobotSettings, type RobotSettings } from "@/lib/robotSettings";
+import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
 
 type RobotOverlayProps = {
   robotState?: RobotState;
@@ -18,9 +18,10 @@ type RobotOverlayProps = {
   narratorEnabled?: boolean;
   narratorSpeaking?: boolean;
   onSilenceNarrator?: () => void;
+  settings?: RobotSettings;
+  onSettingsChange?: (settings: RobotSettings) => void;
   onClose?: () => void;
   showConfig?: boolean;
-  storageKey?: string;
 };
 
 type Position = {
@@ -43,16 +44,17 @@ export function RobotOverlay({
   narratorEnabled = false,
   narratorSpeaking = false,
   onSilenceNarrator,
+  settings: savedSettings = DEFAULT_ROBOT_SETTINGS,
+  onSettingsChange,
   onClose,
   showConfig,
-  storageKey = "robot-overlay-position",
 }: RobotOverlayProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
-  const [settings, setSettings] = useState<RobotSettings>(() => readRobotSettings());
+  const [settings, setSettings] = useState<RobotSettings>(savedSettings);
   const now = useCurrentTime();
   const smoothNextCycleSeconds = useSmoothCountdown(
     robotState?.seconds_until_next_cycle,
@@ -85,9 +87,12 @@ export function RobotOverlay({
   });
 
   useEffect(() => {
-    const savedPosition = readPosition(storageKey);
+    setSettings(savedSettings);
+  }, [savedSettings]);
+
+  useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      setPosition(clampPosition(savedPosition ?? getDefaultPosition(), overlayRef.current));
+      setPosition(clampPosition(getDefaultPosition(), overlayRef.current));
     });
 
     const handleResize = () => {
@@ -99,7 +104,7 @@ export function RobotOverlay({
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", handleResize);
     };
-  }, [storageKey]);
+  }, []);
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || !position) return;
@@ -133,10 +138,6 @@ export function RobotOverlay({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setDragging(false);
-    setPosition((current) => {
-      if (current) localStorage.setItem(storageKey, JSON.stringify(current));
-      return current;
-    });
   }
 
   return (
@@ -175,7 +176,7 @@ export function RobotOverlay({
           <button
             type="button"
             onClick={() => {
-              setSettings(readRobotSettings());
+              setSettings(savedSettings);
               setConfigOpen((current) => !current);
             }}
             className="flex cursor-pointer items-center gap-1 rounded-full border border-border bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground transition hover:opacity-90"
@@ -203,7 +204,7 @@ export function RobotOverlay({
           onChange={setSettings}
           onClose={() => setConfigOpen(false)}
           onSave={() => {
-            saveRobotSettings(settings);
+            onSettingsChange?.(settings);
             setConfigOpen(false);
           }}
         />
@@ -522,20 +523,6 @@ function getViewportBounds() {
   return window.innerWidth >= 768
     ? { minX: 256 + VIEWPORT_GAP, minY: VIEWPORT_GAP }
     : { minX: VIEWPORT_GAP, minY: 92 };
-}
-
-function readPosition(storageKey: string): Position | null {
-  try {
-    const value = JSON.parse(
-      localStorage.getItem(storageKey) ?? "null",
-    ) as Partial<Position> | null;
-    if (typeof value?.x === "number" && typeof value?.y === "number") {
-      return { x: value.x, y: value.y };
-    }
-  } catch {
-    return null;
-  }
-  return null;
 }
 
 function formatPercentage(value: number) {

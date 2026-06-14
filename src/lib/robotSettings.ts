@@ -6,9 +6,6 @@ export type RobotSettings = {
   narratorEnabled: boolean;
 };
 
-export const ROBOT_SETTINGS_KEY = "robot-settings";
-export const ROBOT_SETTINGS_EVENT = "robot-settings-changed";
-
 export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   entryValue: 2,
   stopWin: 50,
@@ -17,24 +14,31 @@ export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   narratorEnabled: false,
 };
 
-export function readRobotSettings(): RobotSettings {
-  if (typeof window === "undefined") return DEFAULT_ROBOT_SETTINGS;
+let currentSettings = DEFAULT_ROBOT_SETTINGS;
+let settingsUserId: string | null = null;
+const listeners = new Set<() => void>();
 
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(ROBOT_SETTINGS_KEY) ?? "null") as
-      | Partial<RobotSettings>
-      | null;
-
-    return normalizeRobotSettings(raw);
-  } catch {
-    return DEFAULT_ROBOT_SETTINGS;
-  }
+export function readRobotSettings(userId?: string): RobotSettings {
+  return userId && settingsUserId === userId ? currentSettings : DEFAULT_ROBOT_SETTINGS;
 }
 
-export function saveRobotSettings(settings: RobotSettings) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ROBOT_SETTINGS_KEY, JSON.stringify(normalizeRobotSettings(settings)));
-  window.dispatchEvent(new Event(ROBOT_SETTINGS_EVENT));
+export function saveRobotSettings(userId: string, settings: RobotSettings) {
+  settingsUserId = userId;
+  currentSettings = normalizeRobotSettings(settings);
+  emitChange();
+}
+
+export function resetRobotSettings() {
+  settingsUserId = null;
+  currentSettings = DEFAULT_ROBOT_SETTINGS;
+  emitChange();
+}
+
+export function subscribeRobotSettings(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null): RobotSettings {
@@ -50,4 +54,8 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
 function positiveNumber(value: unknown, fallback: number) {
   const next = typeof value === "number" ? value : Number(value);
   return Number.isFinite(next) && next > 0 ? next : fallback;
+}
+
+function emitChange() {
+  listeners.forEach((listener) => listener());
 }
