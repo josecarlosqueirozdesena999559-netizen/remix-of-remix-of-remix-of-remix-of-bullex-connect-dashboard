@@ -38,17 +38,19 @@ const EMPTY_ASSETS: Asset[] = [];
 function MarketPage() {
   const { user } = useAuth();
   const [selectedSymbol, setSelectedSymbol] = useState("EURUSD-OTC");
+  const [robotChartSymbol, setRobotChartSymbol] = useState<string | null>(null);
   const [followPrice, setFollowPrice] = useState(true);
   const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
   const bestCandidate = robotState.data?.best_candidate ?? null;
-  const chartSymbol = bestCandidate?.symbol ?? selectedSymbol;
+  const chartSymbol = robotChartSymbol ?? selectedSymbol;
 
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevSymbolRef = useRef<string>("");
+  const prevCandlesLengthRef = useRef(0);
 
   const assetsQuery = useQuery({
     queryKey: ["bullex", user?.id, "assets"],
@@ -91,8 +93,14 @@ function MarketPage() {
   } = useMarketData(chartSymbol || null);
 
   useEffect(() => {
+    if (!bestCandidate?.symbol) return;
+    setRobotChartSymbol(bestCandidate.symbol);
+    setFollowPrice(true);
+  }, [bestCandidate?.symbol]);
+
+  useEffect(() => {
     if (assets.length === 0) return;
-    if (bestCandidate?.symbol) return;
+    if (robotChartSymbol) return;
     if (assets.some((asset) => asset.symbol === selectedSymbol)) return;
 
     const defaultAsset = assets.find((asset) => asset.symbol === "EURUSD-OTC") ?? assets[0];
@@ -100,7 +108,7 @@ function MarketPage() {
     if (defaultAsset?.symbol) {
       setSelectedSymbol(defaultAsset.symbol);
     }
-  }, [assets, bestCandidate?.symbol, selectedSymbol]);
+  }, [assets, robotChartSymbol, selectedSymbol]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -231,11 +239,6 @@ function MarketPage() {
     series.applyOptions({
       priceFormat: buildPriceFormat(chartSymbol, lastPrice),
     });
-    if (candles.length > 0) {
-      series.setData(candles);
-    } else {
-      series.setData([]);
-    }
     chart.priceScale("right").applyOptions({
       autoScale: true,
       borderVisible: false,
@@ -250,11 +253,30 @@ function MarketPage() {
     });
 
     if (symbolChanged) {
+      series.setData(candles);
       chart.timeScale().fitContent();
       prevSymbolRef.current = chartSymbol;
+      prevCandlesLengthRef.current = candles.length;
+    } else if (candles.length === 0) {
+      series.setData([]);
+      prevCandlesLengthRef.current = 0;
+    } else if (prevCandlesLengthRef.current === 0 || candles.length < prevCandlesLengthRef.current) {
+      series.setData(candles);
+      prevCandlesLengthRef.current = candles.length;
     } else if (followPrice && candles.length > 0) {
+      const latestCandle = candles[candles.length - 1];
+      if (latestCandle) {
+        series.update(latestCandle);
+      }
+      prevCandlesLengthRef.current = candles.length;
       chart.timeScale().scrollToRealTime();
       console.log("[CHART FOLLOW PRICE]", { symbol: chartSymbol, enabled: true });
+    } else {
+      const latestCandle = candles[candles.length - 1];
+      if (latestCandle) {
+        series.update(latestCandle);
+      }
+      prevCandlesLengthRef.current = candles.length;
     }
   }, [candles, chartSymbol, followPrice, lastPrice]);
 
@@ -310,8 +332,11 @@ function MarketPage() {
             </label>
             <select
               value={chartSymbol}
-              onChange={(event) => setSelectedSymbol(event.target.value)}
-              disabled={Boolean(bestCandidate) || assetsQuery.isLoading || assets.length === 0}
+              onChange={(event) => {
+                setRobotChartSymbol(null);
+                setSelectedSymbol(event.target.value);
+              }}
+              disabled={assetsQuery.isLoading || assets.length === 0}
               className="w-full rounded-lg border border-border bg-input px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
             >
               <option value="">
