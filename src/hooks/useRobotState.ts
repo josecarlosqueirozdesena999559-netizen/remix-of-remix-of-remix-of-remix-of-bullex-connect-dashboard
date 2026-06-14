@@ -13,6 +13,8 @@ export type RobotSignal = {
   direction: RobotDirection;
   confidence: number | null;
   payout: number | null;
+  reason: string | null;
+  created_at: string | null;
 };
 
 export type RobotTrade = {

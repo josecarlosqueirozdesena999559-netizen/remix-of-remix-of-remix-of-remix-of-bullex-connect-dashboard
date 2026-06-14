@@ -3,15 +3,18 @@ export type RobotSettings = {
   stopWin: number;
   stopLoss: number;
   g1: boolean;
+  narratorEnabled: boolean;
 };
 
 export const ROBOT_SETTINGS_KEY = "robot-settings";
+export const ROBOT_SETTINGS_EVENT = "robot-settings-changed";
 
 export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   entryValue: 2,
   stopWin: 50,
   stopLoss: 30,
   g1: false,
+  narratorEnabled: false,
 };
 
 export function readRobotSettings(): RobotSettings {
@@ -31,6 +34,7 @@ export function readRobotSettings(): RobotSettings {
 export function saveRobotSettings(settings: RobotSettings) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ROBOT_SETTINGS_KEY, JSON.stringify(normalizeRobotSettings(settings)));
+  window.dispatchEvent(new Event(ROBOT_SETTINGS_EVENT));
 }
 
 export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null): RobotSettings {
@@ -39,6 +43,7 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
     stopWin: positiveNumber(settings?.stopWin, DEFAULT_ROBOT_SETTINGS.stopWin),
     stopLoss: positiveNumber(settings?.stopLoss, DEFAULT_ROBOT_SETTINGS.stopLoss),
     g1: settings?.g1 === true,
+    narratorEnabled: settings?.narratorEnabled === true,
   };
 }
 

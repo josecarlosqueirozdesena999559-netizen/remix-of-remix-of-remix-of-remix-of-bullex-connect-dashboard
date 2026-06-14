@@ -78,6 +78,8 @@ function normalizeSignal(input: unknown): RobotSignal | null {
     direction,
     confidence: normalizePercentage(value.confidence ?? value.score ?? value.probability),
     payout: normalizePercentage(value.payout),
+    reason: normalizeOptionalText(value.reason ?? value.motive ?? value.explanation),
+    created_at: normalizeOptionalText(value.created_at ?? value.createdAt ?? value.timestamp),
   };
 }
 

@@ -5,6 +5,7 @@ import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
+import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { readRobotSettings } from "@/lib/robotSettings";
 
@@ -26,6 +27,7 @@ function RobotPage() {
 
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
+  const { settings, setSettings } = useRobotSettings();
   const robotPresentation = getRobotPresentation(robotState.data, Date.now());
 
   const connected = account.data?.connected === true;
@@ -197,6 +199,30 @@ function RobotPage() {
         {robotActionError ? (
           <p className="mt-3 text-sm text-destructive">{robotActionError}</p>
         ) : null}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Narrador do robo</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Fala eventos importantes enquanto esta aba estiver aberta.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setSettings({ ...settings, narratorEnabled: !settings.narratorEnabled })
+            }
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              settings.narratorEnabled
+                ? "bg-primary text-primary-foreground"
+                : "border border-border bg-background/40 text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {settings.narratorEnabled ? "Ligado" : "Desligado"}
+          </button>
+        </div>
       </section>
     </div>
   );

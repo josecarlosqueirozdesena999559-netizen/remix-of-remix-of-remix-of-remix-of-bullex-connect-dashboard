@@ -37,25 +37,25 @@
 
 :root {
   --radius: 0.75rem;
-  --background: #000020;
+  --background: #000011;
   --foreground: #ffffff;
 
-  --card: #03032c;
+  --card: #000018;
   --card-foreground: #ffffff;
 
-  --popover: #050532;
+  --popover: #00001f;
   --popover-foreground: #ffffff;
 
-  --primary: #ffffff;
-  --primary-foreground: #000020;
+  --primary: #ebe9e4;
+  --primary-foreground: #171717;
 
-  --secondary: #09093d;
+  --secondary: #020226;
   --secondary-foreground: #ffffff;
 
-  --muted: #09093d;
-  --muted-foreground: #c3c6e8;
+  --muted: #020226;
+  --muted-foreground: #b3b7db;
 
-  --accent: #10104b;
+  --accent: #050536;
   --accent-foreground: #ffffff;
 
   --destructive: oklch(0.62 0.22 25);
@@ -67,9 +67,9 @@
   --warning: oklch(0.78 0.15 75);
   --warning-foreground: oklch(0.2 0.03 80);
 
-  --border: #20205d;
-  --input: #050532;
-  --ring: #ffffff;
+  --border: #10104a;
+  --input: #00001f;
+  --ring: #ebe9e4;
 }
 
 @layer base {
@@ -82,7 +82,7 @@
   }
 
   ::selection {
-    background: #ffffff;
-    color: #000020;
+    background: #ebe9e4;
+    color: #000011;
   }
 }

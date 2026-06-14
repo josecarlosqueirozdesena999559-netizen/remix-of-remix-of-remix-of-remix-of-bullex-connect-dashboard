@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
+import { useRobotNarrator } from "@/hooks/useRobotNarrator";
+import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useRobotState } from "@/hooks/useRobotState";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
@@ -10,6 +12,8 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(() => readVisibility(visibilityKey));
   const robotState = useRobotState(userId);
   const account = useBullExAccount();
+  const { settings } = useRobotSettings();
+  const narrator = useRobotNarrator(robotState.data, settings.narratorEnabled);
 
   useEffect(() => {
     setVisible(readVisibility(visibilityKey));
@@ -37,6 +41,9 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     <RobotOverlay
       robotState={robotState.data}
       account={account.data}
+      narratorEnabled={settings.narratorEnabled}
+      narratorSpeaking={narrator.speaking}
+      onSilenceNarrator={narrator.silence}
       storageKey={positionKey}
       onClose={() => setOverlayVisible(false)}
       showConfig

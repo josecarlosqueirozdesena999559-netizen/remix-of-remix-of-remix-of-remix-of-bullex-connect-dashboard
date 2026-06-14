@@ -5,7 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Settings, X } from "lucide-react";
+import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { getRobotPresentation } from "@/lib/robotPresentation";
@@ -14,6 +14,9 @@ import { readRobotSettings, saveRobotSettings, type RobotSettings } from "@/lib/
 type RobotOverlayProps = {
   robotState?: RobotState;
   account?: BullExAccountState;
+  narratorEnabled?: boolean;
+  narratorSpeaking?: boolean;
+  onSilenceNarrator?: () => void;
   onClose?: () => void;
   showConfig?: boolean;
   storageKey?: string;
@@ -36,6 +39,9 @@ const VIEWPORT_GAP = 12;
 export function RobotOverlay({
   robotState,
   account,
+  narratorEnabled = false,
+  narratorSpeaking = false,
+  onSilenceNarrator,
   onClose,
   showConfig,
   storageKey = "robot-overlay-position",
@@ -118,6 +124,24 @@ export function RobotOverlay({
       aria-label="Robô flutuante. Arraste para reposicionar."
     >
       <div className="absolute -right-1 -top-7 flex items-center gap-1.5 sm:right-0">
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-foreground"
+          title={narratorEnabled ? "Narrador ligado" : "Narrador desligado"}
+          aria-label={narratorEnabled ? "Narrador ligado" : "Narrador desligado"}
+        >
+          {narratorEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+        </span>
+        {narratorEnabled && onSilenceNarrator ? (
+          <button
+            type="button"
+            onClick={onSilenceNarrator}
+            className={`rounded-full border border-border px-2 py-1 text-[10px] font-semibold transition hover:bg-accent ${
+              narratorSpeaking ? "bg-card text-foreground" : "bg-card/80 text-muted-foreground"
+            }`}
+          >
+            Silenciar
+          </button>
+        ) : null}
         {showConfig ? (
           <button
             type="button"
@@ -161,7 +185,7 @@ export function RobotOverlay({
         <video
           src="/robo-wink.webm"
           aria-label="Robô analisando o mercado"
-          className="pointer-events-none h-auto w-[110px] object-contain [filter:grayscale(1)_brightness(1.18)_contrast(1.12)_drop-shadow(0_0_12px_rgba(255,255,255,0.35))] sm:w-[170px]"
+          className="pointer-events-none h-auto w-[110px] object-contain [filter:grayscale(1)_brightness(1.38)_contrast(1.28)_drop-shadow(0_0_10px_rgba(0,0,32,0.95))_drop-shadow(0_0_6px_rgba(255,255,255,0.45))] sm:w-[170px]"
           autoPlay
           loop
           muted
@@ -380,15 +404,20 @@ function ConfigNumber({
 function Score({
   label,
   value,
-  tone: _tone,
+  tone,
 }: {
   label: "WIN" | "LOSS";
   value: number;
   tone: "win" | "loss";
 }) {
+  const color =
+    tone === "win"
+      ? "text-[#39ff88] [text-shadow:0_0_8px_#00ff66,0_2px_4px_#000]"
+      : "text-[#ff4d5f] [text-shadow:0_0_8px_#ff1935,0_2px_4px_#000]";
+
   return (
-    <div className="rounded-xl border border-border bg-card px-2 py-1 text-center font-black text-foreground">
-      <div className="text-[10px] tracking-[0.22em] text-muted-foreground sm:text-xs">{label}</div>
+    <div className={`text-center font-black ${color}`}>
+      <div className="text-[10px] tracking-[0.22em] sm:text-xs">{label}</div>
       <div className="text-3xl leading-none sm:text-5xl">{value}</div>
     </div>
   );

@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row w-full bg-background text-foreground">
-      <aside className="md:w-64 md:min-h-screen bg-card border-r border-border flex md:flex-col">
+      <aside className="md:w-64 md:min-h-screen bg-background border-r border-border flex md:flex-col">
         <div className="p-6 flex items-center gap-3 border-b border-border">
           <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
             <Bot className="h-5 w-5" />
@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={to}
                 to={to}
                 preload="render"
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                   active
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="text-xs text-muted-foreground truncate mb-2">{user?.email}</div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 text-sm py-2 px-3 rounded-lg border border-border bg-background/40 hover:bg-accent transition-colors"
+            className="w-full flex items-center justify-center gap-2 text-sm py-2 px-3 rounded-md border border-border bg-card hover:bg-accent transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sair
           </button>
