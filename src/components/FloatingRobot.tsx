@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
+import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
 import { useRobotNarrator } from "@/hooks/useRobotNarrator";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
@@ -11,15 +12,20 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(true);
   const robotState = useRobotState(userId);
   const account = useBullExAccount();
+  const effectiveRobotState = useRobotConnectionSync({
+    userId,
+    accountConnected: account.data?.connected === true,
+    robotState: robotState.data,
+  });
   const { settings, saveSettings } = useRobotSettings(userId);
   const smoothNextCycleSeconds = useSmoothCountdown(
-    robotState.data?.seconds_until_next_cycle,
-    getCountdownResetKey(robotState.data),
-    Boolean(robotState.data?.enabled && robotState.data.seconds_until_next_cycle > 0),
-    robotState.data?.fetched_at,
+    effectiveRobotState?.seconds_until_next_cycle,
+    getCountdownResetKey(effectiveRobotState),
+    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_next_cycle > 0),
+    effectiveRobotState?.fetched_at,
   );
   const narrator = useRobotNarrator(
-    robotState.data,
+    effectiveRobotState,
     settings.narratorEnabled,
     smoothNextCycleSeconds,
   );
@@ -43,7 +49,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
 
   return (
     <RobotOverlay
-      robotState={robotState.data}
+      robotState={effectiveRobotState}
       account={account.data}
       narratorEnabled={settings.narratorEnabled}
       narratorSpeaking={narrator.speaking}
@@ -51,8 +57,8 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       settings={settings}
       onSettingsChange={(nextSettings) =>
         saveSettings(nextSettings, {
-          enabled: robotState.data?.enabled ?? false,
-          cycleMinutes: robotState.data?.cycle_minutes ?? 5,
+          enabled: effectiveRobotState?.enabled ?? false,
+          cycleMinutes: effectiveRobotState?.cycle_minutes ?? 5,
         })
       }
       onClose={() => setOverlayVisible(false)}

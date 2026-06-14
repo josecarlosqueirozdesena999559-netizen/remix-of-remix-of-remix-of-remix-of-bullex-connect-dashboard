@@ -15,6 +15,7 @@ export type RobotSignal = {
   confidence: number | null;
   strategy_score: number | null;
   strategy_name: string | null;
+  used_strategies: string[];
   strategy_reason: string | null;
   payout: number | null;
   reason: string | null;
@@ -77,6 +78,7 @@ export function useRobotState(userId?: string) {
     queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
     queryFn: async () => {
       if (!userId) throw new ApiError("Não autenticado", "NO_AUTH");
+      console.log("[ROBOT STATE REFETCH]");
       console.log(`[ROBOT STATE FETCH user_id=${userId}]`);
       const response = await robotState(userId);
 

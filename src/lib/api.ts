@@ -140,6 +140,10 @@ export function robotState(userId: string) {
   return apiRequest<unknown>("/robot/state", {}, userId);
 }
 
+export function robotSyncConnection() {
+  return apiRequest<{ ok: boolean }>("/robot/sync-connection", { method: "POST" });
+}
+
 export const bullexApi = {
   connect: (payload: { email: string; password: string; sms_code?: string }) =>
     apiRequest<{ ok: boolean }>("/bullex/connect", {

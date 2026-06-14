@@ -9,7 +9,7 @@ import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
-import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
+import { getRobotPresentation } from "@/lib/robotPresentation";
 import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
 
 type RobotOverlayProps = {
@@ -346,25 +346,22 @@ function getOverlayContent(
       </>
     );
   } else if (signal) {
-    const reasonLines = formatSignalReasonLines(signal.strategy_reason ?? signal.reason);
+    const usedStrategies =
+      signal.used_strategies.length > 0
+        ? signal.used_strategies
+        : [signal.strategy_name ?? "Não informada"];
     details = (
       <>
         {presentation.detail ? <span>{presentation.detail}</span> : null}
         <TradeIdentity active={signal.symbol} direction={signal.direction} />
-        {signal.confidence != null ? (
-          <span>Confiança: {formatPercentage(signal.confidence)}%</span>
-        ) : null}
         {signal.strategy_score != null ? (
           <span>Score: {formatScore(signal.strategy_score)}</span>
         ) : null}
-        <span>Estratégia usada: {signal.strategy_name ?? "Não informada"}</span>
-        {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
-        {reasonLines.length > 0 ? (
-          <>
-            <span className="basis-full">Motivo:</span>
-            <span className="basis-full">{reasonLines.join(", ")}</span>
-          </>
+        {signal.confidence != null ? (
+          <span>Confiança: {formatPercentage(signal.confidence)}%</span>
         ) : null}
+        {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
+        <span>Estratégias usadas: {usedStrategies.join(", ")}</span>
       </>
     );
   }

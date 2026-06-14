@@ -147,6 +147,16 @@ function normalizeSignal(input: unknown): RobotSignal | null {
     strategy_name: normalizeOptionalText(
       value.strategy_name ?? value.strategyName ?? value.strategy,
     ),
+    used_strategies: normalizeTextList(
+      value.used_strategies ??
+        value.usedStrategies ??
+        value.strategies_used ??
+        value.strategiesUsed ??
+        value.strategies ??
+        value.strategy_name ??
+        value.strategyName ??
+        value.strategy,
+    ),
     strategy_reason: normalizeReason(
       value.strategy_reason ?? value.strategyReason ?? value.reason ?? value.reasons,
     ),
@@ -243,6 +253,20 @@ function normalizeReason(input: unknown) {
   }
 
   return normalizeOptionalText(input);
+}
+
+function normalizeTextList(input: unknown) {
+  if (Array.isArray(input)) {
+    return input.map((item) => normalizeText(item)).filter(Boolean);
+  }
+
+  const value = normalizeText(input);
+  return value
+    ? value
+        .split(/[,;|]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
 }
 
 function asRecord(input: unknown): Record<string, unknown> {

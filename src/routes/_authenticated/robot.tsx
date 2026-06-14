@@ -4,10 +4,11 @@ import { Bot, Loader2, Power } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
+import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
-import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
+import { getRobotPresentation } from "@/lib/robotPresentation";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
@@ -29,45 +30,47 @@ function RobotPage() {
 
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
+  const effectiveRobotState = useRobotConnectionSync({
+    userId: user?.id,
+    accountConnected: account.data?.connected === true,
+    robotState: robotState.data,
+  });
   const { settings, setSettings } = useRobotSettings(user?.id);
   const now = useCurrentTime();
   const smoothNextCycleSeconds = useSmoothCountdown(
-    robotState.data?.seconds_until_next_cycle,
-    getCountdownResetKey(robotState.data),
-    Boolean(robotState.data?.enabled && robotState.data.seconds_until_next_cycle > 0),
-    robotState.data?.fetched_at,
+    effectiveRobotState?.seconds_until_next_cycle,
+    getCountdownResetKey(effectiveRobotState),
+    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_next_cycle > 0),
+    effectiveRobotState?.fetched_at,
   );
   const smoothEntryWindowSeconds = useSmoothCountdown(
-    robotState.data?.seconds_until_entry_window,
-    getEntryWindowResetKey(robotState.data),
-    Boolean(robotState.data?.enabled && robotState.data.seconds_until_entry_window > 0),
-    robotState.data?.fetched_at,
+    effectiveRobotState?.seconds_until_entry_window,
+    getEntryWindowResetKey(effectiveRobotState),
+    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_entry_window > 0),
+    effectiveRobotState?.fetched_at,
   );
   const smoothExpirationSeconds = useSmoothCountdown(
-    robotState.data?.expiration_seconds,
-    getExpirationResetKey(robotState.data),
+    effectiveRobotState?.expiration_seconds,
+    getExpirationResetKey(effectiveRobotState),
     Boolean(
-      robotState.data?.enabled &&
-      (robotState.data.operation_in_progress ||
-        robotState.data.status === "PENDING_RESULT" ||
-        robotState.data.last_trade?.result === "PENDING_RESULT") &&
-      robotState.data.expiration_seconds > 0,
+      effectiveRobotState?.enabled &&
+      (effectiveRobotState.operation_in_progress ||
+        effectiveRobotState.status === "PENDING_RESULT" ||
+        effectiveRobotState.last_trade?.result === "PENDING_RESULT") &&
+      effectiveRobotState.expiration_seconds > 0,
     ),
-    robotState.data?.fetched_at,
+    effectiveRobotState?.fetched_at,
   );
-  const robotPresentation = getRobotPresentation(robotState.data, now, {
+  const robotPresentation = getRobotPresentation(effectiveRobotState, now, {
     nextCycleSeconds: smoothNextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
-  const signalReasonLines = formatSignalReasonLines(
-    robotPresentation.signal?.strategy_reason ?? robotPresentation.signal?.reason,
-  );
-
   const connected = account.data?.connected === true;
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
-  const robotEnabled = robotState.data?.enabled === true && robotState.data.status !== "STOPPED";
+  const robotEnabled =
+    effectiveRobotState?.enabled === true && effectiveRobotState.status !== "STOPPED";
   const hasBackend = !!apiConfig.BASE_URL;
 
   async function refreshAccountAndRobot() {
@@ -274,35 +277,27 @@ function RobotPage() {
             <div className="flex flex-wrap gap-2">
               <Pill label="Ativo" value={robotPresentation.signal.symbol} />
               <Pill label="Direção" value={robotPresentation.signal.direction} />
+              {robotPresentation.signal.strategy_score != null ? (
+                <Pill label="Score" value={formatScore(robotPresentation.signal.strategy_score)} />
+              ) : null}
               {robotPresentation.signal.confidence != null ? (
                 <Pill
                   label="Confiança"
                   value={`${Math.round(robotPresentation.signal.confidence)}%`}
                 />
               ) : null}
-              {robotPresentation.signal.strategy_score != null ? (
-                <Pill label="Score" value={formatScore(robotPresentation.signal.strategy_score)} />
-              ) : null}
-              <Pill
-                label="Estratégia usada"
-                value={robotPresentation.signal.strategy_name ?? "Não informada"}
-              />
               {robotPresentation.signal.payout != null ? (
                 <Pill label="Payout" value={`${Math.round(robotPresentation.signal.payout)}%`} />
               ) : null}
+              <Pill
+                label="Estratégias usadas"
+                value={
+                  robotPresentation.signal.used_strategies.length > 0
+                    ? robotPresentation.signal.used_strategies.join(", ")
+                    : (robotPresentation.signal.strategy_name ?? "Não informada")
+                }
+              />
             </div>
-            {signalReasonLines.length > 0 ? (
-              <div className="rounded-lg border border-border bg-background/35 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Motivo
-                </p>
-                <ul className="mt-2 space-y-1 text-muted-foreground">
-                  {signalReasonLines.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
           </div>
         ) : null}
 

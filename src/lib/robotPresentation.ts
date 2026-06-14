@@ -4,15 +4,8 @@ type RobotResult = "WIN" | "LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
 let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
-let signalRejectionSnapshot: SignalRejectionSnapshot | null = null;
 
 type OrderRejectionSnapshot = {
-  key: string;
-  reason: string;
-  observedAt: number;
-};
-
-type SignalRejectionSnapshot = {
   key: string;
   reason: string;
   observedAt: number;
@@ -62,35 +55,8 @@ export function getRobotPresentation(
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
 
   if (status === "SIGNAL_REJECTED") {
-    const reason = getSignalRejectionReason(robotState);
-    const key = [
-      robotState.rejected_at ?? "-",
-      robotState.last_signal?.created_at ?? "-",
-      reason,
-    ].join("|");
-
-    if (signalRejectionSnapshot?.key !== key) {
-      signalRejectionSnapshot = {
-        key,
-        reason,
-        observedAt: now,
-      };
-    }
-  }
-
-  if (signalRejectionSnapshot && now - signalRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS) {
-    return createPresentation(
-      "rejected",
-      "Nenhum sinal aprovado",
-      `Motivo: ${formatFriendlyRobotText(signalRejectionSnapshot.reason)}`,
-    );
-  }
-
-  if (status === "SIGNAL_REJECTED") {
     return createNextCyclePresentation(robotState, now, options);
   }
-
-  signalRejectionSnapshot = null;
 
   const orderRejected = status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED";
   if (orderRejected) {
@@ -131,7 +97,16 @@ export function getRobotPresentation(
     return createPresentation("operation", "Entrada liberada", "Enviando ordem...");
   }
 
-  if (status === "PENDING_RESULT") {
+  if (trade && result && isRecentResult(trade.finished_at, now)) {
+    return {
+      ...createPresentation("result", result),
+      trade,
+      direction: trade.direction,
+      result,
+    };
+  }
+
+  if (status === "PENDING_RESULT" && !result) {
     const remainingSeconds = Math.max(
       0,
       Math.ceil(options.expirationSeconds ?? robotState.expiration_seconds),
@@ -188,15 +163,6 @@ export function getRobotPresentation(
     };
   }
 
-  if (trade && result && isRecentResult(trade.finished_at, now)) {
-    return {
-      ...createPresentation("result", result),
-      trade,
-      direction: trade.direction,
-      result,
-    };
-  }
-
   if (signal && status === "WAITING_ENTRY_WINDOW") {
     const remainingSeconds = Math.max(
       0,
@@ -206,7 +172,7 @@ export function getRobotPresentation(
     return {
       ...createPresentation(
         "analyzing",
-        "Sinal encontrado",
+        "Sinal escolhido",
         null,
         remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
       ),
@@ -216,11 +182,11 @@ export function getRobotPresentation(
   }
 
   if (status === "WAITING_ENTRY_WINDOW") {
-    return createPresentation("analyzing", "Analisando mercado...", "Buscando melhor ativo...");
+    return createPresentation("analyzing", "Sinal escolhido");
   }
 
   if (status === "ANALYZING") {
-    return createPresentation("analyzing", "Analisando mercado...", "Buscando melhor ativo...");
+    return createPresentation("analyzing", "Analisando mercado...", "Escolhendo melhor ativo...");
   }
 
   if (status === "WAITING_NEXT_CYCLE") {
@@ -249,14 +215,6 @@ export function formatDuration(totalSeconds: number) {
   return `${String(minutesPart).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
 }
 
-export function formatSignalReasonLines(reason: string | null | undefined) {
-  if (!reason) return [];
-  return reason
-    .split(/\r?\n|;|\|/)
-    .map((line) => formatFriendlyRobotText(line))
-    .filter(Boolean);
-}
-
 export function formatFriendlyRobotText(value: string | null | undefined) {
   if (!value) return "Motivo não informado.";
 
@@ -278,7 +236,6 @@ export function formatFriendlyRobotText(value: string | null | undefined) {
 
 export function resetRobotPresentationState() {
   orderRejectionSnapshot = null;
-  signalRejectionSnapshot = null;
 }
 
 function isDisconnected(robotState: RobotState) {
@@ -292,14 +249,6 @@ function isDisconnected(robotState: RobotState) {
 function getOrderRejectionReason(robotState: RobotState) {
   return (
     robotState.last_order_error ?? robotState.rejection_reason ?? "Ordem recusada pela corretora."
-  );
-}
-
-function getSignalRejectionReason(robotState: RobotState) {
-  return (
-    robotState.last_rejection_reason ??
-    robotState.rejection_reason ??
-    "Nenhum sinal atingiu os critérios da estratégia."
   );
 }
 

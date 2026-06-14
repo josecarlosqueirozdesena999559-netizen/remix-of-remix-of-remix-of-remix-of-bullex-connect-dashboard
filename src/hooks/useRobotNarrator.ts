@@ -127,15 +127,11 @@ function getNarrationEvents(
   if (signal && status === "WAITING_ENTRY_WINDOW") {
     events.push({
       key: createSignalEventKey(signal),
-      text: `Sinal encontrado em ${formatSpokenActive(signal.symbol)}. Direção ${
+      text: `Melhor ativo encontrado: ${formatSpokenActive(signal.symbol)}. Direção ${
         signal.direction
-      }. Estratégia usada. ${formatSpokenStrategy(
-        signal.strategy_name ?? "não informada",
-      )}. Motivo. ${formatNarrationReason(
-        signal.strategy_reason ?? signal.reason ?? "não informado",
-      )}. Confiança ${formatPercent(signal.confidence)} por cento. Payout ${formatPercent(
-        signal.payout,
-      )} por cento.`,
+      }. Score ${formatScore(signal.strategy_score)}. Estratégias usadas: ${formatUsedStrategies(
+        signal,
+      )}. Aguardando janela de entrada.`,
     });
   }
 
@@ -161,15 +157,6 @@ function getNarrationEvents(
         text: `Operação aberta em ${formatSpokenActive(active)}. Aguardando resultado.`,
       });
     }
-  }
-
-  if (status === "SIGNAL_REJECTED") {
-    const reason =
-      robotState.last_rejection_reason ?? robotState.rejection_reason ?? "Sinal insuficiente";
-    events.push({
-      key: createEventKey("SIGNAL_REJECTED", orderId, signalCreatedAt, signal, reason),
-      text: "Nenhum sinal aprovado nesta análise. Próxima análise em cinco minutos.",
-    });
   }
 
   if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
@@ -321,6 +308,20 @@ function formatSpokenStrategy(strategy: string) {
   return formatTechnicalSpeech(formatFriendlyRobotText(strategy)).replace(/[.!?]+$/, "");
 }
 
+function formatUsedStrategies(signal: RobotSignal) {
+  const strategies =
+    signal.used_strategies.length > 0
+      ? signal.used_strategies
+      : [signal.strategy_name ?? "não informada"];
+
+  return strategies.map(formatSpokenStrategy).join(", ");
+}
+
+function formatScore(value: number | null) {
+  if (value == null) return "não informado";
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
+}
+
 function formatTechnicalSpeech(value: string) {
   return value
     .replace(/([a-zà-öø-ÿ])([A-Z])/g, "$1 $2")
@@ -350,10 +351,6 @@ function formatSpokenDuration(totalSeconds: number) {
   return `${minutesPart} ${minutesPart === 1 ? "minuto" : "minutos"} e ${secondsPart} ${
     secondsPart === 1 ? "segundo" : "segundos"
   }`;
-}
-
-function formatPercent(value: number | null) {
-  return Math.round(value ?? 0);
 }
 
 function formatProfit(value: number | null | undefined) {

@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BULLEX_ACCOUNT_QUERY_KEY, getDisconnectedState } from "@/hooks/useBullExAccount";
+import { ROBOT_STATE_QUERY_KEY } from "@/hooks/useRobotState";
 import {
   ApiError,
   type ApiResult,
   type ChangeBullexModePayload,
   bullexApi,
   isKnownApiError,
+  robotSyncConnection,
 } from "./api";
 import { useAuth } from "@/lib/useAuth";
 
@@ -24,11 +26,14 @@ export function useBullexAccount() {
   const { user } = useAuth();
   return useQuery({
     queryKey: ["bullex", user?.id, "account"],
-    queryFn: async () => unwrap(await bullexApi.account()),
+    queryFn: async () => {
+      console.log("[ACCOUNT REFETCH]");
+      return unwrap(await bullexApi.account());
+    },
     enabled: Boolean(user?.id),
-    refetchInterval: 8000,
+    refetchInterval: 3000,
     retry: 1,
-    staleTime: 5000,
+    staleTime: 1000,
   });
 }
 
@@ -46,11 +51,40 @@ export function useBullexBalance(enabled = true) {
 
 export function useConnectBullex() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) =>
       unwrap(await bullexApi.connect(payload)),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["bullex"] });
+    onSuccess: async () => {
+      console.log("[BULLEX CONNECT SUCCESS]");
+      console.log("[ACCOUNT REFETCH]");
+      await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
+      await qc.refetchQueries({ queryKey: ["bullex"], type: "active" });
+
+      if (user?.id) {
+        console.log("[ROBOT STATE REFETCH]");
+        await qc.refetchQueries({
+          queryKey: [...ROBOT_STATE_QUERY_KEY, user.id],
+          exact: true,
+          type: "active",
+        });
+      }
+
+      console.log("[ROBOT SYNC CONNECTION]");
+      try {
+        await robotSyncConnection();
+      } catch (error) {
+        console.warn("[ROBOT SYNC CONNECTION ERROR]", error);
+      }
+
+      if (user?.id) {
+        console.log("[ROBOT STATE REFETCH]");
+        await qc.refetchQueries({
+          queryKey: [...ROBOT_STATE_QUERY_KEY, user.id],
+          exact: true,
+          type: "active",
+        });
+      }
     },
     onError: toastGenericError,
   });

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
+import { Bot, Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
+import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
+import { useRobotState } from "@/hooks/useRobotState";
 import { ApiError, apiConfig } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
@@ -13,14 +15,22 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { user } = useAuth();
   const account = useBullExAccount();
+  const robotState = useRobotState(user?.id);
   const acc = account.data;
   const connected = acc?.connected === true;
+  const effectiveRobotState = useRobotConnectionSync({
+    userId: user?.id,
+    accountConnected: connected,
+    robotState: robotState.data,
+  });
+  const robotConnected = connected && effectiveRobotState?.connected !== false;
   const isLoading = account.isLoading;
   const hasBackend = !!apiConfig.BASE_URL;
   const disconnected =
     acc?.connected === false ||
     (account.error instanceof ApiError &&
-      (account.error.code === "SESSION_NOT_FOUND" || account.error.code === "SESSION_DISCONNECTED"));
+      (account.error.code === "SESSION_NOT_FOUND" ||
+        account.error.code === "SESSION_DISCONNECTED"));
   const apiError = disconnected ? null : account.error;
   const isNoBackend = apiError instanceof Error && apiError.message.includes("VITE_API_BASE_URL");
 
@@ -32,13 +42,20 @@ function Dashboard() {
       <header>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Resumo da sua conta BullEx.</p>
-        {user?.id && <p className="mt-1 text-xs text-muted-foreground">Sessão: {user.id.slice(0, 8)}</p>}
+        {user?.id && (
+          <p className="mt-1 text-xs text-muted-foreground">Sessão: {user.id.slice(0, 8)}</p>
+        )}
       </header>
 
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          <strong>Backend não configurado.</strong> Defina <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code> e{" "}
-          <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_PANEL_API_KEY</code> no ambiente para conectar a API BullEx.
+          <strong>Backend não configurado.</strong> Defina{" "}
+          <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
+          e{" "}
+          <code className="rounded bg-background/40 px-1 font-mono text-xs">
+            VITE_PANEL_API_KEY
+          </code>{" "}
+          no ambiente para conectar a API BullEx.
         </div>
       )}
 
@@ -74,6 +91,12 @@ function Dashboard() {
           value={acc?.mode ?? "-"}
           Icon={Gamepad2}
           tone={acc?.mode === "REAL" ? "negative" : "positive"}
+        />
+        <LiveCard
+          label="RobÃ´"
+          value={robotConnected ? "Conectado" : "Desconectado"}
+          Icon={Bot}
+          tone={robotConnected ? "positive" : "negative"}
         />
         <LiveCard label="Email BullEx" value={acc?.email ?? "-"} Icon={Mail} />
       </div>
@@ -112,7 +135,9 @@ function LiveCard({
         <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
         <Icon className={`h-4 w-4 ${valueClass}`} />
       </div>
-      <div className={`${isLongValue ? "break-all text-base leading-snug" : "text-2xl"} font-semibold ${valueClass}`}>
+      <div
+        className={`${isLongValue ? "break-all text-base leading-snug" : "text-2xl"} font-semibold ${valueClass}`}
+      >
         {value}
       </div>
       {badge && (

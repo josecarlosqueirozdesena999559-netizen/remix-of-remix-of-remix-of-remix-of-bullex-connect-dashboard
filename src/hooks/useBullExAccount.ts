@@ -20,6 +20,7 @@ export function useBullExAccount() {
   return useQuery({
     queryKey: [...BULLEX_ACCOUNT_QUERY_KEY, user?.id],
     queryFn: async () => {
+      console.log("[ACCOUNT REFETCH]");
       console.log("[BULLEX ACCOUNT FETCH]");
 
       const response = await bullexApi.account();
@@ -40,11 +41,11 @@ export function useBullExAccount() {
       return nextState;
     },
     enabled: Boolean(user?.id),
-    refetchInterval: 5000,
+    refetchInterval: 3000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 1,
-    staleTime: 4000,
+    staleTime: 1000,
   });
 }
 
