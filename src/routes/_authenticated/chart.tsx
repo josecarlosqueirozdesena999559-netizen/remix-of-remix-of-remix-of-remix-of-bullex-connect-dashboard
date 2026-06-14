@@ -332,9 +332,6 @@ function MarketPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
           <div>
             <h2 className="font-semibold">{selected ? selected.symbol : "Selecione um ativo"}</h2>
-            <p className="text-xs text-muted-foreground">
-              Intervalo 60s, ultimos 100 candles. Atualizacao via REST polling.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -387,8 +384,20 @@ function MarketPage() {
             className="h-[520px] w-full overflow-hidden rounded-xl border border-border/60 bg-card"
           />
 
+          <div className="pointer-events-none absolute inset-4 z-10 flex select-none items-center justify-center overflow-hidden rounded-xl">
+            <div className="flex items-center gap-4 text-foreground/10">
+              <div className="hidden h-20 w-20 items-end gap-1.5 sm:flex" aria-hidden="true">
+                <span className="h-8 w-2.5 rounded-sm bg-current" />
+                <span className="h-14 w-2.5 rounded-sm bg-current" />
+                <span className="h-20 w-2.5 rounded-sm bg-current" />
+                <span className="h-11 w-2.5 rounded-sm bg-current" />
+              </div>
+              <span className="text-5xl font-black tracking-normal sm:text-7xl">BullEx</span>
+            </div>
+          </div>
+
           {displayedCandle && (
-            <div className="pointer-events-none absolute right-8 top-8 rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
+            <div className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
               <div className="font-semibold text-foreground">{formatTime(displayedCandle.time)}</div>
               <div className="mt-1 text-muted-foreground">Open {formatNumber(displayedCandle.open)}</div>
               <div className="text-muted-foreground">High {formatNumber(displayedCandle.high)}</div>

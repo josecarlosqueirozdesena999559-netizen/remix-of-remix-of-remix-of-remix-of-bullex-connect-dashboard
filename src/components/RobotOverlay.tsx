@@ -194,7 +194,7 @@ export function RobotOverlay({
         <Score label="LOSS" value={robotState?.losses ?? 0} tone="loss" />
       </div>
 
-      <div className="-mt-1 w-[290px] max-w-[92vw] rounded-xl border border-border bg-card px-3 py-2 text-center text-foreground sm:-mt-2 sm:w-[410px]">
+      <div className="-mt-1 w-[290px] max-w-[92vw] px-3 py-2 text-center text-foreground [text-shadow:0_2px_5px_rgba(0,0,0,0.85)] sm:-mt-2 sm:w-[410px]">
         {account?.connected ? (
           <p className="mb-1 text-[11px] font-semibold sm:text-xs">
             {account.mode ?? "-"}
