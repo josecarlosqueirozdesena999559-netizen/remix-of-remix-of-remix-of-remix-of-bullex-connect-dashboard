@@ -84,6 +84,12 @@ export function normalizeRobotState(input: unknown): RobotState {
     wins: Math.max(0, normalizeNumber(value.wins) ?? 0),
     losses: Math.max(0, normalizeNumber(value.losses) ?? 0),
     profit: normalizeNumber(value.profit) ?? 0,
+    last_order_error: normalizeOptionalText(
+      value.last_order_error ??
+        value.lastOrderError ??
+        value.order_error ??
+        value.orderError,
+    ),
     rejection_reason: normalizeOptionalText(value.rejection_reason ?? value.rejectionReason),
     last_rejection_reason: normalizeOptionalText(
       value.last_rejection_reason ??

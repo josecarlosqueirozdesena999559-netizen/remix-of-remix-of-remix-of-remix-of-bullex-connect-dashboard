@@ -140,24 +140,30 @@ function getNarrationEvents(
   }
 
   if (status === "SIGNAL_REJECTED") {
+    const reason =
+      robotState.last_rejection_reason ??
+      robotState.rejection_reason ??
+      "Sinal insuficiente";
     events.push({
       key: createEventKey(
         "SIGNAL_REJECTED",
         orderId,
         signalCreatedAt,
         signal,
-        robotState.last_rejection_reason ?? robotState.rejection_reason ?? "",
+        reason,
       ),
-      text:
-        "A entrada foi encontrada, porém não segue os parâmetros de análises confiáveis. Aguarde mais um pouco.",
+      text: `Sinal bloqueado. Motivo: ${formatNarrationReason(reason)}.`,
     });
   }
 
   if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
+    const reason =
+      robotState.last_order_error ??
+      robotState.rejection_reason ??
+      "Ordem recusada pela corretora";
     events.push({
-      key: createEventKey("ORDER_REJECTED", orderId, signalCreatedAt, signal, robotState.rejection_reason ?? ""),
-      text:
-        "A entrada foi encontrada, porém não segue os parâmetros de análises confiáveis. Aguarde mais um pouco.",
+      key: createEventKey("ORDER_REJECTED", orderId, signalCreatedAt, signal, reason),
+      text: `Entrada rejeitada. Motivo: ${formatNarrationReason(reason)}.`,
     });
   }
 
@@ -302,6 +308,10 @@ function formatSpokenReason(reason: string | null | undefined) {
     .replace(/\bPUT\b/gi, "venda")
     .replace(/_/g, " ")
     .trim();
+}
+
+function formatNarrationReason(reason: string) {
+  return formatSpokenReason(reason).replace(/[.!?]+$/, "");
 }
 
 function getRemainingNextCycleSeconds(robotState: RobotState) {

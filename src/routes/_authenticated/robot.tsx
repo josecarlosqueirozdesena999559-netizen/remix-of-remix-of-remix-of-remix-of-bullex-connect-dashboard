@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/robot")({
   component: RobotPage,
 });
 
-const FIXED_CYCLE_MINUTES = 10;
+const FIXED_CYCLE_MINUTES = 5;
 const FIXED_MIN_CONFIDENCE = 80;
 const FIXED_MIN_PAYOUT = 80;
 

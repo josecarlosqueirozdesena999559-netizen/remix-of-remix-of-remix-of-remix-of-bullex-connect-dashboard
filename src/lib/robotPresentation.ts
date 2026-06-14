@@ -5,6 +5,16 @@ const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
 let observedStatus: string | null = null;
 let localRejectedAt: number | null = null;
+let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
+
+type OrderRejectionSnapshot = {
+  key: string;
+  reason: string;
+  observedAt: number;
+  trade: RobotTrade | null;
+  signal: RobotSignal | null;
+  direction: RobotDirection | null;
+};
 
 type RobotPresentationOptions = {
   nextCycleSeconds?: number | null;
@@ -67,22 +77,55 @@ export function getRobotPresentation(
     );
   }
 
-  if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
+  const orderRejected = status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED";
+  if (orderRejected) {
+    const reason = getOrderRejectionReason(robotState);
+    const key = [
+      robotState.rejected_at ?? "-",
+      trade?.order_id ?? "-",
+      trade?.sent_at ?? "-",
+      reason,
+    ].join("|");
+
+    if (orderRejectionSnapshot?.key !== key) {
+      orderRejectionSnapshot = {
+        key,
+        reason,
+        observedAt: now,
+        trade,
+        signal,
+        direction: trade?.direction ?? signal?.direction ?? null,
+      };
+    }
+  }
+
+  if (
+    orderRejectionSnapshot &&
+    now - orderRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS
+  ) {
     return {
       ...createPresentation(
         "rejected",
         "Entrada rejeitada",
-        `Motivo: ${robotState.rejection_reason ?? robotState.last_rejection_reason ?? "Ordem recusada pela corretora."}`,
+        `Motivo: ${orderRejectionSnapshot.reason}`,
       ),
-      trade,
-      signal,
-      direction: trade?.direction ?? signal?.direction ?? null,
+      trade: orderRejectionSnapshot.trade,
+      signal: orderRejectionSnapshot.signal,
+      direction: orderRejectionSnapshot.direction,
     };
+  }
+
+  if (orderRejected) {
+    return createNextCyclePresentation(robotState, now, options);
+  }
+
+  if (!orderRejected) {
+    orderRejectionSnapshot = null;
   }
 
   if (status === "SENDING_ORDER") {
     return {
-      ...createPresentation("operation", "Enviando ordem..."),
+      ...createPresentation("operation", "Entrada liberada", "Enviando ordem..."),
       trade,
       signal,
       direction: trade?.direction ?? signal?.direction ?? null,
@@ -183,7 +226,7 @@ export function getRobotPresentation(
     );
   }
 
-  return createNextCyclePresentation(robotState, now, options, "Robô ativo", 600);
+  return createNextCyclePresentation(robotState, now, options, "Robô ativo", 300);
 }
 
 export function formatDuration(totalSeconds: number) {
@@ -223,6 +266,14 @@ function getRejectedAt(robotState: RobotState, now: number) {
   }
 
   return localRejectedAt;
+}
+
+function getOrderRejectionReason(robotState: RobotState) {
+  return (
+    robotState.last_order_error ??
+    robotState.rejection_reason ??
+    "Ordem recusada pela corretora."
+  );
 }
 
 function createNextCyclePresentation(
