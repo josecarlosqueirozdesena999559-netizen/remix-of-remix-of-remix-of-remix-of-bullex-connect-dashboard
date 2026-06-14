@@ -54,6 +54,14 @@ export function normalizeRobotState(input: unknown): RobotState {
     active_mode: normalizeOptionalText(value.active_mode ?? value.activeMode),
     real_ready: normalizeBoolean(value.real_ready ?? value.realReady),
     real_block_reason: normalizeOptionalText(value.real_block_reason ?? value.realBlockReason),
+    stop_reason: normalizeOptionalText(
+      value.stop_reason ??
+        value.stopReason ??
+        value.stop_status ??
+        value.stopStatus ??
+        value.stop_type ??
+        value.stopType,
+    ),
     next_cycle_at: normalizeOptionalText(value.next_cycle_at ?? value.nextCycleAt),
     seconds_until_next_cycle: Math.max(
       0,

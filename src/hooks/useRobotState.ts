@@ -41,6 +41,7 @@ export type RobotState = {
   active_mode: string | null;
   real_ready: boolean;
   real_block_reason: string | null;
+  stop_reason: string | null;
   next_cycle_at: string | null;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
@@ -105,6 +106,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     active_mode: null,
     real_ready: false,
     real_block_reason: disconnected ? "Conta BullEx desconectada" : null,
+    stop_reason: null,
     next_cycle_at: null,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,

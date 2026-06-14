@@ -19,7 +19,9 @@ export function useRobotNarrator(robotState: RobotState | undefined, enabled: bo
   }, [enabled, supported]);
 
   useEffect(() => {
-    if (!supported || !enabled || !robotState?.enabled || robotState.status === "STOPPED") return;
+    if (!supported || !enabled || !robotState) return;
+    const stopLimit = getStopLimit(robotState);
+    if ((!robotState.enabled || robotState.status === "STOPPED") && !stopLimit) return;
     if (document.visibilityState !== "visible") return;
     if (speaking || window.speechSynthesis.speaking || window.speechSynthesis.pending) return;
 
@@ -69,6 +71,24 @@ function getNarrationEvents(robotState: RobotState): NarrationEvent[] {
   const orderId = trade?.order_id ?? "-";
   const signalCreatedAt = signal?.created_at ?? "-";
   const result = getTradeResult(trade);
+  const stopLimit = getStopLimit(robotState);
+
+  if (stopLimit) {
+    events.push({
+      key: createEventKey(
+        stopLimit,
+        orderId,
+        signalCreatedAt,
+        signal,
+        `${robotState.profit}:${robotState.wins}:${robotState.losses}:${robotState.stop_reason ?? ""}`,
+      ),
+      text:
+        stopLimit === "STOP_WIN"
+          ? `Stop win atingido. Meta de ganho alcançada. Lucro atual de ${formatProfit(robotState.profit)}. Robô pausado.`
+          : `Stop loss atingido. Limite de perda alcançado. Prejuízo atual de ${formatProfit(robotState.profit)}. Robô pausado.`,
+    });
+    return events;
+  }
 
   if (
     !signal &&
@@ -190,6 +210,26 @@ function createResultKey(result: "WIN" | "LOSS", trade: RobotTrade | null) {
 
 function getTradeResult(trade: RobotTrade | null) {
   return trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+}
+
+function getStopLimit(robotState: RobotState): "STOP_WIN" | "STOP_LOSS" | null {
+  const text = `${robotState.status} ${robotState.stop_reason ?? ""}`
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (text.includes("STOP_WIN") || text.includes("WIN_REACHED") || text.includes("TAKE_PROFIT")) {
+    return "STOP_WIN";
+  }
+
+  if (
+    text.includes("STOP_LOSS") ||
+    text.includes("LOSS_REACHED") ||
+    text.includes("MAX_LOSS")
+  ) {
+    return "STOP_LOSS";
+  }
+
+  return null;
 }
 
 function translateDirection(direction: RobotDirection) {
