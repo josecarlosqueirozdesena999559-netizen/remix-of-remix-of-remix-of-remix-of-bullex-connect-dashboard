@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CandlestickData, UTCTimestamp } from "lightweight-charts";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 
@@ -13,6 +13,9 @@ export type MarketPollingStatus = "idle" | "polling" | "error";
 
 const CANDLES_POLL_INTERVAL_MS = 1000;
 const PAYOUT_POLL_INTERVAL_MS = 5000;
+const MARKET_REQUEST_TIMEOUT_MS = 8000;
+const INITIAL_CANDLE_COUNT = 60;
+const UPDATE_CANDLE_COUNT = 5;
 
 export function useMarketData(active: string | null) {
   const [candles, setCandles] = useState<MarketCandle[]>([]);
@@ -25,9 +28,6 @@ export function useMarketData(active: string | null) {
   const [lastCandleReceivedAt, setLastCandleReceivedAt] = useState<Date | null>(null);
   const [lastCandleTimestamp, setLastCandleTimestamp] = useState<UTCTimestamp | null>(null);
   const [pollingStatus, setPollingStatus] = useState<MarketPollingStatus>("idle");
-
-  const candlesInFlightRef = useRef(false);
-  const payoutInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!active) {
@@ -45,6 +45,14 @@ export function useMarketData(active: string | null) {
     }
 
     let cancelled = false;
+    let candlesInFlight = false;
+    let payoutInFlight = false;
+    let hasInitialCandles = false;
+    let candlesTimer: number | null = null;
+    let payoutTimer: number | null = null;
+    let candlesController: AbortController | null = null;
+    let payoutController: AbortController | null = null;
+
     setCandles([]);
     setLastPrice(null);
     setSelectedPayout(null);
@@ -57,46 +65,62 @@ export function useMarketData(active: string | null) {
     setPollingStatus("polling");
 
     const fetchCandles = async () => {
-      if (candlesInFlightRef.current) return;
-      candlesInFlightRef.current = true;
+      if (cancelled || candlesInFlight) return;
+      candlesInFlight = true;
+      candlesController = new AbortController();
+      const timeout = window.setTimeout(
+        () => candlesController?.abort(),
+        MARKET_REQUEST_TIMEOUT_MS,
+      );
 
       try {
-        const url = `/bullex/candles?active=${encodeURIComponent(active)}&interval=60&count=100`;
-        const candlesResponse = await apiRequest<unknown>(url);
+        const count = hasInitialCandles ? UPDATE_CANDLE_COUNT : INITIAL_CANDLE_COUNT;
+        const url = `/bullex/candles?active=${encodeURIComponent(active)}&interval=60&count=${count}`;
+        const candlesResponse = await apiRequest<unknown>(url, {
+          signal: candlesController.signal,
+        });
         const nextCandles = normalizeCandlesPayload(active, unwrap(candlesResponse)).slice(-200);
 
         if (cancelled) return;
 
-        setCandles(nextCandles);
-        setLastPrice(nextCandles[nextCandles.length - 1]?.close ?? null);
-        setLastCandleTimestamp(nextCandles[nextCandles.length - 1]?.time ?? null);
-        setLastCandleReceivedAt(nextCandles.length > 0 ? new Date() : null);
+        const latestCandle = nextCandles[nextCandles.length - 1] ?? null;
+        setCandles((currentCandles) => mergeCandles(currentCandles, nextCandles).slice(-200));
+        if (latestCandle) {
+          hasInitialCandles = true;
+          setLastPrice(latestCandle.close);
+          setLastCandleTimestamp(latestCandle.time);
+          setLastCandleReceivedAt(new Date());
+        }
         setCandlesError(null);
         setPollingStatus("polling");
       } catch (error) {
         if (!cancelled) {
           setCandlesError(error);
-          setCandles([]);
-          setLastPrice(null);
-          setLastCandleTimestamp(null);
-          setLastCandleReceivedAt(null);
           setPollingStatus("error");
         }
       } finally {
-        candlesInFlightRef.current = false;
+        window.clearTimeout(timeout);
+        candlesController = null;
+        candlesInFlight = false;
         if (!cancelled) {
           setIsCandlesLoading(false);
+          candlesTimer = window.setTimeout(() => {
+            void fetchCandles();
+          }, CANDLES_POLL_INTERVAL_MS);
         }
       }
     };
 
     const fetchPayout = async () => {
-      if (payoutInFlightRef.current) return;
-      payoutInFlightRef.current = true;
+      if (cancelled || payoutInFlight) return;
+      payoutInFlight = true;
+      payoutController = new AbortController();
+      const timeout = window.setTimeout(() => payoutController?.abort(), MARKET_REQUEST_TIMEOUT_MS);
 
       try {
         const payoutResponse = await apiRequest<unknown>(
           `/bullex/payouts?active=${encodeURIComponent(active)}`,
+          { signal: payoutController.signal },
         );
         const payout = normalizePayout(active, unwrap(payoutResponse)).payout;
 
@@ -110,29 +134,29 @@ export function useMarketData(active: string | null) {
           setSelectedPayout(null);
         }
       } finally {
-        payoutInFlightRef.current = false;
+        window.clearTimeout(timeout);
+        payoutController = null;
+        payoutInFlight = false;
         if (!cancelled) {
           setIsPayoutLoading(false);
+          payoutTimer = window.setTimeout(() => {
+            void fetchPayout();
+          }, PAYOUT_POLL_INTERVAL_MS);
         }
       }
     };
 
     void fetchCandles();
-    void fetchPayout();
-
-    const candlesInterval = window.setInterval(() => {
-      void fetchCandles();
-    }, CANDLES_POLL_INTERVAL_MS);
-    const payoutInterval = window.setInterval(() => {
+    payoutTimer = window.setTimeout(() => {
       void fetchPayout();
-    }, PAYOUT_POLL_INTERVAL_MS);
+    }, 500);
 
     return () => {
       cancelled = true;
-      candlesInFlightRef.current = false;
-      payoutInFlightRef.current = false;
-      window.clearInterval(candlesInterval);
-      window.clearInterval(payoutInterval);
+      candlesController?.abort();
+      payoutController?.abort();
+      if (candlesTimer != null) window.clearTimeout(candlesTimer);
+      if (payoutTimer != null) window.clearTimeout(payoutTimer);
     };
   }, [active]);
 
@@ -148,6 +172,22 @@ export function useMarketData(active: string | null) {
     pollingStatus,
     selectedPayout,
   };
+}
+
+function mergeCandles(currentCandles: MarketCandle[], nextCandles: MarketCandle[]) {
+  if (currentCandles.length === 0) return nextCandles;
+  if (nextCandles.length === 0) return currentCandles;
+
+  const byTime = new Map<number, MarketCandle>();
+  for (const candle of currentCandles) {
+    byTime.set(Number(candle.time), candle);
+  }
+
+  for (const candle of nextCandles) {
+    byTime.set(Number(candle.time), candle);
+  }
+
+  return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
 }
 
 function unwrap<T>(res: ApiResult<T>): T {
@@ -198,7 +238,9 @@ function normalizeCandlesPayload(active: string, input: unknown): MarketCandle[]
     return [];
   }
 
-  const normalized = raw.map((item) => normalizeCandle(active, item)).filter(Boolean) as MarketCandle[];
+  const normalized = raw
+    .map((item) => normalizeCandle(active, item))
+    .filter(Boolean) as MarketCandle[];
   normalized.sort((a, b) => Number(a.time) - Number(b.time));
 
   return normalized.filter((candle, index, array) => {

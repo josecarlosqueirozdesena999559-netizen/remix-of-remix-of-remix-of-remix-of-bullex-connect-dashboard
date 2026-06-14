@@ -19,12 +19,12 @@ import { isAdminUser } from "@/lib/adminAccess";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { to: "/chart", label: "Grafico", Icon: CandlestickChart },
+  { to: "/chart", label: "Gráfico", Icon: CandlestickChart },
   { to: "/bullex", label: "BullEx", Icon: Plug },
-  { to: "/robot", label: "Robo", Icon: Bot },
-  { to: "/history", label: "Historico", Icon: History },
+  { to: "/robot", label: "Robô", Icon: Bot },
+  { to: "/history", label: "Histórico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
-  { to: "/settings", label: "Configuracoes", Icon: Settings },
+  { to: "/settings", label: "Configurações", Icon: Settings },
 ] as const;
 
 const adminNav = { to: "/admin", label: "Admin", Icon: ShieldCheck } as const;
@@ -85,7 +85,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
+      <main
+        className={`flex-1 p-4 md:p-8 w-full mx-auto ${
+          pathname === "/chart" ? "max-w-[1680px]" : "max-w-7xl"
+        }`}
+      >
         {pathname !== "/welcome-trial" && <TrialBanner />}
         {children}
       </main>

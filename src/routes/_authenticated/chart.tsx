@@ -13,7 +13,7 @@ import {
 import { BarChart3, Loader2 } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useMarketData } from "@/hooks/useMarketData";
-import { useRobotState } from "@/hooks/useRobotState";
+import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
@@ -34,17 +34,19 @@ type HoveredCandle = Candle | null;
 type ChartApi = ReturnType<typeof createChart>;
 type CandlestickSeriesApi = ReturnType<ChartApi["addSeries"]>;
 const EMPTY_ASSETS: Asset[] = [];
+const CHART_HEIGHT = 680;
+const MOBILE_CHART_HEIGHT = 560;
 
 function MarketPage() {
   const { user } = useAuth();
   const [selectedSymbol, setSelectedSymbol] = useState("EURUSD-OTC");
-  const [robotChartSymbol, setRobotChartSymbol] = useState<string | null>(null);
   const [followPrice, setFollowPrice] = useState(true);
   const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
-  const bestCandidate = robotState.data?.best_candidate ?? null;
-  const chartSymbol = robotChartSymbol ?? selectedSymbol;
+  const now = useCurrentTime();
+  const chartSelection = resolveChartSelection(robotState.data, selectedSymbol, now);
+  const chartSymbol = chartSelection.symbol;
 
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ChartApi | null>(null);
@@ -91,16 +93,35 @@ function MarketPage() {
     pollingStatus,
     selectedPayout,
   } = useMarketData(chartSymbol || null);
+  const realtimeAgeSeconds =
+    lastCandleReceivedAt == null
+      ? null
+      : Math.max(0, Math.floor((now - lastCandleReceivedAt.getTime()) / 1000));
+  const realtimeStatus =
+    realtimeAgeSeconds == null ? "Atrasado" : realtimeAgeSeconds <= 3 ? "Tempo real" : "Atrasado";
 
   useEffect(() => {
-    if (!bestCandidate?.symbol) return;
-    setRobotChartSymbol(bestCandidate.symbol);
     setFollowPrice(true);
-  }, [bestCandidate?.symbol]);
+  }, [chartSymbol]);
+
+  const lastRealtimeStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!chartSymbol || realtimeAgeSeconds == null) return;
+    const realtimeKey = `${chartSymbol}|${realtimeStatus}`;
+    if (lastRealtimeStatusRef.current === realtimeKey) return;
+    lastRealtimeStatusRef.current = realtimeKey;
+
+    const payload = { symbol: chartSymbol, age_seconds: realtimeAgeSeconds };
+    if (realtimeStatus === "Tempo real") {
+      console.log("[CHART_REALTIME_OK]", payload);
+    } else {
+      console.log("[CHART_REALTIME_STALE]", payload);
+    }
+  }, [chartSymbol, realtimeAgeSeconds, realtimeStatus]);
 
   useEffect(() => {
     if (assets.length === 0) return;
-    if (robotChartSymbol) return;
+    if (chartSelection.source !== "selected") return;
     if (assets.some((asset) => asset.symbol === selectedSymbol)) return;
 
     const defaultAsset = assets.find((asset) => asset.symbol === "EURUSD-OTC") ?? assets[0];
@@ -108,15 +129,15 @@ function MarketPage() {
     if (defaultAsset?.symbol) {
       setSelectedSymbol(defaultAsset.symbol);
     }
-  }, [assets, robotChartSymbol, selectedSymbol]);
+  }, [assets, chartSelection.source, selectedSymbol]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
     if (!container || chartRef.current) return;
 
     const chart = createChart(container, {
-      width: container.clientWidth,
-      height: 520,
+      width: Math.max(1, Math.floor(container.getBoundingClientRect().width)),
+      height: CHART_HEIGHT,
       layout: {
         background: { color: "#111827" },
         textColor: "#9CA3AF",
@@ -197,8 +218,10 @@ function MarketPage() {
       const entry = entries[0];
       if (!entry) return;
       chart.applyOptions({
-        width: Math.floor(entry.contentRect.width),
-        height: 520,
+        width: Math.max(1, Math.floor(entry.contentRect.width)),
+        height: window.matchMedia("(min-width: 768px)").matches
+          ? CHART_HEIGHT
+          : MOBILE_CHART_HEIGHT,
       });
     });
 
@@ -260,7 +283,10 @@ function MarketPage() {
     } else if (candles.length === 0) {
       series.setData([]);
       prevCandlesLengthRef.current = 0;
-    } else if (prevCandlesLengthRef.current === 0 || candles.length < prevCandlesLengthRef.current) {
+    } else if (
+      prevCandlesLengthRef.current === 0 ||
+      candles.length < prevCandlesLengthRef.current
+    ) {
       series.setData(candles);
       prevCandlesLengthRef.current = candles.length;
     } else if (followPrice && candles.length > 0) {
@@ -333,7 +359,6 @@ function MarketPage() {
             <select
               value={chartSymbol}
               onChange={(event) => {
-                setRobotChartSymbol(null);
                 setSelectedSymbol(event.target.value);
               }}
               disabled={assetsQuery.isLoading || assets.length === 0}
@@ -346,9 +371,10 @@ function MarketPage() {
                     ? "Nenhum ativo binário disponível no momento."
                     : "Selecione um ativo"}
               </option>
-              {bestCandidate && !assets.some((asset) => asset.symbol === bestCandidate.symbol) ? (
-                <option value={bestCandidate.symbol}>
-                  {`${bestCandidate.symbol} | Melhor ativo`}
+              {chartSelection.source !== "selected" &&
+              !assets.some((asset) => asset.symbol === chartSymbol) ? (
+                <option value={chartSymbol}>
+                  {`${chartSymbol} | ${formatChartSource(chartSelection.source)}`}
                 </option>
               ) : null}
               {assets.map((asset) => (
@@ -360,18 +386,22 @@ function MarketPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {bestCandidate ? <BadgeLabel label="Melhor ativo" value={bestCandidate.symbol} /> : null}
+            <BadgeLabel label="Fonte" value={formatChartSource(chartSelection.source)} />
+            <BadgeLabel
+              label="Tempo real"
+              value={formatRealtimeStatus(realtimeStatus, realtimeAgeSeconds)}
+            />
             <BadgeLabel
               label="Payout"
               value={isPayoutLoading ? "..." : formatPayoutValue(selectedPayout)}
             />
             <BadgeLabel label="Modo" value={formatAccountMode(account.data?.mode)} />
             <BadgeLabel
-              label="Ultimo preco"
+              label="Último preço"
               value={lastPrice != null ? formatNumber(lastPrice) : "-"}
             />
             <BadgeLabel
-              label="Ultimo candle"
+              label="Último candle"
               value={lastCandleTimestamp ? formatDateTimeFromTimestamp(lastCandleTimestamp) : "-"}
             />
             <BadgeLabel
@@ -392,7 +422,9 @@ function MarketPage() {
       <section className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
           <div>
-            <h2 className="font-semibold">{selected ? selected.symbol : "Selecione um ativo"}</h2>
+            <h2 className="font-semibold">
+              {selected?.symbol ?? chartSymbol ?? "Selecione um ativo"}
+            </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -420,7 +452,7 @@ function MarketPage() {
               }}
               className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
             >
-              Seguir preco {followPrice ? "ON" : "OFF"}
+              Seguir preço {followPrice ? "ON" : "OFF"}
             </button>
             <span className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground">
               Intervalo 60s
@@ -439,10 +471,10 @@ function MarketPage() {
           </div>
         )}
 
-        <div className="relative h-[520px] min-h-[520px] p-4">
+        <div className="relative min-h-[592px] p-4 md:min-h-[712px]">
           <div
             ref={chartContainerRef}
-            className="h-[520px] w-full overflow-hidden rounded-xl border border-border/60 bg-card"
+            className="h-[560px] w-full overflow-hidden rounded-xl border border-border/60 bg-card md:h-[680px]"
           />
 
           <div className="pointer-events-none absolute inset-4 z-10 flex select-none items-center justify-center overflow-hidden rounded-xl">
@@ -481,7 +513,7 @@ function MarketPage() {
 
           {!chartSymbol && (
             <div className="mt-4 flex items-center justify-center text-sm text-muted-foreground">
-              Selecione um ativo para abrir o grafico.
+              Selecione um ativo para abrir o gráfico.
             </div>
           )}
         </div>
@@ -489,7 +521,7 @@ function MarketPage() {
 
       <section className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="border-b border-border p-5">
-          <h2 className="font-semibold">Ultimos 10 candles</h2>
+          <h2 className="font-semibold">Últimos 10 candles</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -541,6 +573,68 @@ function BadgeLabel({ label, value }: { label: string; value: string }) {
       <div className="text-sm font-semibold">{value}</div>
     </div>
   );
+}
+
+function useCurrentTime() {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return now;
+}
+
+function resolveChartSelection(
+  robotState: RobotState | undefined,
+  selectedSymbol: string,
+  now: number,
+) {
+  if (robotState?.best_candidate?.symbol) {
+    return { symbol: robotState.best_candidate.symbol, source: "best_candidate" as const };
+  }
+
+  if (robotState?.pending_signal?.symbol) {
+    return { symbol: robotState.pending_signal.symbol, source: "pending_signal" as const };
+  }
+
+  if (robotState?.last_trade && isRecentTrade(robotState.last_trade, now)) {
+    return { symbol: robotState.last_trade.active, source: "last_trade" as const };
+  }
+
+  return { symbol: selectedSymbol, source: "selected" as const };
+}
+
+function isRecentTrade(trade: NonNullable<RobotState["last_trade"]>, now: number) {
+  const timestamp = parseTimestamp(trade.finished_at ?? trade.sent_at);
+  if (timestamp == null) return false;
+  const ageSeconds = (now - timestamp) / 1000;
+  return ageSeconds >= 0 && ageSeconds < 60;
+}
+
+function parseTimestamp(value: string | null) {
+  if (!value) return null;
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const timestamp = Date.parse(hasTimezone ? value : `${value}Z`);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function formatChartSource(source: ReturnType<typeof resolveChartSelection>["source"]) {
+  switch (source) {
+    case "best_candidate":
+      return "Melhor ativo";
+    case "pending_signal":
+      return "Sinal pendente";
+    case "last_trade":
+      return "Última entrada";
+    default:
+      return "Selecionado";
+  }
+}
+
+function formatRealtimeStatus(status: string, ageSeconds: number | null) {
+  return ageSeconds == null ? status : `${status} (${ageSeconds}s)`;
 }
 
 function unwrap<T>(res: ApiResult<T>): T {

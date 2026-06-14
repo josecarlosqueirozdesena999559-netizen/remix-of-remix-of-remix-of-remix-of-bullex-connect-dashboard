@@ -66,15 +66,7 @@ export function normalizeRobotState(input: unknown): RobotState {
         tradeValue.expiresIn,
     ) ?? 0;
   const bestCandidate = normalizeSignal(value.best_candidate ?? value.bestCandidate);
-  const pendingSignal =
-    status === "WAITING_ENTRY_WINDOW"
-      ? normalizeSignal(
-          value.pending_signal ??
-            value.pendingSignal ??
-            value.best_candidate ??
-            value.bestCandidate,
-        )
-      : null;
+  const pendingSignal = normalizeSignal(value.pending_signal ?? value.pendingSignal);
   const fallbackAttempt = Math.max(
     0,
     normalizeNumber(
