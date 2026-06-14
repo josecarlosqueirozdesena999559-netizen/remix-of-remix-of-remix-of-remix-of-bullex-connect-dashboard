@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Loader2, LockKeyhole, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +16,7 @@ type Feedback = { type: "success" | "error"; text: string } | null;
 function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,6 +31,7 @@ function SettingsPage() {
 
   async function logout() {
     await supabase.auth.signOut();
+    queryClient.clear();
     navigate({ to: "/login", replace: true });
   }
 

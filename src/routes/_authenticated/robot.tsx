@@ -78,7 +78,9 @@ function RobotPage() {
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
-  const connected = account.data?.connected === true;
+  const syncing = account.isLoading || robotState.isLoading;
+  const cachedGrace = effectiveRobotState?.connection_status_source === "cached_grace";
+  const connected = account.data?.connected === true || cachedGrace;
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
   const robotEnabled =
@@ -91,7 +93,9 @@ function RobotPage() {
   }
 
   async function handleDemoMode() {
-    if (!hasBackend || !connected || modeActionPending || activeMode === "PRACTICE") return;
+    if (!hasBackend || syncing || !connected || modeActionPending || activeMode === "PRACTICE") {
+      return;
+    }
     setModeActionError(null);
     setShowRealConfirm(false);
     setRealConfirmed(false);
@@ -109,7 +113,7 @@ function RobotPage() {
   }
 
   function handleRealMode() {
-    if (!hasBackend || !connected || modeActionPending || activeMode === "REAL") return;
+    if (!hasBackend || syncing || !connected || modeActionPending || activeMode === "REAL") return;
     setModeActionError(null);
     setRealConfirmed(false);
     setShowRealConfirm(true);
@@ -137,7 +141,7 @@ function RobotPage() {
     if (!hasBackend || robotActionPending) return;
     setRobotActionError(null);
 
-    if (!robotEnabled && !connected) {
+    if (!syncing && !robotEnabled && !connected) {
       setRobotActionError("Conecte sua conta BullEx antes de iniciar o robô.");
       return;
     }
@@ -198,7 +202,7 @@ function RobotPage() {
         </div>
       ) : null}
 
-      {!connected ? (
+      {!syncing && !connected ? (
         <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-sm">
           <p className="font-medium text-warning-foreground">Conta BullEx desconectada.</p>
           <p className="mt-1 text-muted-foreground">
@@ -223,7 +227,7 @@ function RobotPage() {
             <button
               type="button"
               onClick={handleDemoMode}
-              disabled={!hasBackend || !connected || modeActionPending}
+              disabled={!hasBackend || syncing || !connected || modeActionPending}
               className={`rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 activeMode === "PRACTICE"
                   ? "bg-success text-success-foreground"
@@ -235,7 +239,7 @@ function RobotPage() {
             <button
               type="button"
               onClick={handleRealMode}
-              disabled={!hasBackend || !connected || modeActionPending}
+              disabled={!hasBackend || syncing || !connected || modeActionPending}
               className={`rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 activeMode === "REAL"
                   ? "bg-primary text-primary-foreground"
@@ -321,6 +325,7 @@ function RobotPage() {
               !hasBackend ||
               robotActionPending ||
               robotState.isLoading ||
+              syncing ||
               (!robotEnabled && !connected)
             }
             className={`flex min-w-40 items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${

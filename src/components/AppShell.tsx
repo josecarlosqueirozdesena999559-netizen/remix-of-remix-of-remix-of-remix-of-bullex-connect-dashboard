@@ -1,4 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import {
@@ -31,11 +32,13 @@ const adminNav = { to: "/admin", label: "Admin", Icon: ShieldCheck } as const;
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const visibleNav = isAdminUser(user) ? [...nav.slice(0, -1), adminNav, nav.at(-1)!] : nav;
 
   async function handleLogout() {
     await supabase.auth.signOut();
+    queryClient.clear();
     navigate({ to: "/login", replace: true });
   }
 

@@ -45,6 +45,7 @@ export type RobotState = {
   confirm_real: boolean;
   account_mode: "DEMO" | "REAL";
   active_mode: string | null;
+  connection_status_source: string | null;
   real_ready: boolean;
   real_block_reason: string | null;
   stop_reason: string | null;
@@ -130,6 +131,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     confirm_real: false,
     account_mode: "DEMO",
     active_mode: null,
+    connection_status_source: null,
     real_ready: false,
     real_block_reason: disconnected ? "Conta BullEx desconectada" : null,
     stop_reason: null,

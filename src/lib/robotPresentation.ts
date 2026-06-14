@@ -279,6 +279,8 @@ export function resetRobotPresentationState() {
 }
 
 function isDisconnected(robotState: RobotState) {
+  if (robotState.connection_status_source === "cached_grace") return false;
+
   return (
     robotState.connected === false ||
     robotState.disconnected ||

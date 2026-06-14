@@ -15,13 +15,23 @@ export function normalizeRobotState(input: unknown): RobotState {
     value.lastTrade;
   const tradeValue = asRecord(tradeInput);
   const status = normalizeText(value.status, "STOPPED").toUpperCase();
+  const connectionStatusSource = normalizeOptionalText(
+    value.connection_status_source ??
+      value.connectionStatusSource ??
+      value.connection_source ??
+      value.connectionSource,
+  );
+  const isCachedGrace = connectionStatusSource === "cached_grace";
   const connected = normalizeConnected(
     value.connected ?? value.account_connected ?? value.accountConnected,
   );
   const disconnected =
-    connected === false ||
-    status === "ACCOUNT_DISCONNECTED" ||
-    normalizeBoolean(value.disconnected ?? value.account_disconnected ?? value.accountDisconnected);
+    !isCachedGrace &&
+    (connected === false ||
+      status === "ACCOUNT_DISCONNECTED" ||
+      normalizeBoolean(
+        value.disconnected ?? value.account_disconnected ?? value.accountDisconnected,
+      ));
   const nextCycleAt = normalizeOptionalText(value.next_cycle_at ?? value.nextCycleAt);
   const serverTime = normalizeOptionalText(value.server_time ?? value.serverTime);
   const cycleMinutes = Math.max(1, normalizeNumber(value.cycle_minutes ?? value.cycleMinutes) ?? 5);
@@ -104,6 +114,7 @@ export function normalizeRobotState(input: unknown): RobotState {
     confirm_real: normalizeBoolean(value.confirm_real ?? value.confirmReal),
     account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode),
     active_mode: normalizeOptionalText(value.active_mode ?? value.activeMode),
+    connection_status_source: connectionStatusSource,
     real_ready: normalizeBoolean(value.real_ready ?? value.realReady),
     real_block_reason: normalizeOptionalText(value.real_block_reason ?? value.realBlockReason),
     stop_reason: normalizeOptionalText(

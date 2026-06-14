@@ -17,20 +17,30 @@ function Dashboard() {
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
   const acc = account.data;
-  const connected = acc?.connected === true;
+  const syncing = account.isLoading || robotState.isLoading;
+  const cachedGrace = robotState.data?.connection_status_source === "cached_grace";
+  const connected = acc?.connected === true || cachedGrace;
   const effectiveRobotState = useRobotConnectionSync({
     userId: user?.id,
     accountConnected: connected,
     robotState: robotState.data,
   });
-  const robotConnected = connected && effectiveRobotState?.connected !== false;
-  const isLoading = account.isLoading;
+  const robotConnected = connected && (cachedGrace || effectiveRobotState?.connected !== false);
+  const accountStatus = getConnectionStatusLabel({ syncing, connected, cachedGrace });
+  const robotStatus = getConnectionStatusLabel({
+    syncing,
+    connected: robotConnected,
+    cachedGrace,
+  });
+  const isLoading = syncing;
   const hasBackend = !!apiConfig.BASE_URL;
   const disconnected =
-    acc?.connected === false ||
-    (account.error instanceof ApiError &&
-      (account.error.code === "SESSION_NOT_FOUND" ||
-        account.error.code === "SESSION_DISCONNECTED"));
+    !syncing &&
+    !cachedGrace &&
+    (acc?.connected === false ||
+      (account.error instanceof ApiError &&
+        (account.error.code === "SESSION_NOT_FOUND" ||
+          account.error.code === "SESSION_DISCONNECTED")));
   const apiError = disconnected ? null : account.error;
   const isNoBackend = apiError instanceof Error && apiError.message.includes("VITE_API_BASE_URL");
 
@@ -74,10 +84,10 @@ function Dashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <LiveCard
           label="Status da conta"
-          value={connected ? "Conectado" : "Desconectado"}
+          value={accountStatus}
           Icon={connected ? Plug : Unplug}
-          tone={connected ? "positive" : "negative"}
-          badge={connected ? "LIVE" : "OFFLINE"}
+          tone={connected ? "positive" : syncing ? undefined : "negative"}
+          badge={syncing ? "SYNC" : connected ? "LIVE" : "OFFLINE"}
         />
         <LiveCard
           label="Saldo"
@@ -94,14 +104,28 @@ function Dashboard() {
         />
         <LiveCard
           label="RobÃ´"
-          value={robotConnected ? "Conectado" : "Desconectado"}
+          value={robotStatus}
           Icon={Bot}
-          tone={robotConnected ? "positive" : "negative"}
+          tone={robotConnected ? "positive" : syncing ? undefined : "negative"}
         />
         <LiveCard label="Email BullEx" value={acc?.email ?? "-"} Icon={Mail} />
       </div>
     </div>
   );
+}
+
+function getConnectionStatusLabel({
+  syncing,
+  connected,
+  cachedGrace,
+}: {
+  syncing: boolean;
+  connected: boolean;
+  cachedGrace: boolean;
+}) {
+  if (syncing) return "Sincronizando...";
+  if (cachedGrace) return "Reconectando...";
+  return connected ? "Conectado" : "Desconectado";
 }
 
 function LiveCard({

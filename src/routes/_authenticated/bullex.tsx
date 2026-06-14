@@ -7,6 +7,7 @@ import {
   type BullExAccountState,
   useBullExAccount,
 } from "@/hooks/useBullExAccount";
+import { useRobotState } from "@/hooks/useRobotState";
 import { apiConfig } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import {
@@ -22,22 +23,27 @@ export const Route = createFileRoute("/_authenticated/bullex")({
 });
 
 function BullExPage() {
+  const { user } = useAuth();
   const account = useBullExAccount();
+  const robotState = useRobotState(user?.id);
   const disconnect = useDisconnectBullex();
   const reconnect = useReconnectBullex();
   const [loginOpen, setLoginOpen] = useState(false);
-  const connected = account.data?.connected === true;
+  const syncing = account.isLoading || robotState.isLoading;
+  const cachedGrace = robotState.data?.connection_status_source === "cached_grace";
+  const connected = account.data?.connected === true || cachedGrace;
+  const statusLabel = getConnectionStatusLabel({ syncing, connected, cachedGrace });
   const hasBackend = !!apiConfig.BASE_URL;
   const isToggling = disconnect.isPending || reconnect.isPending;
 
   async function handleDisconnect() {
-    if (!hasBackend || !connected) return;
+    if (!hasBackend || syncing || !connected) return;
     await disconnect.mutateAsync();
     await account.refetch();
   }
 
   async function handleReconnect() {
-    if (!hasBackend || connected) return;
+    if (!hasBackend || syncing || connected) return;
     await reconnect.mutateAsync();
     await account.refetch();
   }
@@ -55,10 +61,14 @@ function BullExPage() {
         </div>
         <span
           className={`rounded-md px-3 py-1 text-sm font-semibold ${
-            connected ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+            connected
+              ? cachedGrace
+                ? "bg-warning/15 text-warning-foreground"
+                : "bg-success/15 text-success"
+              : "bg-muted text-muted-foreground"
           }`}
         >
-          {connected ? "Online" : "Offline"}
+          {statusLabel}
         </span>
       </header>
 
@@ -81,17 +91,31 @@ function BullExPage() {
               Status da conexão
             </p>
             <h2 className="mt-1 text-xl font-semibold">
-              {connected ? "Conta BullEx online" : "Conta BullEx offline"}
+              {syncing
+                ? "Sincronizando..."
+                : connected
+                  ? cachedGrace
+                    ? "Reconectando conta BullEx"
+                    : "Conta BullEx online"
+                  : "Conta BullEx offline"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {connected
-                ? "Sua conta está pronta para ser usada pelo robô."
-                : "Faça login para deixar a conta online."}
+              {syncing
+                ? "Buscando conta BullEx e estado do robo."
+                : connected
+                  ? cachedGrace
+                    ? "Usando estado recente enquanto a reconexao finaliza."
+                    : "Sua conta está pronta para ser usada pelo robô."
+                  : "Faça login para deixar a conta online."}
             </p>
           </div>
           <span
             className={`h-3 w-3 rounded-full ${
-              connected ? "animate-pulse bg-success" : "bg-muted-foreground/40"
+              syncing
+                ? "animate-pulse bg-warning"
+                : connected
+                  ? "animate-pulse bg-success"
+                  : "bg-muted-foreground/40"
             }`}
           />
         </div>
@@ -116,7 +140,7 @@ function BullExPage() {
               <button
                 type="button"
                 onClick={() => setLoginOpen(true)}
-                disabled={!hasBackend}
+                disabled={!hasBackend || syncing}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Entrar na BullEx
@@ -124,7 +148,7 @@ function BullExPage() {
               <button
                 type="button"
                 onClick={() => void handleReconnect()}
-                disabled={!hasBackend || isToggling}
+                disabled={!hasBackend || syncing || isToggling}
                 className="flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {reconnect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -135,7 +159,7 @@ function BullExPage() {
             <button
               type="button"
               onClick={() => void handleDisconnect()}
-              disabled={!hasBackend || isToggling}
+              disabled={!hasBackend || syncing || isToggling}
               className="flex items-center justify-center gap-2 rounded-lg border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {disconnect.isPending ? (
@@ -143,7 +167,7 @@ function BullExPage() {
               ) : (
                 <Power className="h-4 w-4" />
               )}
-              Desconectar
+              Desconectar BullEx
             </button>
           )}
         </div>
@@ -169,6 +193,20 @@ function BullExPage() {
       ) : null}
     </div>
   );
+}
+
+function getConnectionStatusLabel({
+  syncing,
+  connected,
+  cachedGrace,
+}: {
+  syncing: boolean;
+  connected: boolean;
+  cachedGrace: boolean;
+}) {
+  if (syncing) return "Sincronizando...";
+  if (cachedGrace) return "Reconectando...";
+  return connected ? "Online" : "Offline";
 }
 
 function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {

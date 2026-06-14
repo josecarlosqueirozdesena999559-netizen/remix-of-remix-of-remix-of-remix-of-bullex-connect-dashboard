@@ -115,6 +115,7 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     confirm_real: false,
     account_mode: "DEMO",
     active_mode: null,
+    connection_status_source: null,
     real_ready: false,
     real_block_reason: null,
     stop_reason: null,

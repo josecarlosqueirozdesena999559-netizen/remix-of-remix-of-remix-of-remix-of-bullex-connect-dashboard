@@ -71,6 +71,8 @@ function preferAccountConnection(
 }
 
 function isRobotDisconnected(robotState: RobotState | undefined) {
+  if (robotState?.connection_status_source === "cached_grace") return false;
+
   return (
     robotState?.connected === false ||
     robotState?.disconnected === true ||
