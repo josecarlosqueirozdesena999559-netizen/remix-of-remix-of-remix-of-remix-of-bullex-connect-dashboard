@@ -16,7 +16,15 @@ export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
 
 let currentSettings = DEFAULT_ROBOT_SETTINGS;
 let settingsUserId: string | null = null;
+let pendingConfig: {
+  userId: string;
+  entryValue: number;
+  stopWin: number;
+  stopLoss: number;
+  savedAt: number;
+} | null = null;
 const listeners = new Set<() => void>();
+const CONFIG_CONFIRMATION_TIMEOUT_MS = 10_000;
 
 export function readRobotSettings(userId?: string): RobotSettings {
   return userId && settingsUserId === userId ? currentSettings : DEFAULT_ROBOT_SETTINGS;
@@ -28,9 +36,71 @@ export function saveRobotSettings(userId: string, settings: RobotSettings) {
   emitChange();
 }
 
+export function markRobotConfigPending(userId: string, settings: RobotSettings) {
+  settingsUserId = userId;
+  currentSettings = normalizeRobotSettings(settings);
+  pendingConfig = {
+    userId,
+    entryValue: currentSettings.entryValue,
+    stopWin: currentSettings.stopWin,
+    stopLoss: currentSettings.stopLoss,
+    savedAt: Date.now(),
+  };
+  emitChange();
+}
+
+export function syncRobotSettings(
+  userId: string,
+  settings: {
+    entryValue: number | null;
+    stopWin: number | null;
+    stopLoss: number | null;
+  },
+) {
+  const previous = readRobotSettings(userId);
+  const backendHasConfig =
+    settings.entryValue != null && settings.stopWin != null && settings.stopLoss != null;
+
+  if (pendingConfig?.userId === userId && backendHasConfig) {
+    const backendConfirmed =
+      settings.entryValue === pendingConfig.entryValue &&
+      settings.stopWin === pendingConfig.stopWin &&
+      settings.stopLoss === pendingConfig.stopLoss;
+
+    if (backendConfirmed) {
+      pendingConfig = null;
+    } else if (Date.now() - pendingConfig.savedAt < CONFIG_CONFIRMATION_TIMEOUT_MS) {
+      return;
+    } else {
+      pendingConfig = null;
+    }
+  }
+
+  const next = normalizeRobotSettings({
+    ...previous,
+    entryValue: settings.entryValue ?? previous.entryValue,
+    stopWin: settings.stopWin ?? previous.stopWin,
+    stopLoss: settings.stopLoss ?? previous.stopLoss,
+  });
+
+  if (
+    settingsUserId === userId &&
+    currentSettings.entryValue === next.entryValue &&
+    currentSettings.stopWin === next.stopWin &&
+    currentSettings.stopLoss === next.stopLoss
+  ) {
+    return;
+  }
+
+  settingsUserId = userId;
+  currentSettings = next;
+  emitChange();
+}
+
 export function resetRobotSettings() {
   settingsUserId = null;
   currentSettings = DEFAULT_ROBOT_SETTINGS;
+  pendingConfig = null;
   emitChange();
 }
 

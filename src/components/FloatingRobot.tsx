@@ -11,7 +11,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(true);
   const robotState = useRobotState(userId);
   const account = useBullExAccount();
-  const { settings, setSettings } = useRobotSettings(userId);
+  const { settings, saveSettings } = useRobotSettings(userId);
   const smoothNextCycleSeconds = useSmoothCountdown(
     robotState.data?.seconds_until_next_cycle,
     getCountdownResetKey(robotState.data),
@@ -49,7 +49,12 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       narratorSpeaking={narrator.speaking}
       onSilenceNarrator={narrator.silence}
       settings={settings}
-      onSettingsChange={setSettings}
+      onSettingsChange={(nextSettings) =>
+        saveSettings(nextSettings, {
+          enabled: robotState.data?.enabled ?? false,
+          cycleMinutes: robotState.data?.cycle_minutes ?? 5,
+        })
+      }
       onClose={() => setOverlayVisible(false)}
       showConfig
     />

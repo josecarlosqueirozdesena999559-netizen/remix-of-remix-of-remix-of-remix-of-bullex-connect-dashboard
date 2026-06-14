@@ -2,6 +2,9 @@ import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hook
 
 export function normalizeRobotState(input: unknown): RobotState {
   const value = unwrapRobotState(input);
+  const config = asRecord(
+    value.config ?? value.robot_config ?? value.robotConfig ?? value.settings,
+  );
   const tradeInput =
     value.current_trade ??
     value.currentTrade ??
@@ -80,6 +83,13 @@ export function normalizeRobotState(input: unknown): RobotState {
     ),
     next_cycle_at: nextCycleAt,
     cycle_minutes: cycleMinutes,
+    entry_value: normalizeNumber(
+      value.entry_value ?? value.entryValue ?? config.entry_value ?? config.entryValue,
+    ),
+    stop_win: normalizeNumber(value.stop_win ?? value.stopWin ?? config.stop_win ?? config.stopWin),
+    stop_loss: normalizeNumber(
+      value.stop_loss ?? value.stopLoss ?? config.stop_loss ?? config.stopLoss,
+    ),
     seconds_until_next_cycle: Math.max(
       0,
       (secondsUntilNextCycle != null && secondsUntilNextCycle > 0 ? secondsUntilNextCycle : null) ??

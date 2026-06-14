@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, robotState } from "@/lib/api";
 import { normalizeRobotState } from "@/lib/normalizeRobotState";
+import { syncRobotSettings } from "@/lib/robotSettings";
 
 export { normalizeRobotState } from "@/lib/normalizeRobotState";
 
@@ -47,6 +48,9 @@ export type RobotState = {
   stop_reason: string | null;
   next_cycle_at: string | null;
   cycle_minutes: number;
+  entry_value: number | null;
+  stop_win: number | null;
+  stop_loss: number | null;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
   expiration_seconds: number;
@@ -89,6 +93,11 @@ export function useRobotState(userId?: string) {
       }
 
       const nextState = normalizeRobotState(response.data);
+      syncRobotSettings(userId, {
+        entryValue: nextState.entry_value,
+        stopWin: nextState.stop_win,
+        stopLoss: nextState.stop_loss,
+      });
       console.log("[ROBOT STATE UPDATED]", nextState);
       return nextState;
     },
@@ -115,6 +124,9 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     stop_reason: null,
     next_cycle_at: null,
     cycle_minutes: 5,
+    entry_value: null,
+    stop_win: null,
+    stop_loss: null,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
     expiration_seconds: 0,

@@ -19,7 +19,7 @@ type RobotOverlayProps = {
   narratorSpeaking?: boolean;
   onSilenceNarrator?: () => void;
   settings?: RobotSettings;
-  onSettingsChange?: (settings: RobotSettings) => void;
+  onSettingsChange?: (settings: RobotSettings) => void | Promise<void>;
   onClose?: () => void;
   showConfig?: boolean;
 };
@@ -208,8 +208,13 @@ export function RobotOverlay({
           onChange={setSettings}
           onClose={() => setConfigOpen(false)}
           onSave={() => {
-            onSettingsChange?.(settings);
-            setConfigOpen(false);
+            void Promise.resolve(onSettingsChange?.(settings))
+              .then(() => {
+                setConfigOpen(false);
+              })
+              .catch((error) => {
+                console.error("[ROBOT CONFIG SAVE ERROR]", error);
+              });
           }}
         />
       ) : null}
