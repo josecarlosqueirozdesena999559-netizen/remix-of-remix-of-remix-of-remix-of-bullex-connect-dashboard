@@ -50,44 +50,48 @@ export function useBullexBalance(enabled = true) {
 }
 
 export function useConnectBullex() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) =>
       unwrap(await bullexApi.connect(payload)),
-    onSuccess: async () => {
+    onSuccess: () => {
       console.log("[BULLEX CONNECT SUCCESS]");
-      console.log("[ACCOUNT REFETCH]");
-      await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
-      await qc.refetchQueries({ queryKey: ["bullex"], type: "active" });
-
-      if (user?.id) {
-        console.log("[ROBOT STATE REFETCH]");
-        await qc.refetchQueries({
-          queryKey: [...ROBOT_STATE_QUERY_KEY, user.id],
-          exact: true,
-          type: "active",
-        });
-      }
-
-      console.log("[ROBOT SYNC CONNECTION]");
-      try {
-        await robotSyncConnection();
-      } catch (error) {
-        console.warn("[ROBOT SYNC CONNECTION ERROR]", error);
-      }
-
-      if (user?.id) {
-        console.log("[ROBOT STATE REFETCH]");
-        await qc.refetchQueries({
-          queryKey: [...ROBOT_STATE_QUERY_KEY, user.id],
-          exact: true,
-          type: "active",
-        });
-      }
     },
     onError: toastGenericError,
   });
+}
+
+export async function syncAfterBullExConnect(
+  qc: ReturnType<typeof useQueryClient>,
+  userId?: string,
+) {
+  console.log("[ACCOUNT REFETCH]");
+  await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
+  await qc.refetchQueries({ queryKey: ["bullex"], type: "active" });
+
+  if (userId) {
+    console.log("[ROBOT STATE REFETCH]");
+    await qc.refetchQueries({
+      queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
+      exact: true,
+      type: "active",
+    });
+  }
+
+  console.log("[ROBOT SYNC CONNECTION]");
+  try {
+    await robotSyncConnection();
+  } catch (error) {
+    console.warn("[ROBOT SYNC CONNECTION ERROR]", error);
+  }
+
+  if (userId) {
+    console.log("[ROBOT STATE REFETCH]");
+    await qc.refetchQueries({
+      queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
+      exact: true,
+      type: "active",
+    });
+  }
 }
 
 export function useDisconnectBullex() {

@@ -90,6 +90,10 @@ export async function apiRequest<T>(
 
     return { ok: true, data: (json?.ok === true && "data" in json ? json.data : json) as T };
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { ok: false, error: "Tempo esgotado ao conectar. Tente novamente.", code: "TIMEOUT" };
+    }
+
     return { ok: false, error: error instanceof Error ? error.message : "Erro de rede" };
   }
 }
@@ -145,11 +149,16 @@ export function robotSyncConnection() {
 }
 
 export const bullexApi = {
-  connect: (payload: { email: string; password: string; sms_code?: string }) =>
-    apiRequest<{ ok: boolean }>("/bullex/connect", {
+  connect: (payload: { email: string; password: string; sms_code?: string }) => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 30000);
+
+    return apiRequest<{ ok: boolean }>("/bullex/connect", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
+      signal: controller.signal,
+    }).finally(() => window.clearTimeout(timeout));
+  },
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),
   changeMode: (payload: BullexAccountMode | ChangeBullexModePayload) =>

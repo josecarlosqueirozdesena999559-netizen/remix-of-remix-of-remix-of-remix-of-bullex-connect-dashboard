@@ -1,9 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Loader2, LockKeyhole, Mail, Plug, Power, X } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { apiConfig } from "@/lib/api";
-import { useConnectBullex, useDisconnectBullex, useReconnectBullex } from "@/lib/useBullex";
+import { useAuth } from "@/lib/useAuth";
+import {
+  syncAfterBullExConnect,
+  useConnectBullex,
+  useDisconnectBullex,
+  useReconnectBullex,
+} from "@/lib/useBullex";
 
 export const Route = createFileRoute("/_authenticated/bullex")({
   head: () => ({ meta: [{ title: "BullEx - BullEx AutoBot" }] }),
@@ -151,9 +158,8 @@ function BullExPage() {
       {loginOpen ? (
         <BullExLoginModal
           onClose={() => setLoginOpen(false)}
-          onSuccess={async () => {
+          onSuccess={() => {
             setLoginOpen(false);
-            await account.refetch();
           }}
         />
       ) : null}
@@ -161,17 +167,13 @@ function BullExPage() {
   );
 }
 
-function BullExLoginModal({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => Promise<void>;
-}) {
+function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const connect = useConnectBullex();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const hasBackend = !!apiConfig.BASE_URL;
 
   useEffect(() => {
@@ -185,9 +187,10 @@ function BullExLoginModal({
 
     try {
       await connect.mutateAsync({ email, password, sms_code: smsCode || undefined });
+      onSuccess();
       setPassword("");
       setSmsCode("");
-      await onSuccess();
+      void syncAfterBullExConnect(queryClient, user?.id);
     } catch {
       setPassword("");
       setSmsCode("");

@@ -183,7 +183,7 @@ function getNarrationEvents(
   }
 
   if (status === "WAITING_NEXT_CYCLE") {
-    const remainingSeconds = nextCycleSeconds ?? getRemainingNextCycleSeconds(robotState);
+    const remainingSeconds = nextCycleSeconds ?? 0;
     if (remainingSeconds > 0) {
       events.push({
         key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
@@ -334,10 +334,6 @@ function formatTechnicalSpeech(value: string) {
     .replace(/\bOTC\b/gi, "O T C")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function getRemainingNextCycleSeconds(robotState: RobotState) {
-  return Math.max(0, Math.ceil(robotState.seconds_until_next_cycle));
 }
 
 function formatSpokenDuration(totalSeconds: number) {

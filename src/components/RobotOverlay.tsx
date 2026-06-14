@@ -8,6 +8,7 @@ import {
 import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
+import { useServerNextCycleCountdown } from "@/hooks/useServerCountdown";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
@@ -56,12 +57,7 @@ export function RobotOverlay({
   const [configOpen, setConfigOpen] = useState(false);
   const [settings, setSettings] = useState<RobotSettings>(savedSettings);
   const now = useCurrentTime();
-  const smoothNextCycleSeconds = useSmoothCountdown(
-    robotState?.seconds_until_next_cycle,
-    getCountdownResetKey(robotState),
-    Boolean(robotState?.enabled && robotState.seconds_until_next_cycle > 0),
-    robotState?.fetched_at,
-  );
+  const nextCycleSeconds = useServerNextCycleCountdown(robotState);
   const smoothEntryWindowSeconds = useSmoothCountdown(
     robotState?.seconds_until_entry_window,
     getEntryWindowResetKey(robotState),
@@ -81,7 +77,7 @@ export function RobotOverlay({
     robotState?.fetched_at,
   );
   const content = getOverlayContent(robotState, now, {
-    nextCycleSeconds: smoothNextCycleSeconds,
+    nextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
@@ -269,15 +265,6 @@ function useCurrentTime() {
   }, []);
 
   return now;
-}
-
-function getCountdownResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.next_cycle_at ?? "-",
-    robotState.last_trade?.finished_at ?? "-",
-  ].join("|");
 }
 
 function getEntryWindowResetKey(robotState: RobotState | undefined) {

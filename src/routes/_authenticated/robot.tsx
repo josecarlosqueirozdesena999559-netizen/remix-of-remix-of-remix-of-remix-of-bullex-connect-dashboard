@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
+import { useServerNextCycleCountdown } from "@/hooks/useServerCountdown";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 
@@ -37,12 +38,7 @@ function RobotPage() {
   });
   const { settings, setSettings } = useRobotSettings(user?.id);
   const now = useCurrentTime();
-  const smoothNextCycleSeconds = useSmoothCountdown(
-    effectiveRobotState?.seconds_until_next_cycle,
-    getCountdownResetKey(effectiveRobotState),
-    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_next_cycle > 0),
-    effectiveRobotState?.fetched_at,
-  );
+  const nextCycleSeconds = useServerNextCycleCountdown(effectiveRobotState);
   const smoothEntryWindowSeconds = useSmoothCountdown(
     effectiveRobotState?.seconds_until_entry_window,
     getEntryWindowResetKey(effectiveRobotState),
@@ -62,7 +58,7 @@ function RobotPage() {
     effectiveRobotState?.fetched_at,
   );
   const robotPresentation = getRobotPresentation(effectiveRobotState, now, {
-    nextCycleSeconds: smoothNextCycleSeconds,
+    nextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
@@ -430,15 +426,6 @@ function useCurrentTime() {
   }, []);
 
   return now;
-}
-
-function getCountdownResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.next_cycle_at ?? "-",
-    robotState.last_trade?.finished_at ?? "-",
-  ].join("|");
 }
 
 function getEntryWindowResetKey(robotState: RobotState | undefined) {

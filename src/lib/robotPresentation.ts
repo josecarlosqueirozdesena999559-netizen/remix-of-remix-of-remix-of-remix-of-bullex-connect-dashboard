@@ -189,8 +189,18 @@ export function getRobotPresentation(
     return createPresentation("analyzing", "Analisando mercado...", "Escolhendo melhor ativo...");
   }
 
+  if (status === "WAITING_ANALYSIS_WINDOW") {
+    const remainingSeconds = Math.max(0, Math.ceil(resolveNextCycleSeconds(robotState, options)));
+
+    return createPresentation(
+      "analyzing",
+      "Aguardando próxima vela",
+      remainingSeconds > 0 ? `Análise em ${formatDuration(remainingSeconds)}` : "Análise em 00:00",
+    );
+  }
+
   if (status === "WAITING_NEXT_CYCLE") {
-    return createNextCyclePresentation(robotState, now, options);
+    return createNextCyclePresentation(robotState, now, options, "Próxima entrada em");
   }
 
   if (trade && result) {
@@ -205,7 +215,7 @@ export function getRobotPresentation(
     );
   }
 
-  return createNextCyclePresentation(robotState, now, options, "Robô ativo", 300);
+  return createNextCyclePresentation(robotState, now, options, "Robô ativo");
 }
 
 export function formatDuration(totalSeconds: number) {
@@ -257,16 +267,23 @@ function createNextCyclePresentation(
   now: number,
   options: RobotPresentationOptions = {},
   title = "Analisando...",
-  fallbackSeconds = robotState.cycle_minutes * 60,
+  fallbackSeconds = 0,
 ) {
-  const remainingSeconds =
-    options.nextCycleSeconds ??
-    (robotState.seconds_until_next_cycle > 0
-      ? robotState.seconds_until_next_cycle
-      : fallbackSeconds);
+  const remainingSeconds = resolveNextCycleSeconds(robotState, options, fallbackSeconds);
 
   if (remainingSeconds <= 0) {
-    return createPresentation("analyzing", "Analisando mercado...");
+    if (title === "Próxima entrada em") {
+      return createPresentation("analyzing", "Próxima entrada em 00:00");
+    }
+
+    return createPresentation("analyzing", title);
+  }
+
+  if (title === "Próxima entrada em") {
+    return createPresentation(
+      "analyzing",
+      `Próxima entrada em ${formatDuration(remainingSeconds)}`,
+    );
   }
 
   return createPresentation(
@@ -274,6 +291,20 @@ function createNextCyclePresentation(
     title,
     `Próxima entrada em ${formatDuration(remainingSeconds)}`,
   );
+}
+
+function resolveNextCycleSeconds(
+  robotState: RobotState,
+  options: RobotPresentationOptions,
+  fallbackSeconds = 0,
+) {
+  if ("nextCycleSeconds" in options) {
+    return options.nextCycleSeconds ?? fallbackSeconds;
+  }
+
+  return robotState.seconds_until_next_cycle > 0
+    ? robotState.seconds_until_next_cycle
+    : fallbackSeconds;
 }
 
 function isRecentResult(finishedAt: string | null, now: number) {
