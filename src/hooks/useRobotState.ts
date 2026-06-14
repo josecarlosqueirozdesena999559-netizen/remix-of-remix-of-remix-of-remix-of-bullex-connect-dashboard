@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, robotState } from "@/lib/api";
 import { normalizeRobotState } from "@/lib/normalizeRobotState";
+import { getRobotStateRefetchInterval } from "@/lib/robotPolling";
 import { syncRobotSettings } from "@/lib/robotSettings";
 
 export { normalizeRobotState } from "@/lib/normalizeRobotState";
@@ -109,7 +110,7 @@ export function useRobotState(userId?: string) {
       return nextState;
     },
     enabled: Boolean(userId),
-    refetchInterval: 2000,
+    refetchInterval: (query) => getRobotStateRefetchInterval(query.state.data),
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 1,

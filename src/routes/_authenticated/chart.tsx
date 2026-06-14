@@ -32,10 +32,11 @@ type Candle = CandlestickData<UTCTimestamp>;
 type HoveredCandle = Candle | null;
 type ChartApi = ReturnType<typeof createChart>;
 type CandlestickSeriesApi = ReturnType<ChartApi["addSeries"]>;
+const EMPTY_ASSETS: Asset[] = [];
 
 function MarketPage() {
   const { user } = useAuth();
-  const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [selectedSymbol, setSelectedSymbol] = useState("EURUSD-OTC");
   const [followPrice, setFollowPrice] = useState(true);
   const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
   const account = useBullExAccount();
@@ -52,7 +53,10 @@ function MarketPage() {
         const assetsResponse = await apiRequest<unknown>("/bullex/assets");
         console.log("[ASSETS RESPONSE]", assetsResponse);
         console.log("[ASSETS DATA]", assetsResponse.ok ? assetsResponse.data : undefined);
-        console.log("[ASSETS LENGTH]", assetsResponse.ok ? getCollectionLength(assetsResponse.data) : undefined);
+        console.log(
+          "[ASSETS LENGTH]",
+          assetsResponse.ok ? getCollectionLength(assetsResponse.data) : undefined,
+        );
 
         return normalizeAssetsPayload(unwrap(assetsResponse))
           .map(normalizeAsset)
@@ -64,12 +68,11 @@ function MarketPage() {
     },
     enabled: Boolean(user?.id),
     retry: 1,
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const assets = assetsQuery.data ?? [];
-  const selected =
-    assets.find((asset) => asset.symbol === selectedSymbol) ?? null;
+  const assets = assetsQuery.data ?? EMPTY_ASSETS;
+  const selected = assets.find((asset) => asset.symbol === selectedSymbol) ?? null;
   const {
     candles,
     candlesError,
@@ -84,11 +87,10 @@ function MarketPage() {
   } = useMarketData(selectedSymbol || null);
 
   useEffect(() => {
-    if (selectedSymbol) return;
+    if (assets.length === 0) return;
+    if (assets.some((asset) => asset.symbol === selectedSymbol)) return;
 
-    const defaultAsset =
-      assets.find((asset) => asset.symbol === "EURUSD-OTC") ??
-      assets[0];
+    const defaultAsset = assets.find((asset) => asset.symbol === "EURUSD-OTC") ?? assets[0];
 
     if (defaultAsset?.symbol) {
       setSelectedSymbol(defaultAsset.symbol);
@@ -162,7 +164,7 @@ function MarketPage() {
       lastValueVisible: true,
       borderVisible: true,
       wickVisible: true,
-      priceFormat: buildPriceFormat(selectedSymbol, lastPrice),
+      priceFormat: buildPriceFormat("", null),
     });
 
     chart.subscribeCrosshairMove((param: MouseEventParams<UTCTimestamp>) => {
@@ -236,7 +238,11 @@ function MarketPage() {
     });
 
     const symbolChanged = prevSymbolRef.current !== selectedSymbol;
-    console.log("[CHART UPDATE]", { symbol: selectedSymbol, candles: candles.length, symbolChanged });
+    console.log("[CHART UPDATE]", {
+      symbol: selectedSymbol,
+      candles: candles.length,
+      symbolChanged,
+    });
 
     if (symbolChanged) {
       chart.timeScale().fitContent();
@@ -281,11 +287,15 @@ function MarketPage() {
         </div>
       )}
 
-      {assetsQuery.error && !isSessionError(assetsQuery.error) && !isAssetNotAllowed(assetsQuery.error) && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
-          {assetsQuery.error instanceof Error ? assetsQuery.error.message : "Erro ao carregar ativos"}
-        </div>
-      )}
+      {assetsQuery.error &&
+        !isSessionError(assetsQuery.error) &&
+        !isAssetNotAllowed(assetsQuery.error) && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
+            {assetsQuery.error instanceof Error
+              ? assetsQuery.error.message
+              : "Erro ao carregar ativos"}
+          </div>
+        )}
 
       <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -315,11 +325,23 @@ function MarketPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <BadgeLabel label="Payout" value={isPayoutLoading ? "..." : formatPayoutValue(selectedPayout)} />
+            <BadgeLabel
+              label="Payout"
+              value={isPayoutLoading ? "..." : formatPayoutValue(selectedPayout)}
+            />
             <BadgeLabel label="Modo" value={formatAccountMode(account.data?.mode)} />
-            <BadgeLabel label="Ultimo preco" value={lastPrice != null ? formatNumber(lastPrice) : "-"} />
-            <BadgeLabel label="Ultimo candle" value={lastCandleTimestamp ? formatDateTimeFromTimestamp(lastCandleTimestamp) : "-"} />
-            <BadgeLabel label="Recebido" value={lastCandleReceivedAt ? formatDateTime(lastCandleReceivedAt) : "-"} />
+            <BadgeLabel
+              label="Ultimo preco"
+              value={lastPrice != null ? formatNumber(lastPrice) : "-"}
+            />
+            <BadgeLabel
+              label="Ultimo candle"
+              value={lastCandleTimestamp ? formatDateTimeFromTimestamp(lastCandleTimestamp) : "-"}
+            />
+            <BadgeLabel
+              label="Recebido"
+              value={lastCandleReceivedAt ? formatDateTime(lastCandleReceivedAt) : "-"}
+            />
             <BadgeLabel label="Polling" value={formatPollingStatus(pollingStatus)} />
           </div>
         </div>
@@ -401,11 +423,17 @@ function MarketPage() {
 
           {displayedCandle && (
             <div className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
-              <div className="font-semibold text-foreground">{formatTime(displayedCandle.time)}</div>
-              <div className="mt-1 text-muted-foreground">Open {formatNumber(displayedCandle.open)}</div>
+              <div className="font-semibold text-foreground">
+                {formatTime(displayedCandle.time)}
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                Open {formatNumber(displayedCandle.open)}
+              </div>
               <div className="text-muted-foreground">High {formatNumber(displayedCandle.high)}</div>
               <div className="text-muted-foreground">Low {formatNumber(displayedCandle.low)}</div>
-              <div className="text-muted-foreground">Close {formatNumber(displayedCandle.close)}</div>
+              <div className="text-muted-foreground">
+                Close {formatNumber(displayedCandle.close)}
+              </div>
             </div>
           )}
 
@@ -555,7 +583,12 @@ function normalizeNumber(value: unknown) {
 }
 
 function buildPriceFormat(symbol: string, lastPrice: number | null) {
-  if (symbol.includes("EUR") || symbol.includes("GBP") || symbol.includes("AUD") || symbol.includes("NZD")) {
+  if (
+    symbol.includes("EUR") ||
+    symbol.includes("GBP") ||
+    symbol.includes("AUD") ||
+    symbol.includes("NZD")
+  ) {
     return { type: "price" as const, precision: 5, minMove: 0.00001 };
   }
 

@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Loader2, LockKeyhole, Mail, Plug, Power, X } from "lucide-react";
-import { useBullExAccount } from "@/hooks/useBullExAccount";
+import {
+  BULLEX_ACCOUNT_QUERY_KEY,
+  type BullExAccountState,
+  useBullExAccount,
+} from "@/hooks/useBullExAccount";
 import { apiConfig } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import {
@@ -187,6 +191,18 @@ function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
     try {
       await connect.mutateAsync({ email, password, sms_code: smsCode || undefined });
+      queryClient.setQueryData<BullExAccountState>(
+        [...BULLEX_ACCOUNT_QUERY_KEY, user?.id],
+        (current) => ({
+          connected: true,
+          balance: current?.balance ?? null,
+          currency: current?.currency ?? null,
+          mode: current?.mode ?? null,
+          email,
+          requires_2fa: false,
+          status: "connected",
+        }),
+      );
       onSuccess();
       setPassword("");
       setSmsCode("");

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getRobotPresentation, resetRobotPresentationState } from "./robotPresentation.ts";
 import type { RobotState } from "@/hooks/useRobotState";
+import { getRobotStateRefetchInterval } from "./robotPolling.ts";
 
 const now = Date.parse("2026-06-14T12:00:00Z");
 
@@ -54,6 +55,56 @@ test("se todos os ativos falharem mostra ORDER_REJECTED", () => {
   assert.equal(presentation.title, "Entrada rejeitada");
   assert.equal(presentation.kind, "rejected");
 });
+
+test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos", () => {
+  resetRobotPresentationState();
+  const state = createRobotState({
+    status: "RESULT_RECEIVED",
+    last_trade: createTrade({ result: "WIN", order_id: "order-123" }),
+  });
+
+  const received = getRobotPresentation(state, now);
+  const nextCycleState = {
+    ...state,
+    status: "WAITING_NEXT_CYCLE",
+    seconds_until_next_cycle: 42,
+  };
+  const beforeTimeout = getRobotPresentation(nextCycleState, now + 4999);
+  const afterTimeout = getRobotPresentation(nextCycleState, now + 5000);
+
+  assert.equal(received.title, "WIN");
+  assert.equal(received.kind, "result");
+  assert.equal(beforeTimeout.title, "WIN");
+  assert.equal(afterTimeout.title, "Próxima entrada em 00:42");
+  assert.equal(afterTimeout.detail, null);
+});
+
+test("polling acelera enquanto aguarda resultado", () => {
+  assert.equal(
+    getRobotStateRefetchInterval(createRobotState({ operation_in_progress: true })),
+    1000,
+  );
+  assert.equal(getRobotStateRefetchInterval(createRobotState({ result_waiting: true })), 1000);
+  assert.equal(getRobotStateRefetchInterval(createRobotState({ status: "PENDING_RESULT" })), 1000);
+  assert.equal(getRobotStateRefetchInterval(createRobotState()), 2000);
+});
+
+function createTrade(overrides: Partial<NonNullable<RobotState["last_trade"]>> = {}) {
+  return {
+    active: "EURUSD",
+    direction: "CALL" as const,
+    amount: 10,
+    order_id: "order-1",
+    confidence: 90,
+    payout: 80,
+    result: "PENDING_RESULT",
+    expires_at: null,
+    sent_at: null,
+    finished_at: null,
+    profit: null,
+    ...overrides,
+  };
+}
 
 function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
   return {

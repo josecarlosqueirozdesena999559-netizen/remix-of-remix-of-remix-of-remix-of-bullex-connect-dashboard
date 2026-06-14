@@ -64,28 +64,28 @@ export async function syncAfterBullExConnect(
   qc: ReturnType<typeof useQueryClient>,
   userId?: string,
 ) {
-  console.log("[ACCOUNT REFETCH]");
-  await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
-  await qc.refetchQueries({ queryKey: ["bullex"], type: "active" });
-
-  if (userId) {
-    console.log("[ROBOT STATE REFETCH]");
-    await qc.refetchQueries({
-      queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
-      exact: true,
-      type: "active",
-    });
-  }
-
-  console.log("[ROBOT SYNC CONNECTION]");
-  try {
-    await robotSyncConnection();
-  } catch (error) {
+  const syncConnection = robotSyncConnection().catch((error) => {
     console.warn("[ROBOT SYNC CONNECTION ERROR]", error);
-  }
+  });
+  const refreshes: Promise<unknown>[] = [
+    qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" }),
+    qc.refetchQueries({ queryKey: ["bullex"], type: "active" }),
+    syncConnection,
+  ];
 
   if (userId) {
-    console.log("[ROBOT STATE REFETCH]");
+    refreshes.push(
+      qc.refetchQueries({
+        queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
+        exact: true,
+        type: "active",
+      }),
+    );
+  }
+
+  await Promise.all(refreshes);
+
+  if (userId) {
     await qc.refetchQueries({
       queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
       exact: true,

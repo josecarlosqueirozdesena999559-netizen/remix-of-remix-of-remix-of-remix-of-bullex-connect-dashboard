@@ -4,10 +4,18 @@ type RobotResult = "WIN" | "LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
 let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
+let resultSnapshot: ResultSnapshot | null = null;
 
 type OrderRejectionSnapshot = {
   key: string;
   reason: string;
+  observedAt: number;
+};
+
+type ResultSnapshot = {
+  key: string;
+  result: Exclude<RobotResult, null>;
+  trade: RobotTrade;
   observedAt: number;
 };
 
@@ -46,14 +54,30 @@ export function getRobotPresentation(
     );
   }
 
-  if (!robotState.enabled || robotState.status === "STOPPED") {
-    return createPresentation("stopped", "Robô parado");
-  }
-
   const status = robotState.status;
   const trade = robotState.last_trade;
   const signal = robotState.pending_signal;
   const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+
+  if (status === "RESULT_RECEIVED" && trade && result) {
+    const key = createResultEventKey(trade, result);
+    if (resultSnapshot?.key !== key) {
+      resultSnapshot = { key, result, trade, observedAt: now };
+    }
+  }
+
+  if (resultSnapshot && now - resultSnapshot.observedAt < RESULT_DISPLAY_MS) {
+    return {
+      ...createPresentation("result", resultSnapshot.result),
+      trade: resultSnapshot.trade,
+      direction: resultSnapshot.trade.direction,
+      result: resultSnapshot.result,
+    };
+  }
+
+  if (!robotState.enabled || status === "STOPPED") {
+    return createPresentation("stopped", "Robô parado");
+  }
 
   if (status === "SIGNAL_REJECTED") {
     return createNextCyclePresentation(robotState, now, options);
@@ -100,15 +124,6 @@ export function getRobotPresentation(
 
   if (status === "SENDING_ORDER") {
     return createPresentation("operation", "Entrada liberada", "Enviando ordem...");
-  }
-
-  if (trade && result && isRecentResult(trade.finished_at, now)) {
-    return {
-      ...createPresentation("result", result),
-      trade,
-      direction: trade.direction,
-      result,
-    };
   }
 
   if (status === "PENDING_RESULT" && !result) {
@@ -250,6 +265,7 @@ export function formatFriendlyRobotText(value: string | null | undefined) {
 
 export function resetRobotPresentationState() {
   orderRejectionSnapshot = null;
+  resultSnapshot = null;
 }
 
 function isDisconnected(robotState: RobotState) {
@@ -343,18 +359,8 @@ function resolveNextCycleSeconds(
     : fallbackSeconds;
 }
 
-function isRecentResult(finishedAt: string | null, now: number) {
-  const finishedAtTime = parseDate(finishedAt);
-  if (finishedAtTime == null) return false;
-  const age = now - finishedAtTime;
-  return age >= 0 && age < RESULT_DISPLAY_MS;
-}
-
-function parseDate(value: string | null) {
-  if (!value) return null;
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  const parsed = Date.parse(hasTimezone ? value : `${value}Z`);
-  return Number.isFinite(parsed) ? parsed : null;
+function createResultEventKey(trade: RobotTrade, result: Exclude<RobotResult, null>) {
+  return `${trade.order_id ?? "-"}|${result}`;
 }
 
 function createPresentation(

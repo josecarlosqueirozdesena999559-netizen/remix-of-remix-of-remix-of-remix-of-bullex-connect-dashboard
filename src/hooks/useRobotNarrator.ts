@@ -24,7 +24,6 @@ export function useRobotNarrator(
     window.speechSynthesis.cancel();
     setSpeaking(false);
     if (enabled) {
-      spokenKeysRef.current.clear();
       setSpeechCycle((cycle) => cycle + 1);
     }
   }, [enabled, supported]);
@@ -168,17 +167,17 @@ function getNarrationEvents(
     });
   }
 
-  if (result === "WIN") {
+  if (status === "RESULT_RECEIVED" && result === "WIN") {
     events.push({
       key: createResultKey("WIN", trade),
-      text: `Green confirmado. Operação vencedora. Lucro de ${formatProfit(trade?.profit)}.`,
+      text: "Resultado: WIN",
     });
   }
 
-  if (result === "LOSS") {
+  if (status === "RESULT_RECEIVED" && result === "LOSS") {
     events.push({
       key: createResultKey("LOSS", trade),
-      text: `Loss confirmado. Operação perdida. Prejuízo de ${formatProfit(trade?.profit)}.`,
+      text: "Resultado: LOSS",
     });
   }
 
@@ -219,13 +218,7 @@ function createSignalEventKey(signal: RobotSignal) {
 }
 
 function createResultKey(result: "WIN" | "LOSS", trade: RobotTrade | null) {
-  return [
-    result,
-    trade?.order_id ?? "-",
-    trade?.sent_at ?? "-",
-    trade?.finished_at ?? "-",
-    trade?.profit ?? "-",
-  ].join("|");
+  return `${trade?.order_id ?? "-"}|${result}`;
 }
 
 function getTradeResult(trade: RobotTrade | null) {
