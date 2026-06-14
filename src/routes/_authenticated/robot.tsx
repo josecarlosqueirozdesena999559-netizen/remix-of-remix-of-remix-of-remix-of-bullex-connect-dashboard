@@ -48,10 +48,10 @@ function RobotPage() {
     getExpirationResetKey(robotState.data),
     Boolean(
       robotState.data?.enabled &&
-        (robotState.data.operation_in_progress ||
-          robotState.data.status === "PENDING_RESULT" ||
-          robotState.data.last_trade?.result === "PENDING_RESULT") &&
-        robotState.data.expiration_seconds > 0,
+      (robotState.data.operation_in_progress ||
+        robotState.data.status === "PENDING_RESULT" ||
+        robotState.data.last_trade?.result === "PENDING_RESULT") &&
+      robotState.data.expiration_seconds > 0,
     ),
     robotState.data?.fetched_at,
   );
@@ -60,7 +60,9 @@ function RobotPage() {
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
-  const signalReasonLines = formatSignalReasonLines(robotPresentation.signal?.reason);
+  const signalReasonLines = formatSignalReasonLines(
+    robotPresentation.signal?.strategy_reason ?? robotPresentation.signal?.reason,
+  );
 
   const connected = account.data?.connected === true;
   const activeMode = account.data?.mode ?? null;
@@ -83,7 +85,9 @@ function RobotPage() {
       unwrapApiResult(await bullexApi.changeMode({ mode: "PRACTICE" }));
       await refreshAccountAndRobot();
     } catch (error) {
-      setModeActionError(error instanceof Error ? error.message : "Nao foi possivel mudar para DEMO.");
+      setModeActionError(
+        error instanceof Error ? error.message : "Nao foi possivel mudar para DEMO.",
+      );
     } finally {
       setModeActionPending(false);
     }
@@ -106,7 +110,9 @@ function RobotPage() {
       setRealConfirmed(false);
       await refreshAccountAndRobot();
     } catch (error) {
-      setModeActionError(error instanceof Error ? error.message : "Nao foi possivel mudar para REAL.");
+      setModeActionError(
+        error instanceof Error ? error.message : "Nao foi possivel mudar para REAL.",
+      );
     } finally {
       setModeActionPending(false);
     }
@@ -196,9 +202,7 @@ function RobotPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="font-semibold">Tipo de conta</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Escolha onde o robo vai operar.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Escolha onde o robo vai operar.</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:w-80">
             <button
@@ -277,11 +281,12 @@ function RobotPage() {
                 />
               ) : null}
               {robotPresentation.signal.strategy_score != null ? (
-                <Pill
-                  label="Score"
-                  value={formatScore(robotPresentation.signal.strategy_score)}
-                />
+                <Pill label="Score" value={formatScore(robotPresentation.signal.strategy_score)} />
               ) : null}
+              <Pill
+                label="Estratégia usada"
+                value={robotPresentation.signal.strategy_name ?? "Não informada"}
+              />
               {robotPresentation.signal.payout != null ? (
                 <Pill label="Payout" value={`${Math.round(robotPresentation.signal.payout)}%`} />
               ) : null}
@@ -341,9 +346,7 @@ function RobotPage() {
           </div>
           <button
             type="button"
-            onClick={() =>
-              setSettings({ ...settings, narratorEnabled: !settings.narratorEnabled })
-            }
+            onClick={() => setSettings({ ...settings, narratorEnabled: !settings.narratorEnabled })}
             className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
               settings.narratorEnabled
                 ? "bg-primary text-primary-foreground"

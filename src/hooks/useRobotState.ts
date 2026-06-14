@@ -13,6 +13,8 @@ export type RobotSignal = {
   direction: RobotDirection;
   confidence: number | null;
   strategy_score: number | null;
+  strategy_name: string | null;
+  strategy_reason: string | null;
   payout: number | null;
   reason: string | null;
   created_at: string | null;
@@ -44,6 +46,7 @@ export type RobotState = {
   real_block_reason: string | null;
   stop_reason: string | null;
   next_cycle_at: string | null;
+  cycle_minutes: number;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
   expiration_seconds: number;
@@ -111,6 +114,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     real_block_reason: disconnected ? "Conta BullEx desconectada" : null,
     stop_reason: null,
     next_cycle_at: null,
+    cycle_minutes: 5,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
     expiration_seconds: 0,

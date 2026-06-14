@@ -18,9 +18,13 @@ export function useRobotNarrator(
   const supported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
-    if (!supported || enabled) return;
+    if (!supported) return;
     window.speechSynthesis.cancel();
     setSpeaking(false);
+    if (enabled) {
+      spokenKeysRef.current.clear();
+      setSpeechCycle((cycle) => cycle + 1);
+    }
   }, [enabled, supported]);
 
   useEffect(() => {
@@ -35,24 +39,28 @@ export function useRobotNarrator(
     );
     if (!event || spokenKeysRef.current.has(event.key)) return;
 
-    spokenKeysRef.current.add(event.key);
-
     const utterance = new SpeechSynthesisUtterance(event.text);
     utterance.lang = "pt-BR";
     utterance.voice = getPortugueseVoice();
     utterance.rate = 0.92;
     utterance.pitch = 1;
+    utterance.onstart = () => {
+      spokenKeysRef.current.add(event.key);
+      setSpeaking(true);
+    };
     utterance.onend = () => {
       setSpeaking(false);
       setSpeechCycle((cycle) => cycle + 1);
     };
-    utterance.onerror = () => {
+    utterance.onerror = (speechError) => {
+      if (speechError.error !== "canceled" && speechError.error !== "interrupted") {
+        spokenKeysRef.current.add(event.key);
+      }
       setSpeaking(false);
       setSpeechCycle((cycle) => cycle + 1);
     };
 
     try {
-      setSpeaking(true);
       window.speechSynthesis.speak(utterance);
     } catch {
       setSpeaking(false);
@@ -98,6 +106,21 @@ function getNarrationEvents(
     return events;
   }
 
+  if (signal && status !== "SIGNAL_REJECTED" && status !== "ORDER_REJECTED") {
+    events.push({
+      key: createSignalEventKey(signal),
+      text: `Sinal encontrado em ${formatSpokenActive(signal.symbol)}. Direção ${
+        signal.direction
+      }. Estratégia usada: ${formatNarrationReason(
+        signal.strategy_name ?? "não informada",
+      )}. Motivo: ${formatNarrationReason(
+        signal.strategy_reason ?? signal.reason ?? "não informado",
+      )}. Confiança ${formatPercent(signal.confidence)} por cento. Payout ${formatPercent(
+        signal.payout,
+      )} por cento.`,
+    });
+  }
+
   if (
     !signal &&
     !trade &&
@@ -109,17 +132,6 @@ function getNarrationEvents(
     events.push({
       key: createEventKey("ROBOT_ANALYSIS_STARTED", "-", "-", null),
       text: "Robô conectado. Vou começar as análises do mercado agora.",
-    });
-  }
-
-  if (status === "WAITING_ENTRY_WINDOW" && signal) {
-    events.push({
-      key: createEventKey(status, orderId, signalCreatedAt, signal),
-      text: `Encontramos uma oportunidade em ${formatSpokenActive(signal.symbol)}. Direção ${
-        signal.direction
-      }. Confiança ${formatPercent(signal.confidence)} por cento. Motivo: ${
-        formatNarrationReason(formatFriendlyRobotText(signal.reason))
-      }.`,
     });
   }
 
@@ -142,26 +154,16 @@ function getNarrationEvents(
 
   if (status === "SIGNAL_REJECTED") {
     const reason =
-      robotState.last_rejection_reason ??
-      robotState.rejection_reason ??
-      "Sinal insuficiente";
+      robotState.last_rejection_reason ?? robotState.rejection_reason ?? "Sinal insuficiente";
     events.push({
-      key: createEventKey(
-        "SIGNAL_REJECTED",
-        orderId,
-        signalCreatedAt,
-        signal,
-        reason,
-      ),
-      text: "Nenhum sinal aprovado nesta análise.",
+      key: createEventKey("SIGNAL_REJECTED", orderId, signalCreatedAt, signal, reason),
+      text: "Nenhum sinal aprovado nesta análise. Próxima análise em cinco minutos.",
     });
   }
 
   if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
     const reason =
-      robotState.last_order_error ??
-      robotState.rejection_reason ??
-      "Ordem recusada pela corretora";
+      robotState.last_order_error ?? robotState.rejection_reason ?? "Ordem recusada pela corretora";
     events.push({
       key: createEventKey("ORDER_REJECTED", orderId, signalCreatedAt, signal, reason),
       text: `Entrada rejeitada. Motivo: ${formatNarrationReason(reason)}.`,
@@ -186,7 +188,13 @@ function getNarrationEvents(
     const remainingSeconds = nextCycleSeconds ?? getRemainingNextCycleSeconds(robotState);
     if (remainingSeconds <= 0) {
       events.push({
-        key: createEventKey("NEXT_CYCLE_STARTED", orderId, signalCreatedAt, signal, robotState.next_cycle_at),
+        key: createEventKey(
+          "NEXT_CYCLE_STARTED",
+          orderId,
+          signalCreatedAt,
+          signal,
+          robotState.next_cycle_at,
+        ),
         text: "Iniciando nova análise de mercado.",
       });
       return events;
@@ -220,6 +228,10 @@ function createEventKey(
   ].join("|");
 }
 
+function createSignalEventKey(signal: RobotSignal) {
+  return ["SIGNAL_FOUND", signal.symbol, signal.direction, signal.created_at ?? "-"].join("|");
+}
+
 function createResultKey(result: "WIN" | "LOSS", trade: RobotTrade | null) {
   return [
     result,
@@ -243,11 +255,7 @@ function getStopLimit(robotState: RobotState): "STOP_WIN" | "STOP_LOSS" | null {
     return "STOP_WIN";
   }
 
-  if (
-    text.includes("STOP_LOSS") ||
-    text.includes("LOSS_REACHED") ||
-    text.includes("MAX_LOSS")
-  ) {
+  if (text.includes("STOP_LOSS") || text.includes("LOSS_REACHED") || text.includes("MAX_LOSS")) {
     return "STOP_LOSS";
   }
 
@@ -272,9 +280,7 @@ function formatSpokenActive(active: string) {
     .replace(/[_-]OTC$/, "")
     .replace(/[^A-Z0-9/]/g, "");
   const isOtc = /(^|[_\-/\s])OTC$/i.test(raw);
-  const parts = clean.includes("/")
-    ? clean.split("/").filter(Boolean)
-    : splitCurrencyPair(clean);
+  const parts = clean.includes("/") ? clean.split("/").filter(Boolean) : splitCurrencyPair(clean);
   const spoken = parts.map((part) => CURRENCY_NAMES[part] ?? spellCode(part)).join(" ");
 
   return isOtc ? `${spoken}, OTC` : spoken || raw;

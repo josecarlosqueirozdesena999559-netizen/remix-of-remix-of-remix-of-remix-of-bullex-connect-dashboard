@@ -73,10 +73,10 @@ export function RobotOverlay({
     getExpirationResetKey(robotState),
     Boolean(
       robotState?.enabled &&
-        (robotState.operation_in_progress ||
-          robotState.status === "PENDING_RESULT" ||
-          robotState.last_trade?.result === "PENDING_RESULT") &&
-        robotState.expiration_seconds > 0,
+      (robotState.operation_in_progress ||
+        robotState.status === "PENDING_RESULT" ||
+        robotState.last_trade?.result === "PENDING_RESULT") &&
+      robotState.expiration_seconds > 0,
     ),
     robotState?.fetched_at,
   );
@@ -159,7 +159,11 @@ export function RobotOverlay({
           title={narratorEnabled ? "Narrador ligado" : "Narrador desligado"}
           aria-label={narratorEnabled ? "Narrador ligado" : "Narrador desligado"}
         >
-          {narratorEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          {narratorEnabled ? (
+            <Volume2 className="h-3.5 w-3.5" />
+          ) : (
+            <VolumeX className="h-3.5 w-3.5" />
+          )}
         </span>
         {narratorEnabled && onSilenceNarrator ? (
           <button
@@ -330,15 +334,14 @@ function getOverlayContent(
         ) : null}
         {presentation.kind === "result" && trade.profit != null ? (
           <span>
-            {presentation.result === "WIN" ? "Lucro" : "Prejuízo"}: {formatMoney(
-              presentation.result === "LOSS" ? Math.abs(trade.profit) : trade.profit,
-            )}
+            {presentation.result === "WIN" ? "Lucro" : "Prejuízo"}:{" "}
+            {formatMoney(presentation.result === "LOSS" ? Math.abs(trade.profit) : trade.profit)}
           </span>
         ) : null}
       </>
     );
   } else if (signal) {
-    const reasonLines = formatSignalReasonLines(signal.reason);
+    const reasonLines = formatSignalReasonLines(signal.strategy_reason ?? signal.reason);
     details = (
       <>
         {presentation.detail ? <span>{presentation.detail}</span> : null}
@@ -349,6 +352,7 @@ function getOverlayContent(
         {signal.strategy_score != null ? (
           <span>Score: {formatScore(signal.strategy_score)}</span>
         ) : null}
+        <span>Estratégia usada: {signal.strategy_name ?? "Não informada"}</span>
         {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
         {reasonLines.length > 0 ? (
           <>

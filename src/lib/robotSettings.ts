@@ -11,7 +11,7 @@ export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   stopWin: 50,
   stopLoss: 30,
   g1: false,
-  narratorEnabled: false,
+  narratorEnabled: true,
 };
 
 let currentSettings = DEFAULT_ROBOT_SETTINGS;
@@ -47,7 +47,10 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
     stopWin: positiveNumber(settings?.stopWin, DEFAULT_ROBOT_SETTINGS.stopWin),
     stopLoss: positiveNumber(settings?.stopLoss, DEFAULT_ROBOT_SETTINGS.stopLoss),
     g1: settings?.g1 === true,
-    narratorEnabled: settings?.narratorEnabled === true,
+    narratorEnabled:
+      typeof settings?.narratorEnabled === "boolean"
+        ? settings.narratorEnabled
+        : DEFAULT_ROBOT_SETTINGS.narratorEnabled,
   };
 }
 

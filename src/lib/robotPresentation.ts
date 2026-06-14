@@ -78,10 +78,7 @@ export function getRobotPresentation(
     }
   }
 
-  if (
-    signalRejectionSnapshot &&
-    now - signalRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS
-  ) {
+  if (signalRejectionSnapshot && now - signalRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS) {
     return createPresentation(
       "rejected",
       "Nenhum sinal aprovado",
@@ -114,10 +111,7 @@ export function getRobotPresentation(
     }
   }
 
-  if (
-    orderRejectionSnapshot &&
-    now - orderRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS
-  ) {
+  if (orderRejectionSnapshot && now - orderRejectionSnapshot.observedAt < REJECTION_DISPLAY_MS) {
     return createPresentation(
       "rejected",
       "Entrada rejeitada",
@@ -194,30 +188,30 @@ export function getRobotPresentation(
     };
   }
 
-  if (status === "WAITING_ENTRY_WINDOW") {
-    if (!signal) {
-      return createPresentation("analyzing", "Analisando...", "Nenhum sinal confirmado ainda");
-    }
-
+  if (signal && status !== "SIGNAL_REJECTED") {
     const remainingSeconds = Math.max(
       0,
       Math.ceil(options.entryWindowSeconds ?? robotState.seconds_until_entry_window),
     );
-
-    if (remainingSeconds <= 0) {
-      return createPresentation("analyzing", "Analisando mercado...");
-    }
 
     return {
       ...createPresentation(
         "analyzing",
         "Sinal encontrado",
         null,
-        `Entrada em ${formatDuration(remainingSeconds)}`,
+        remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
       ),
       signal,
       direction: signal.direction,
     };
+  }
+
+  if (status === "WAITING_ENTRY_WINDOW") {
+    return createPresentation("analyzing", "Analisando mercado...", "Buscando melhor ativo...");
+  }
+
+  if (status === "ANALYZING") {
+    return createPresentation("analyzing", "Analisando mercado...", "Buscando melhor ativo...");
   }
 
   if (status === "WAITING_NEXT_CYCLE") {
@@ -232,9 +226,7 @@ export function getRobotPresentation(
     return createPresentation(
       "analyzing",
       "Erro no robô",
-      formatFriendlyRobotText(
-        robotState.rejection_reason ?? "Não foi possível concluir o ciclo.",
-      ),
+      formatFriendlyRobotText(robotState.rejection_reason ?? "Não foi possível concluir o ciclo."),
     );
   }
 
@@ -290,9 +282,7 @@ function isDisconnected(robotState: RobotState) {
 
 function getOrderRejectionReason(robotState: RobotState) {
   return (
-    robotState.last_order_error ??
-    robotState.rejection_reason ??
-    "Ordem recusada pela corretora."
+    robotState.last_order_error ?? robotState.rejection_reason ?? "Ordem recusada pela corretora."
   );
 }
 
@@ -309,11 +299,13 @@ function createNextCyclePresentation(
   now: number,
   options: RobotPresentationOptions = {},
   title = "Analisando...",
-  fallbackSeconds = 0,
+  fallbackSeconds = robotState.cycle_minutes * 60,
 ) {
   const remainingSeconds =
     options.nextCycleSeconds ??
-    (robotState.seconds_until_next_cycle > 0 ? robotState.seconds_until_next_cycle : fallbackSeconds);
+    (robotState.seconds_until_next_cycle > 0
+      ? robotState.seconds_until_next_cycle
+      : fallbackSeconds);
 
   if (remainingSeconds <= 0) {
     return createPresentation("analyzing", "Analisando mercado...");

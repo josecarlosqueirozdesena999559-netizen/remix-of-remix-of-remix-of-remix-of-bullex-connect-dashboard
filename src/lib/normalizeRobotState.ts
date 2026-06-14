@@ -12,11 +12,18 @@ export function normalizeRobotState(input: unknown): RobotState {
     value.lastTrade;
   const tradeValue = asRecord(tradeInput);
   const status = normalizeText(value.status, "STOPPED").toUpperCase();
-  const connected = normalizeConnected(value.connected ?? value.account_connected ?? value.accountConnected);
+  const connected = normalizeConnected(
+    value.connected ?? value.account_connected ?? value.accountConnected,
+  );
   const disconnected =
     connected === false ||
     status === "ACCOUNT_DISCONNECTED" ||
     normalizeBoolean(value.disconnected ?? value.account_disconnected ?? value.accountDisconnected);
+  const nextCycleAt = normalizeOptionalText(value.next_cycle_at ?? value.nextCycleAt);
+  const cycleMinutes = Math.max(1, normalizeNumber(value.cycle_minutes ?? value.cycleMinutes) ?? 5);
+  const secondsUntilNextCycle = normalizeNumber(
+    value.seconds_until_next_cycle ?? value.secondsUntilNextCycle,
+  );
 
   const expiresAt = normalizeOptionalText(
     value.expires_at ??
@@ -62,10 +69,13 @@ export function normalizeRobotState(input: unknown): RobotState {
         value.stop_type ??
         value.stopType,
     ),
-    next_cycle_at: normalizeOptionalText(value.next_cycle_at ?? value.nextCycleAt),
+    next_cycle_at: nextCycleAt,
+    cycle_minutes: cycleMinutes,
     seconds_until_next_cycle: Math.max(
       0,
-      normalizeNumber(value.seconds_until_next_cycle ?? value.secondsUntilNextCycle) ?? 0,
+      (secondsUntilNextCycle != null && secondsUntilNextCycle > 0 ? secondsUntilNextCycle : null) ??
+        getSecondsUntil(nextCycleAt) ??
+        (status === "WAITING_NEXT_CYCLE" ? cycleMinutes * 60 : 0),
     ),
     seconds_until_entry_window: Math.max(
       0,
@@ -78,17 +88,16 @@ export function normalizeRobotState(input: unknown): RobotState {
       value.operation_in_progress ?? value.operationInProgress,
     ),
     result_waiting: normalizeBoolean(value.result_waiting ?? value.resultWaiting),
-    pending_signal: normalizeSignal(value.pending_signal ?? value.pendingSignal),
+    pending_signal: normalizeSignal(
+      value.pending_signal ?? value.pendingSignal ?? value.best_candidate ?? value.bestCandidate,
+    ),
     last_signal: normalizeSignal(value.last_signal ?? value.lastSignal),
     last_trade: normalizeTrade(tradeInput),
     wins: Math.max(0, normalizeNumber(value.wins) ?? 0),
     losses: Math.max(0, normalizeNumber(value.losses) ?? 0),
     profit: normalizeNumber(value.profit) ?? 0,
     last_order_error: normalizeOptionalText(
-      value.last_order_error ??
-        value.lastOrderError ??
-        value.order_error ??
-        value.orderError,
+      value.last_order_error ?? value.lastOrderError ?? value.order_error ?? value.orderError,
     ),
     rejection_reason: normalizeOptionalText(value.rejection_reason ?? value.rejectionReason),
     last_rejection_reason: normalizeOptionalText(
@@ -117,15 +126,25 @@ function normalizeSignal(input: unknown): RobotSignal | null {
     symbol,
     direction,
     confidence: normalizePercentage(value.confidence ?? value.probability),
-    strategy_score: normalizeNumber(
-      value.strategy_score ??
-        value.strategyScore ??
-        value.score,
+    strategy_score: normalizeNumber(value.strategy_score ?? value.strategyScore ?? value.score),
+    strategy_name: normalizeOptionalText(
+      value.strategy_name ?? value.strategyName ?? value.strategy,
+    ),
+    strategy_reason: normalizeReason(
+      value.strategy_reason ?? value.strategyReason ?? value.reason ?? value.reasons,
     ),
     payout: normalizePercentage(value.payout),
     reason: normalizeReason(value.reason ?? value.reasons ?? value.motive ?? value.explanation),
     created_at: normalizeOptionalText(value.created_at ?? value.createdAt ?? value.timestamp),
   };
+}
+
+function getSecondsUntil(value: string | null) {
+  if (!value) return null;
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const timestamp = Date.parse(hasTimezone ? value : `${value}Z`);
+  if (!Number.isFinite(timestamp)) return null;
+  return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
 }
 
 function normalizeTrade(input: unknown): RobotTrade | null {
