@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   CandlestickChart,
   Bot,
+  Plug,
   History,
   CreditCard,
   Settings,
@@ -16,6 +17,7 @@ import { FloatingRobot } from "@/components/FloatingRobot";
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { to: "/chart", label: "Gráfico", Icon: CandlestickChart },
+  { to: "/bullex", label: "BullEx", Icon: Plug },
   { to: "/robot", label: "Robô", Icon: Bot },
   { to: "/history", label: "Histórico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },

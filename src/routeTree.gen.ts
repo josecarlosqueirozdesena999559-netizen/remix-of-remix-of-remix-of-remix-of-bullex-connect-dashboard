@@ -19,6 +19,7 @@ import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
+import { Route as AuthenticatedBullexRouteImport } from './routes/_authenticated/bullex'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -70,10 +71,16 @@ const AuthenticatedChartRoute = AuthenticatedChartRouteImport.update({
   path: '/chart',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBullexRoute = AuthenticatedBullexRouteImport.update({
+  id: '/bullex',
+  path: '/bullex',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/bullex': typeof AuthenticatedBullexRoute
   '/chart': typeof AuthenticatedChartRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/bullex': typeof AuthenticatedBullexRoute
   '/chart': typeof AuthenticatedChartRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/bullex': typeof AuthenticatedBullexRoute
   '/_authenticated/chart': typeof AuthenticatedChartRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/bullex'
     | '/chart'
     | '/dashboard'
     | '/history'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/bullex'
     | '/chart'
     | '/dashboard'
     | '/history'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/bullex'
     | '/_authenticated/chart'
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
@@ -221,10 +233,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChartRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bullex': {
+      id: '/_authenticated/bullex'
+      path: '/bullex'
+      fullPath: '/bullex'
+      preLoaderRoute: typeof AuthenticatedBullexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedBullexRoute: typeof AuthenticatedBullexRoute
   AuthenticatedChartRoute: typeof AuthenticatedChartRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
@@ -235,6 +255,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedBullexRoute: AuthenticatedBullexRoute,
   AuthenticatedChartRoute: AuthenticatedChartRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
