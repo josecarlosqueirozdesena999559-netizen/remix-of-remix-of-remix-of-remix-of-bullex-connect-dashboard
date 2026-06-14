@@ -111,8 +111,6 @@ export type RobotConfigPayload = {
   allow_real?: boolean;
   confirm_real?: boolean;
   entry_value?: number;
-  martingale_g1?: boolean;
-  g1?: boolean;
   cycle_minutes?: number;
   min_confidence?: number;
   min_payout?: number;

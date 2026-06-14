@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
-import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult } from "@/lib/api";
+import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
@@ -23,6 +23,10 @@ function RobotPage() {
   const { user } = useAuth();
   const [robotActionPending, setRobotActionPending] = useState(false);
   const [robotActionError, setRobotActionError] = useState<string | null>(null);
+  const [modeActionPending, setModeActionPending] = useState(false);
+  const [modeActionError, setModeActionError] = useState<string | null>(null);
+  const [showRealConfirm, setShowRealConfirm] = useState(false);
+  const [realConfirmed, setRealConfirmed] = useState(false);
   const robotStartAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const account = useBullExAccount();
@@ -43,6 +47,50 @@ function RobotPage() {
     robotStartAudioRef.current = audio;
     audio.currentTime = 0;
     void audio.play().catch(() => undefined);
+  }
+
+  async function refreshAccountAndRobot() {
+    await account.refetch();
+    await robotState.refetch();
+  }
+
+  async function handleDemoMode() {
+    if (!hasBackend || !connected || modeActionPending || activeMode === "PRACTICE") return;
+    setModeActionError(null);
+    setShowRealConfirm(false);
+    setRealConfirmed(false);
+    setModeActionPending(true);
+    try {
+      unwrapApiResult(await bullexApi.changeMode({ mode: "PRACTICE" }));
+      await refreshAccountAndRobot();
+    } catch (error) {
+      setModeActionError(error instanceof Error ? error.message : "Nao foi possivel mudar para DEMO.");
+    } finally {
+      setModeActionPending(false);
+    }
+  }
+
+  function handleRealMode() {
+    if (!hasBackend || !connected || modeActionPending || activeMode === "REAL") return;
+    setModeActionError(null);
+    setRealConfirmed(false);
+    setShowRealConfirm(true);
+  }
+
+  async function confirmRealMode() {
+    if (!realConfirmed || modeActionPending) return;
+    setModeActionError(null);
+    setModeActionPending(true);
+    try {
+      unwrapApiResult(await bullexApi.changeMode({ mode: "REAL", confirm_real: true }));
+      setShowRealConfirm(false);
+      setRealConfirmed(false);
+      await refreshAccountAndRobot();
+    } catch (error) {
+      setModeActionError(error instanceof Error ? error.message : "Nao foi possivel mudar para REAL.");
+    } finally {
+      setModeActionPending(false);
+    }
   }
 
   async function handleRobotToggle() {
@@ -67,8 +115,6 @@ function RobotPage() {
             allow_real: realSelected,
             confirm_real: realSelected,
             entry_value: settings.entryValue,
-            martingale_g1: settings.g1,
-            g1: settings.g1,
             cycle_minutes: FIXED_CYCLE_MINUTES,
             min_confidence: FIXED_MIN_CONFIDENCE,
             min_payout: FIXED_MIN_PAYOUT,
@@ -128,6 +174,47 @@ function RobotPage() {
           </Link>
         </div>
       ) : null}
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">Tipo de conta</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Escolha onde o robo vai operar.
+            </p>
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-80">
+            <button
+              type="button"
+              onClick={handleDemoMode}
+              disabled={!hasBackend || !connected || modeActionPending}
+              className={`rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                activeMode === "PRACTICE"
+                  ? "bg-success text-success-foreground"
+                  : "border border-border bg-background/40 text-foreground hover:bg-accent"
+              }`}
+            >
+              DEMO
+            </button>
+            <button
+              type="button"
+              onClick={handleRealMode}
+              disabled={!hasBackend || !connected || modeActionPending}
+              className={`rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                activeMode === "REAL"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-background/40 text-foreground hover:bg-accent"
+              }`}
+            >
+              REAL
+            </button>
+          </div>
+        </div>
+
+        {modeActionError ? (
+          <p className="mt-3 text-sm text-destructive">{modeActionError}</p>
+        ) : null}
+      </section>
 
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -224,6 +311,55 @@ function RobotPage() {
           </button>
         </div>
       </section>
+
+      {showRealConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-semibold">Confirmar conta REAL</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Entendo que estou mudando para CONTA REAL. As operacoes usarao saldo real e podem
+              gerar perdas.
+            </p>
+
+            <label className="mt-5 flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={realConfirmed}
+                onChange={(event) => setRealConfirmed(event.target.checked)}
+                className="mt-1 h-4 w-4 accent-primary"
+              />
+              <span>Confirmo que quero operar em conta REAL.</span>
+            </label>
+
+            {modeActionError ? (
+              <p className="mt-3 text-sm text-destructive">{modeActionError}</p>
+            ) : null}
+
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRealConfirm(false);
+                  setRealConfirmed(false);
+                }}
+                disabled={modeActionPending}
+                className="rounded-lg border border-border bg-background/40 px-4 py-2 text-sm font-semibold transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmRealMode}
+                disabled={!realConfirmed || modeActionPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {modeActionPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Confirmar conta REAL
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
