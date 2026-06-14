@@ -4,8 +4,9 @@ import { Bot, Loader2, Power } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
-import { useRobotState } from "@/hooks/useRobotState";
+import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
+import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
 import { readRobotSettings } from "@/lib/robotSettings";
 
@@ -30,7 +31,14 @@ function RobotPage() {
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
   const { settings, setSettings } = useRobotSettings();
-  const robotPresentation = getRobotPresentation(robotState.data, Date.now());
+  const smoothNextCycleSeconds = useSmoothCountdown(
+    robotState.data?.seconds_until_next_cycle,
+    getCountdownResetKey(robotState.data),
+    Boolean(robotState.data?.enabled && robotState.data.seconds_until_next_cycle > 0),
+  );
+  const robotPresentation = getRobotPresentation(robotState.data, Date.now(), {
+    nextCycleSeconds: smoothNextCycleSeconds,
+  });
   const signalReasonLines = formatSignalReasonLines(robotPresentation.signal?.reason);
 
   const connected = account.data?.connected === true;
@@ -377,6 +385,15 @@ function Pill({ label, value }: { label: string; value: string }) {
 
 function formatAmount(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function getCountdownResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.next_cycle_at ?? "-",
+    robotState.last_trade?.finished_at ?? "-",
+  ].join("|");
 }
 
 function unwrapApiResult<T>(result: ApiResult<T>) {

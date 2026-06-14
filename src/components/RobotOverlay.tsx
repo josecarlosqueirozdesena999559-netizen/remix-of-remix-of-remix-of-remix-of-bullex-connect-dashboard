@@ -8,6 +8,7 @@ import {
 import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
+import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { formatSignalReasonLines, getRobotPresentation } from "@/lib/robotPresentation";
 import { readRobotSettings, saveRobotSettings, type RobotSettings } from "@/lib/robotSettings";
 
@@ -53,7 +54,12 @@ export function RobotOverlay({
   const [configOpen, setConfigOpen] = useState(false);
   const [settings, setSettings] = useState<RobotSettings>(() => readRobotSettings());
   const now = useCurrentTime();
-  const content = getOverlayContent(robotState, now);
+  const smoothNextCycleSeconds = useSmoothCountdown(
+    robotState?.seconds_until_next_cycle,
+    getCountdownResetKey(robotState),
+    Boolean(robotState?.enabled && robotState.seconds_until_next_cycle > 0),
+  );
+  const content = getOverlayContent(robotState, now, smoothNextCycleSeconds);
 
   useEffect(() => {
     const savedPosition = readPosition(storageKey);
@@ -232,11 +238,23 @@ function useCurrentTime() {
   return now;
 }
 
+function getCountdownResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.next_cycle_at ?? "-",
+    robotState.last_trade?.finished_at ?? "-",
+  ].join("|");
+}
+
 function getOverlayContent(
   robotState: RobotState | undefined,
   now: number,
+  smoothNextCycleSeconds: number | null,
 ): OverlayContent {
-  const presentation = getRobotPresentation(robotState, now);
+  const presentation = getRobotPresentation(robotState, now, {
+    nextCycleSeconds: smoothNextCycleSeconds,
+  });
   const trade = presentation.trade;
   const signal = presentation.signal;
   const tone =

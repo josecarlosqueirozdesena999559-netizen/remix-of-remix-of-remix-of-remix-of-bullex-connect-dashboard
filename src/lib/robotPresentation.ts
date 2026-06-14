@@ -6,6 +6,10 @@ const REJECTION_DISPLAY_MS = 5000;
 let observedStatus: string | null = null;
 let localRejectedAt: number | null = null;
 
+type RobotPresentationOptions = {
+  nextCycleSeconds?: number | null;
+};
+
 export type RobotPresentation = {
   kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "rejected" | "result";
   title: string;
@@ -20,6 +24,7 @@ export type RobotPresentation = {
 export function getRobotPresentation(
   robotState: RobotState | undefined,
   now: number,
+  options: RobotPresentationOptions = {},
 ): RobotPresentation {
   if (!robotState) {
     return createPresentation("loading", "Consultando robô...");
@@ -50,7 +55,7 @@ export function getRobotPresentation(
   if (status === "SIGNAL_REJECTED") {
     const rejectedAt = getRejectedAt(robotState, now);
     if (now - rejectedAt >= REJECTION_DISPLAY_MS) {
-      return createNextCyclePresentation(robotState, now);
+      return createNextCyclePresentation(robotState, now, options);
     }
 
     return createPresentation(
@@ -87,39 +92,26 @@ export function getRobotPresentation(
     (robotState.operation_in_progress ||
       status === "PENDING_RESULT" ||
       trade?.result === "PENDING_RESULT");
-  const resultWaiting = !result && (robotState.result_waiting || operationInProgress);
+  const resultWaiting = !result && robotState.result_waiting;
 
-  if (operationInProgress) {
-    const remainingSeconds = getExpirationRemainingSeconds(
-      trade?.expires_at ?? robotState.expires_at,
-      now,
-    );
-
+  if (resultWaiting) {
     return {
-      ...createPresentation(
-        "operation",
-        remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
-        null,
-        `Expira em ${formatDuration(remainingSeconds)}`,
-      ),
+      ...createPresentation("operation", "Aguardando resultado..."),
       trade,
       signal: trade ? null : signal,
       direction: trade?.direction ?? signal?.direction ?? null,
     };
   }
 
-  if (resultWaiting) {
-    const remainingSeconds = getExpirationRemainingSeconds(
-      trade?.expires_at ?? robotState.expires_at,
-      now,
-    );
+  if (operationInProgress) {
+    const remainingSeconds = Math.max(0, Math.ceil(robotState.expiration_seconds));
 
     return {
       ...createPresentation(
         "operation",
-        "Aguardando resultado...",
+        remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
         null,
-        `Expira em ${formatDuration(remainingSeconds)}`,
+        remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
       ),
       trade,
       signal: trade ? null : signal,
@@ -167,11 +159,11 @@ export function getRobotPresentation(
   }
 
   if (status === "WAITING_NEXT_CYCLE") {
-    return createNextCyclePresentation(robotState, now);
+    return createNextCyclePresentation(robotState, now, options);
   }
 
   if (trade && result) {
-    return createNextCyclePresentation(robotState, now);
+    return createNextCyclePresentation(robotState, now, options);
   }
 
   if (status === "ERROR") {
@@ -182,7 +174,7 @@ export function getRobotPresentation(
     );
   }
 
-  return createNextCyclePresentation(robotState, now, "Robô ativo", 600);
+  return createNextCyclePresentation(robotState, now, options, "Robô ativo", 600);
 }
 
 export function formatDuration(totalSeconds: number) {
@@ -229,20 +221,16 @@ function getRemainingSeconds(seconds: number, fetchedAt: number, now: number) {
   return Math.max(0, Math.ceil(seconds - elapsed));
 }
 
-function getExpirationRemainingSeconds(expiresAt: string | null, now: number) {
-  const expiresAtTime = parseDate(expiresAt);
-  if (expiresAtTime == null) return 0;
-  return Math.max(0, Math.ceil((expiresAtTime - now) / 1000));
-}
-
 function createNextCyclePresentation(
   robotState: RobotState,
   now: number,
+  options: RobotPresentationOptions = {},
   title = "Analisando...",
   fallbackSeconds = 0,
 ) {
   const remainingSeconds =
-    robotState.seconds_until_next_cycle > 0 ? robotState.seconds_until_next_cycle : fallbackSeconds;
+    options.nextCycleSeconds ??
+    (robotState.seconds_until_next_cycle > 0 ? robotState.seconds_until_next_cycle : fallbackSeconds);
 
   return createPresentation(
     "analyzing",

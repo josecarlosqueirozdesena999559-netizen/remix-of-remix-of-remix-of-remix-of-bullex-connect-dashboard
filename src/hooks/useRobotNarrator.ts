@@ -112,10 +112,25 @@ function getNarrationEvents(robotState: RobotState): NarrationEvent[] {
     }
   }
 
+  if (status === "SIGNAL_REJECTED") {
+    events.push({
+      key: createEventKey(
+        "SIGNAL_REJECTED",
+        orderId,
+        signalCreatedAt,
+        signal,
+        robotState.last_rejection_reason ?? robotState.rejection_reason ?? "",
+      ),
+      text:
+        "A entrada foi encontrada, porém não segue os parâmetros de análises confiáveis. Aguarde mais um pouco.",
+    });
+  }
+
   if (status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED") {
     events.push({
       key: createEventKey("ORDER_REJECTED", orderId, signalCreatedAt, signal, robotState.rejection_reason ?? ""),
-      text: "Vamos fazer mais uma análise, pois o sinal encontrado não era bom o suficiente.",
+      text:
+        "A entrada foi encontrada, porém não segue os parâmetros de análises confiáveis. Aguarde mais um pouco.",
     });
   }
 
