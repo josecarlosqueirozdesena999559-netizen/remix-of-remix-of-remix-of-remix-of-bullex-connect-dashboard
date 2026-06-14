@@ -5,8 +5,8 @@ import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
 import { useRobotNarrator } from "@/hooks/useRobotNarrator";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
-import { useRobotState } from "@/hooks/useRobotState";
-import { useServerNextCycleCountdown } from "@/hooks/useServerCountdown";
+import { useRobotState, type RobotState } from "@/hooks/useRobotState";
+import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(true);
@@ -18,7 +18,12 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     robotState: robotState.data,
   });
   const { settings, saveSettings } = useRobotSettings(userId);
-  const nextCycleSeconds = useServerNextCycleCountdown(effectiveRobotState);
+  const nextCycleSeconds = useSmoothCountdown(
+    effectiveRobotState?.seconds_until_next_cycle,
+    getNextCycleResetKey(effectiveRobotState),
+    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_next_cycle > 0),
+    effectiveRobotState?.fetched_at,
+  );
   const narrator = useRobotNarrator(
     effectiveRobotState,
     settings.narratorEnabled,
@@ -60,4 +65,13 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       showConfig
     />
   );
+}
+
+function getNextCycleResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.next_cycle_at ?? "-",
+    robotState.last_trade?.finished_at ?? "-",
+  ].join("|");
 }

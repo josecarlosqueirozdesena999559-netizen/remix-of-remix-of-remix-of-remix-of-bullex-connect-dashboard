@@ -12,6 +12,7 @@ type OrderRejectionSnapshot = {
 };
 
 type RobotPresentationOptions = {
+  analysisWindowSeconds?: number | null;
   nextCycleSeconds?: number | null;
   entryWindowSeconds?: number | null;
   expirationSeconds?: number | null;
@@ -93,6 +94,10 @@ export function getRobotPresentation(
     orderRejectionSnapshot = null;
   }
 
+  if (isOrderFallbackInProgress(robotState)) {
+    return createPresentation("analyzing", "Ativo indisponível, tentando próximo melhor ativo...");
+  }
+
   if (status === "SENDING_ORDER") {
     return createPresentation("operation", "Entrada liberada", "Enviando ordem...");
   }
@@ -163,7 +168,7 @@ export function getRobotPresentation(
     };
   }
 
-  if (signal && status === "WAITING_ENTRY_WINDOW") {
+  if (status === "WAITING_ENTRY_WINDOW") {
     const remainingSeconds = Math.max(
       0,
       Math.ceil(options.entryWindowSeconds ?? robotState.seconds_until_entry_window),
@@ -172,17 +177,13 @@ export function getRobotPresentation(
     return {
       ...createPresentation(
         "analyzing",
-        "Sinal escolhido",
+        "Sinal encontrado",
         null,
-        remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
+        `Entrada em ${formatDuration(remainingSeconds)}`,
       ),
       signal,
-      direction: signal.direction,
+      direction: signal?.direction ?? null,
     };
-  }
-
-  if (status === "WAITING_ENTRY_WINDOW") {
-    return createPresentation("analyzing", "Sinal escolhido");
   }
 
   if (status === "ANALYZING") {
@@ -190,7 +191,10 @@ export function getRobotPresentation(
   }
 
   if (status === "WAITING_ANALYSIS_WINDOW") {
-    const remainingSeconds = Math.max(0, Math.ceil(resolveNextCycleSeconds(robotState, options)));
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil(options.analysisWindowSeconds ?? robotState.seconds_until_analysis_window),
+    );
 
     return createPresentation(
       "analyzing",
@@ -259,6 +263,38 @@ function isDisconnected(robotState: RobotState) {
 function getOrderRejectionReason(robotState: RobotState) {
   return (
     robotState.last_order_error ?? robotState.rejection_reason ?? "Ordem recusada pela corretora."
+  );
+}
+
+function isOrderFallbackInProgress(robotState: RobotState) {
+  if (robotState.order_fallback_in_progress) return true;
+  if (
+    robotState.order_fallback_attempt > 0 &&
+    robotState.order_fallback_attempt <= robotState.order_fallback_max_attempts
+  ) {
+    return true;
+  }
+
+  const fallbackText = [
+    robotState.status,
+    robotState.last_order_error,
+    robotState.rejection_reason,
+    robotState.last_rejection_reason,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  return (
+    fallbackText.includes("FALLBACK") ||
+    fallbackText.includes("TRYING_NEXT_ACTIVE") ||
+    fallbackText.includes("NEXT_BEST_ACTIVE") ||
+    fallbackText.includes("ACTIVE_UNAVAILABLE") ||
+    fallbackText.includes("ACTIVE UNAVAILABLE") ||
+    fallbackText.includes("ATIVO_INDISPONIVEL") ||
+    fallbackText.includes("ATIVO INDISPONIVEL")
   );
 }
 

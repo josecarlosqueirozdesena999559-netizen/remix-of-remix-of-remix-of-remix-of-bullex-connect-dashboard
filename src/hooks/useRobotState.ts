@@ -48,10 +48,12 @@ export type RobotState = {
   real_block_reason: string | null;
   stop_reason: string | null;
   next_cycle_at: string | null;
+  server_time: string | null;
   cycle_minutes: number;
   entry_value: number | null;
   stop_win: number | null;
   stop_loss: number | null;
+  seconds_until_analysis_window: number;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
   expiration_seconds: number;
@@ -66,6 +68,9 @@ export type RobotState = {
   losses: number;
   profit: number;
   last_order_error: string | null;
+  order_fallback_in_progress: boolean;
+  order_fallback_attempt: number;
+  order_fallback_max_attempts: number;
   rejection_reason: string | null;
   last_rejection_reason: string | null;
   rejected_at: string | null;
@@ -125,10 +130,12 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     real_block_reason: disconnected ? "Conta BullEx desconectada" : null,
     stop_reason: null,
     next_cycle_at: null,
+    server_time: null,
     cycle_minutes: 5,
     entry_value: null,
     stop_win: null,
     stop_loss: null,
+    seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
     expiration_seconds: 0,
@@ -143,6 +150,9 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     losses: 0,
     profit: 0,
     last_order_error: null,
+    order_fallback_in_progress: false,
+    order_fallback_attempt: 0,
+    order_fallback_max_attempts: 3,
     rejection_reason: disconnected ? "Conta BullEx desconectada" : null,
     last_rejection_reason: disconnected ? "Conta BullEx desconectada" : null,
     rejected_at: null,

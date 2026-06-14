@@ -23,10 +23,12 @@ export function normalizeRobotState(input: unknown): RobotState {
     status === "ACCOUNT_DISCONNECTED" ||
     normalizeBoolean(value.disconnected ?? value.account_disconnected ?? value.accountDisconnected);
   const nextCycleAt = normalizeOptionalText(value.next_cycle_at ?? value.nextCycleAt);
+  const serverTime = normalizeOptionalText(value.server_time ?? value.serverTime);
   const cycleMinutes = Math.max(1, normalizeNumber(value.cycle_minutes ?? value.cycleMinutes) ?? 5);
   const secondsUntilNextCycle = normalizeNumber(
     value.seconds_until_next_cycle ?? value.secondsUntilNextCycle,
   );
+  const secondsUntilNextCycleFromClock = getSecondsUntil(nextCycleAt, serverTime);
 
   const expiresAt = normalizeOptionalText(
     value.expires_at ??
@@ -62,6 +64,36 @@ export function normalizeRobotState(input: unknown): RobotState {
             value.bestCandidate,
         )
       : null;
+  const fallbackAttempt = Math.max(
+    0,
+    normalizeNumber(
+      value.order_fallback_attempt ??
+        value.orderFallbackAttempt ??
+        value.fallback_attempt ??
+        value.fallbackAttempt ??
+        value.active_fallback_attempt ??
+        value.activeFallbackAttempt,
+    ) ?? 0,
+  );
+  const fallbackMaxAttempts = Math.max(
+    1,
+    normalizeNumber(
+      value.order_fallback_max_attempts ??
+        value.orderFallbackMaxAttempts ??
+        value.fallback_max_attempts ??
+        value.fallbackMaxAttempts ??
+        value.max_fallback_attempts ??
+        value.maxFallbackAttempts,
+    ) ?? 3,
+  );
+  const fallbackInProgress = normalizeBoolean(
+    value.order_fallback_in_progress ??
+      value.orderFallbackInProgress ??
+      value.fallback_in_progress ??
+      value.fallbackInProgress ??
+      value.active_fallback_in_progress ??
+      value.activeFallbackInProgress,
+  );
 
   return {
     enabled: normalizeBoolean(value.enabled),
@@ -82,6 +114,7 @@ export function normalizeRobotState(input: unknown): RobotState {
         value.stopType,
     ),
     next_cycle_at: nextCycleAt,
+    server_time: serverTime,
     cycle_minutes: cycleMinutes,
     entry_value: normalizeNumber(
       value.entry_value ?? value.entryValue ?? config.entry_value ?? config.entryValue,
@@ -92,9 +125,11 @@ export function normalizeRobotState(input: unknown): RobotState {
     ),
     seconds_until_next_cycle: Math.max(
       0,
-      (secondsUntilNextCycle != null && secondsUntilNextCycle > 0 ? secondsUntilNextCycle : null) ??
-        getSecondsUntil(nextCycleAt) ??
-        (status === "WAITING_NEXT_CYCLE" ? cycleMinutes * 60 : 0),
+      secondsUntilNextCycle ?? secondsUntilNextCycleFromClock ?? 0,
+    ),
+    seconds_until_analysis_window: Math.max(
+      0,
+      normalizeNumber(value.seconds_until_analysis_window ?? value.secondsUntilAnalysisWindow) ?? 0,
     ),
     seconds_until_entry_window: Math.max(
       0,
@@ -116,6 +151,9 @@ export function normalizeRobotState(input: unknown): RobotState {
     last_order_error: normalizeOptionalText(
       value.last_order_error ?? value.lastOrderError ?? value.order_error ?? value.orderError,
     ),
+    order_fallback_in_progress: fallbackInProgress || fallbackAttempt > 0,
+    order_fallback_attempt: fallbackAttempt,
+    order_fallback_max_attempts: fallbackMaxAttempts,
     rejection_reason: normalizeOptionalText(value.rejection_reason ?? value.rejectionReason),
     last_rejection_reason: normalizeOptionalText(
       value.last_rejection_reason ??
@@ -166,12 +204,20 @@ function normalizeSignal(input: unknown): RobotSignal | null {
   };
 }
 
-function getSecondsUntil(value: string | null) {
+function getSecondsUntil(targetValue: string | null, serverValue: string | null) {
+  if (!targetValue || !serverValue) return null;
+  const targetTimestamp = parseTimestamp(targetValue);
+  const serverTimestamp = parseTimestamp(serverValue);
+  if (targetTimestamp == null || serverTimestamp == null) return null;
+  return Math.max(0, Math.ceil((targetTimestamp - serverTimestamp) / 1000));
+}
+
+function parseTimestamp(value: string | null) {
   if (!value) return null;
   const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
   const timestamp = Date.parse(hasTimezone ? value : `${value}Z`);
   if (!Number.isFinite(timestamp)) return null;
-  return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+  return timestamp;
 }
 
 function normalizeTrade(input: unknown): RobotTrade | null {

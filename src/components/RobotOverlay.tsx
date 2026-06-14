@@ -8,7 +8,6 @@ import {
 import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
-import { useServerNextCycleCountdown } from "@/hooks/useServerCountdown";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
@@ -57,7 +56,18 @@ export function RobotOverlay({
   const [configOpen, setConfigOpen] = useState(false);
   const [settings, setSettings] = useState<RobotSettings>(savedSettings);
   const now = useCurrentTime();
-  const nextCycleSeconds = useServerNextCycleCountdown(robotState);
+  const analysisWindowSeconds = useSmoothCountdown(
+    robotState?.seconds_until_analysis_window,
+    getAnalysisWindowResetKey(robotState),
+    Boolean(robotState?.enabled && robotState.seconds_until_analysis_window > 0),
+    robotState?.fetched_at,
+  );
+  const nextCycleSeconds = useSmoothCountdown(
+    robotState?.seconds_until_next_cycle,
+    getNextCycleResetKey(robotState),
+    Boolean(robotState?.enabled && robotState.seconds_until_next_cycle > 0),
+    robotState?.fetched_at,
+  );
   const smoothEntryWindowSeconds = useSmoothCountdown(
     robotState?.seconds_until_entry_window,
     getEntryWindowResetKey(robotState),
@@ -77,6 +87,7 @@ export function RobotOverlay({
     robotState?.fetched_at,
   );
   const content = getOverlayContent(robotState, now, {
+    analysisWindowSeconds,
     nextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
@@ -267,6 +278,20 @@ function useCurrentTime() {
   return now;
 }
 
+function getAnalysisWindowResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [robotState.status, robotState.next_cycle_at ?? "-"].join("|");
+}
+
+function getNextCycleResetKey(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  return [
+    robotState.status,
+    robotState.next_cycle_at ?? "-",
+    robotState.last_trade?.finished_at ?? "-",
+  ].join("|");
+}
+
 function getEntryWindowResetKey(robotState: RobotState | undefined) {
   if (!robotState) return null;
   return [
@@ -291,12 +316,14 @@ function getOverlayContent(
   robotState: RobotState | undefined,
   now: number,
   countdowns: {
+    analysisWindowSeconds: number | null;
     nextCycleSeconds: number | null;
     entryWindowSeconds: number | null;
     expirationSeconds: number | null;
   },
 ): OverlayContent {
   const presentation = getRobotPresentation(robotState, now, {
+    analysisWindowSeconds: countdowns.analysisWindowSeconds,
     nextCycleSeconds: countdowns.nextCycleSeconds,
     entryWindowSeconds: countdowns.entryWindowSeconds,
     expirationSeconds: countdowns.expirationSeconds,
