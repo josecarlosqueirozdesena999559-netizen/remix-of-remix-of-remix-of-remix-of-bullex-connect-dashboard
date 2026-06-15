@@ -1,16 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { BarChart3, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { UTCTimestamp } from "lightweight-charts";
-import { TradingChart } from "@/components/TradingChart";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
+const TradingChart = lazy(() =>
+  import("@/components/TradingChart").then((module) => ({ default: module.TradingChart })),
+);
+
 export const Route = createFileRoute("/_authenticated/chart")({
+  ssr: false,
   head: () => ({ meta: [{ title: "GrÃ¡fico em tempo real - BullEx AutoBot" }] }),
   component: MarketPage,
 });
@@ -236,22 +240,42 @@ function MarketPage() {
           </div>
         )}
 
-        <TradingChart
-          symbol={chartSymbol || DEFAULT_SYMBOL}
-          timeframe={DEFAULT_TIMEFRAME}
-          candles={candles}
-          overlay={{
-            currentPrice: lastPrice,
-            realtimeStatus: formatRealtimeStatus(realtimeStatus, realtimeAgeSeconds),
-            bestSymbol: robotState.data?.best_candidate?.symbol ?? null,
-            direction: overlaySignal?.direction ?? null,
-            confidence: overlaySignal?.confidence ?? null,
-            score: overlaySignal?.strategy_score ?? null,
-            strategy: overlaySignal?.strategy_name ?? null,
-            entryCountdown: formatEntryCountdown(robotState.data),
-            result: overlayResult,
-          }}
-        />
+        <ClientOnly
+          fallback={
+            <div className="p-4">
+              <div className="flex h-[560px] w-full items-center justify-center rounded-xl border border-border/60 bg-card text-sm text-muted-foreground md:h-[680px]">
+                Carregando grÃ¡fico...
+              </div>
+            </div>
+          }
+        >
+          <Suspense
+            fallback={
+              <div className="p-4">
+                <div className="flex h-[560px] w-full items-center justify-center rounded-xl border border-border/60 bg-card text-sm text-muted-foreground md:h-[680px]">
+                  Carregando grÃ¡fico...
+                </div>
+              </div>
+            }
+          >
+            <TradingChart
+              symbol={chartSymbol || DEFAULT_SYMBOL}
+              timeframe={DEFAULT_TIMEFRAME}
+              candles={candles}
+              overlay={{
+                currentPrice: lastPrice,
+                realtimeStatus: formatRealtimeStatus(realtimeStatus, realtimeAgeSeconds),
+                bestSymbol: robotState.data?.best_candidate?.symbol ?? null,
+                direction: overlaySignal?.direction ?? null,
+                confidence: overlaySignal?.confidence ?? null,
+                score: overlaySignal?.strategy_score ?? null,
+                strategy: overlaySignal?.strategy_name ?? null,
+                entryCountdown: formatEntryCountdown(robotState.data),
+                result: overlayResult,
+              }}
+            />
+          </Suspense>
+        </ClientOnly>
 
         {chartSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
           <div className="pb-5 text-center text-sm text-muted-foreground">
