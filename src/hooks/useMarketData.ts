@@ -84,7 +84,14 @@ export function useMarketData(active: string | null) {
         if (cancelled) return;
 
         const latestCandle = nextCandles[nextCandles.length - 1] ?? null;
-        setCandles((currentCandles) => mergeCandles(currentCandles, nextCandles).slice(-200));
+        setCandles((currentCandles) => {
+          return mergeCandles(currentCandles, nextCandles).slice(-200);
+        });
+        console.log("[CHART_CANDLES_UPDATED]", {
+          active,
+          received: nextCandles.length,
+          latest_time: latestCandle?.time ?? null,
+        });
         if (latestCandle) {
           hasInitialCandles = true;
           setLastPrice(latestCandle.close);
@@ -238,37 +245,51 @@ function normalizeCandlesPayload(active: string, input: unknown): MarketCandle[]
     return [];
   }
 
-  const normalized = raw
-    .map((item) => normalizeCandle(active, item))
-    .filter(Boolean) as MarketCandle[];
-  normalized.sort((a, b) => Number(a.time) - Number(b.time));
+  const byTime = new Map<number, MarketCandle>();
 
-  return normalized.filter((candle, index, array) => {
-    const previous = array[index - 1];
-    return !previous || Number(previous.time) !== Number(candle.time);
-  });
+  for (const item of raw) {
+    const candle = normalizeCandle(item);
+    if (!candle) continue;
+
+    byTime.set(Number(candle.time), candle);
+    console.log("[CHART_CANDLE_NORMALIZED]", {
+      active,
+      time: candle.time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+    });
+  }
+
+  return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
 }
 
-function normalizeCandle(active: string, item: unknown): MarketCandle | null {
-  if (!item || typeof item !== "object") {
-    console.error("[bullex/market-data] Invalid candle item", { active, candle: item });
-    return null;
-  }
+function normalizeCandle(raw: unknown): MarketCandle | null {
+  if (!raw || typeof raw !== "object") return null;
 
-  const value = item as Record<string, unknown>;
-  const open = Number(value.open);
-  const high = Number(value.max ?? value.high);
-  const low = Number(value.min ?? value.low);
-  const close = Number(value.close);
-  const rawTime = Math.floor(Number(value.from));
+  const wrapper = raw as Record<string, unknown>;
+  const candle =
+    wrapper.candle && typeof wrapper.candle === "object"
+      ? (wrapper.candle as Record<string, unknown>)
+      : wrapper;
 
-  if (![open, high, low, close, rawTime].every(Number.isFinite)) {
-    console.error("[bullex/market-data] Unexpected candle shape", { active, candle: item });
-    return null;
-  }
+  const open = normalizeNumber(candle.open);
+  const high = normalizeNumber(candle.high ?? candle.max);
+  const low = normalizeNumber(candle.low ?? candle.min);
+  const close = normalizeNumber(candle.close);
+
+  if (open == null || high == null || low == null || close == null) return null;
+
+  const timeValue = candle.time ?? candle.from ?? candle.at ?? candle.timestamp;
+  const parsedTime = normalizeNumber(timeValue);
+  const timeInSeconds =
+    parsedTime == null
+      ? Math.floor(Date.now() / 1000)
+      : Math.floor(parsedTime > 10_000_000_000 ? parsedTime / 1000 : parsedTime);
 
   return {
-    time: rawTime as UTCTimestamp,
+    time: timeInSeconds as UTCTimestamp,
     open,
     high,
     low,
@@ -287,8 +308,20 @@ function getRawCandles(input: unknown): unknown[] {
   if (data && typeof data === "object") {
     const nested = data as Record<string, unknown>;
     if (Array.isArray(nested.candles)) return nested.candles;
+    if (nested.candle && typeof nested.candle === "object") return [nested];
   }
 
   if (Array.isArray(value.candles)) return value.candles;
+  if (value.candle && typeof value.candle === "object") return [value];
+  if (hasCandlePrices(value)) return [value];
   return [];
+}
+
+function hasCandlePrices(value: Record<string, unknown>) {
+  return (
+    value.open != null &&
+    (value.high != null || value.max != null) &&
+    (value.low != null || value.min != null) &&
+    value.close != null
+  );
 }
