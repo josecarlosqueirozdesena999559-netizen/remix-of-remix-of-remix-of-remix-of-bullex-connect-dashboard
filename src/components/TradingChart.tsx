@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { createChart, CrosshairMode, LineStyle, type IChartApi, type UTCTimestamp } from "lightweight-charts";
+import {
+  CandlestickSeries,
+  createChart,
+  CrosshairMode,
+  LineStyle,
+  type IChartApi,
+  type ISeriesApi,
+  type UTCTimestamp,
+} from "lightweight-charts";
 import type { MarketCandle } from "@/hooks/useMarketData";
 
 const CHART_HEIGHT = 680;
@@ -26,7 +34,7 @@ type TradingChartProps = {
   overlay?: TradingChartOverlay;
 };
 
-type CandlestickSeriesApi = ReturnType<IChartApi["addCandlestickSeries"]>;
+type CandlestickSeriesApi = ISeriesApi<"Candlestick", UTCTimestamp, MarketCandle, MarketCandle>;
 
 export function TradingChart({ symbol, timeframe, candles, overlay }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -85,19 +93,19 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       },
     });
 
-    const series = chart.addCandlestickSeries({
+    const candleOptions = {
       upColor: "#22C55E",
       downColor: "#EF4444",
-      borderUpColor: "#22C55E",
-      borderDownColor: "#EF4444",
+      borderVisible: false,
       wickUpColor: "#22C55E",
       wickDownColor: "#EF4444",
       priceLineColor: "#22C55E",
       lastValueVisible: true,
-      borderVisible: true,
       wickVisible: true,
       priceFormat: buildPriceFormat(symbol, overlay?.currentPrice ?? null),
-    });
+    };
+
+    const series = createCandlestickSeries(chart, candleOptions);
 
     chart.subscribeCrosshairMove((param) => {
       if (!param.point || !param.time) {
@@ -220,6 +228,39 @@ function OverlayRow({ label, value }: { label: string; value: string }) {
       <div className="font-semibold text-foreground">{value}</div>
     </div>
   );
+}
+
+function createCandlestickSeries(
+  chart: IChartApi,
+  candleOptions: {
+    upColor: string;
+    downColor: string;
+    borderVisible: boolean;
+    wickUpColor: string;
+    wickDownColor: string;
+    priceLineColor: string;
+    lastValueVisible: boolean;
+    wickVisible: boolean;
+    priceFormat: ReturnType<typeof buildPriceFormat>;
+  },
+) {
+  const compatibleChart = chart as IChartApi & {
+    addSeries?: (
+      definition: typeof CandlestickSeries,
+      options: typeof candleOptions,
+    ) => CandlestickSeriesApi;
+    addCandlestickSeries?: (options: typeof candleOptions) => CandlestickSeriesApi;
+  };
+
+  if (typeof compatibleChart.addSeries === "function") {
+    return compatibleChart.addSeries(CandlestickSeries, candleOptions);
+  }
+
+  if (typeof compatibleChart.addCandlestickSeries === "function") {
+    return compatibleChart.addCandlestickSeries(candleOptions);
+  }
+
+  throw new Error("Lightweight Charts candlestick API not available");
 }
 
 function focusLatestCandles(chart: IChartApi, candleCount: number) {
