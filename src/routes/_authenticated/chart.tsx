@@ -36,6 +36,8 @@ type CandlestickSeriesApi = ReturnType<ChartApi["addSeries"]>;
 const EMPTY_ASSETS: Asset[] = [];
 const CHART_HEIGHT = 680;
 const MOBILE_CHART_HEIGHT = 560;
+const VISIBLE_CANDLE_COUNT = 32;
+const CHART_RIGHT_OFFSET = 4;
 
 function MarketPage() {
   const { user } = useAuth();
@@ -165,12 +167,18 @@ function MarketPage() {
         visible: true,
         autoScale: true,
         borderVisible: false,
+        scaleMargins: {
+          top: 0.12,
+          bottom: 0.12,
+        },
       },
       timeScale: {
         borderVisible: false,
         timeVisible: true,
         secondsVisible: true,
-        rightOffset: 6,
+        rightOffset: CHART_RIGHT_OFFSET,
+        barSpacing: 12,
+        minBarSpacing: 5,
         fixLeftEdge: false,
         fixRightEdge: false,
       },
@@ -266,6 +274,10 @@ function MarketPage() {
       autoScale: true,
       borderVisible: false,
       visible: true,
+      scaleMargins: {
+        top: 0.12,
+        bottom: 0.12,
+      },
     });
 
     const symbolChanged = prevSymbolRef.current !== chartSymbol;
@@ -277,7 +289,7 @@ function MarketPage() {
 
     if (symbolChanged) {
       series.setData(candles);
-      chart.timeScale().fitContent();
+      focusLatestCandles(chart, candles.length);
       prevSymbolRef.current = chartSymbol;
       prevCandlesLengthRef.current = candles.length;
     } else if (candles.length === 0) {
@@ -288,6 +300,7 @@ function MarketPage() {
       candles.length < prevCandlesLengthRef.current
     ) {
       series.setData(candles);
+      focusLatestCandles(chart, candles.length);
       prevCandlesLengthRef.current = candles.length;
     } else if (followPrice && candles.length > 0) {
       const latestCandle = candles[candles.length - 1];
@@ -431,7 +444,8 @@ function MarketPage() {
             <button
               type="button"
               onClick={() => {
-                chartRef.current?.timeScale().fitContent();
+                const chart = chartRef.current;
+                if (chart) focusLatestCandles(chart, candles.length);
                 console.log("[CHART RESET ZOOM]");
               }}
               className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
@@ -573,6 +587,19 @@ function BadgeLabel({ label, value }: { label: string; value: string }) {
       <div className="text-sm font-semibold">{value}</div>
     </div>
   );
+}
+
+function focusLatestCandles(chart: ChartApi, candleCount: number) {
+  if (candleCount <= 0) {
+    chart.timeScale().fitContent();
+    return;
+  }
+
+  const lastIndex = candleCount - 1;
+  chart.timeScale().setVisibleLogicalRange({
+    from: Math.max(0, candleCount - VISIBLE_CANDLE_COUNT),
+    to: lastIndex + CHART_RIGHT_OFFSET,
+  });
 }
 
 function useCurrentTime() {

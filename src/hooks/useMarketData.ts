@@ -11,11 +11,11 @@ type Payout = {
 
 export type MarketPollingStatus = "idle" | "polling" | "error";
 
-const CANDLES_POLL_INTERVAL_MS = 1000;
+const CANDLES_POLL_INTERVAL_MS = 250;
 const PAYOUT_POLL_INTERVAL_MS = 5000;
 const MARKET_REQUEST_TIMEOUT_MS = 8000;
 const INITIAL_CANDLE_COUNT = 60;
-const UPDATE_CANDLE_COUNT = 5;
+const UPDATE_CANDLE_COUNT = 2;
 
 export function useMarketData(active: string | null) {
   const [candles, setCandles] = useState<MarketCandle[]>([]);
