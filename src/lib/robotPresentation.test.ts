@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getRobotPresentation, resetRobotPresentationState } from "./robotPresentation.ts";
-import type { RobotState } from "@/hooks/useRobotState";
+import type { RobotState } from "../hooks/useRobotState.ts";
 import { getRobotStateRefetchInterval } from "./robotPolling.ts";
 
 const now = Date.parse("2026-06-14T12:00:00Z");

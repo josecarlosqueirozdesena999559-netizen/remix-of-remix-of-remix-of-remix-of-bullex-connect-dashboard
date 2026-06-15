@@ -13,6 +13,7 @@ import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { resetRobotPresentationState } from "@/lib/robotPresentation";
 import { resetRobotSettings } from "@/lib/robotSettings";
 import { useAuth } from "@/lib/useAuth";
+import { resetBullExAccountState } from "@/hooks/useBullExAccount";
 
 import appCss from "../styles.css?url";
 
@@ -165,6 +166,8 @@ function AuthStateBoundary({ children }: { children: ReactNode }) {
 
     void queryClient.cancelQueries().then(() => {
       queryClient.clear();
+      resetBullExAccountState(previousUserId);
+      resetBullExAccountState(nextUserId);
       resetRobotSettings();
       resetRobotPresentationState();
       console.log("[ROBOT STATE RESET]");

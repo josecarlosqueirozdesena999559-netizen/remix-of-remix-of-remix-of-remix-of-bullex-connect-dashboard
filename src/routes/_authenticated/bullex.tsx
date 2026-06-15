@@ -9,6 +9,7 @@ import {
 } from "@/hooks/useBullExAccount";
 import { useRobotState } from "@/hooks/useRobotState";
 import { apiConfig } from "@/lib/api";
+import { createOptimisticConnectedBullExAccount } from "@/lib/bullexAccountPolling";
 import { useAuth } from "@/lib/useAuth";
 import {
   syncAfterBullExConnect,
@@ -228,19 +229,13 @@ function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     if (!email || !password) return;
 
     try {
-      await connect.mutateAsync({ email, password, sms_code: smsCode || undefined });
-      queryClient.setQueryData<BullExAccountState>(
-        [...BULLEX_ACCOUNT_QUERY_KEY, user?.id],
-        (current) => ({
-          connected: true,
-          balance: current?.balance ?? null,
-          currency: current?.currency ?? null,
-          mode: current?.mode ?? null,
-          email,
-          requires_2fa: false,
-          status: "connected",
-        }),
-      );
+      const result = await connect.mutateAsync({ email, password, sms_code: smsCode || undefined });
+      if (result.connected === true || result.ok === true || result.status === "connected") {
+        queryClient.setQueryData<BullExAccountState>(
+          [...BULLEX_ACCOUNT_QUERY_KEY, user?.id],
+          (current) => createOptimisticConnectedBullExAccount(email, current),
+        );
+      }
       onSuccess();
       setPassword("");
       setSmsCode("");

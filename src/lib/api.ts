@@ -3,7 +3,9 @@ import { API_BASE_URL } from "@/lib/config";
 
 const API_KEY = import.meta.env.VITE_PANEL_API_KEY ?? "";
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; code?: string };
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string; code?: string; status?: number };
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_API_KEY: "Erro de configuração da API",
@@ -14,11 +16,13 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export class ApiError extends Error {
   code?: string;
+  status?: number;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, status?: number) {
     super(message);
     this.name = "ApiError";
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -76,6 +80,7 @@ export async function apiRequest<T>(
         ok: false,
         error: getApiErrorMessage(code, json?.message ?? json?.error ?? "Erro na API"),
         code,
+        status: res.status,
       };
     }
 
@@ -85,6 +90,7 @@ export async function apiRequest<T>(
         ok: false,
         error: getApiErrorMessage(code, json?.message ?? `Erro ${res.status}`),
         code,
+        status: res.status,
       };
     }
 
@@ -153,11 +159,14 @@ export const bullexApi = {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 30000);
 
-    return apiRequest<{ ok: boolean }>("/bullex/connect", {
+    return apiRequest<{ ok?: boolean; connected?: boolean; status?: "connected" | "disconnected" }>(
+      "/bullex/connect",
+      {
       method: "POST",
       body: JSON.stringify(payload),
       signal: controller.signal,
-    }).finally(() => window.clearTimeout(timeout));
+      },
+    ).finally(() => window.clearTimeout(timeout));
   },
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),

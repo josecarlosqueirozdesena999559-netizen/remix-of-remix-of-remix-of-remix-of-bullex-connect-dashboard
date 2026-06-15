@@ -10,10 +10,16 @@ import {
   isKnownApiError,
   robotSyncConnection,
 } from "./api";
+import {
+  getBullExAccountRefetchInterval,
+  getBullExAccountBackoffRemaining,
+  markBullExAccountConnectBurst,
+  resetBullExAccountPolling,
+} from "./bullexAccountPolling";
 import { useAuth } from "@/lib/useAuth";
 
 function unwrap<T>(res: ApiResult<T>): T {
-  if (!res.ok) throw new ApiError(res.error, res.code);
+  if (!res.ok) throw new ApiError(res.error, res.code, res.status);
   return res.data;
 }
 
@@ -31,9 +37,9 @@ export function useBullexAccount() {
       return unwrap(await bullexApi.account());
     },
     enabled: Boolean(user?.id),
-    refetchInterval: 3000,
-    retry: 1,
-    staleTime: 1000,
+    refetchInterval: () => getBullExAccountRefetchInterval(user?.id),
+    retry: false,
+    staleTime: 15000,
   });
 }
 
@@ -50,10 +56,12 @@ export function useBullexBalance(enabled = true) {
 }
 
 export function useConnectBullex() {
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) =>
       unwrap(await bullexApi.connect(payload)),
     onSuccess: () => {
+      markBullExAccountConnectBurst(user?.id);
       console.log("[BULLEX CONNECT SUCCESS]");
     },
     onError: toastGenericError,
@@ -64,7 +72,13 @@ export async function syncAfterBullExConnect(
   qc: ReturnType<typeof useQueryClient>,
   userId?: string,
 ) {
-  await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
+  if (userId) {
+    await qc.refetchQueries({
+      queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
+      exact: true,
+      type: "active",
+    });
+  }
 
   try {
     await robotSyncConnection();
@@ -73,12 +87,14 @@ export async function syncAfterBullExConnect(
   }
 
   if (userId) {
-    await qc.refetchQueries({
-      queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
-      exact: true,
-      type: "active",
-    });
+    const remainingBackoffMs = getBullExAccountBackoffRemaining(userId);
+    if (remainingBackoffMs > 0) {
+      resetBullExAccountPolling(userId);
+    }
   }
+
+  await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
+  console.log("[CONNECT_SUCCESS_STATE_SYNCED]", { user_id: userId ?? null });
 }
 
 export function useDisconnectBullex() {
@@ -97,9 +113,11 @@ export function useDisconnectBullex() {
 
 export function useReconnectBullex() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async () => unwrap(await bullexApi.reconnect()),
     onSuccess: async () => {
+      markBullExAccountConnectBurst(user?.id);
       await qc.invalidateQueries({ queryKey: ["bullex"] });
       await qc.invalidateQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY });
     },

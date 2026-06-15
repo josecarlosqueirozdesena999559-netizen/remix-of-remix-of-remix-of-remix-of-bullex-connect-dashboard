@@ -16,6 +16,7 @@ import {
 import { TrialBanner } from "@/components/TrialBanner";
 import { FloatingRobot } from "@/components/FloatingRobot";
 import { isAdminUser } from "@/lib/adminAccess";
+import { resetBullExAccountState } from "@/hooks/useBullExAccount";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   async function handleLogout() {
     await supabase.auth.signOut();
+    resetBullExAccountState(user?.id);
     queryClient.clear();
     navigate({ to: "/login", replace: true });
   }

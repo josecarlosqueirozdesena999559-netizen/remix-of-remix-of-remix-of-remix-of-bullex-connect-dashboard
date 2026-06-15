@@ -5,6 +5,7 @@ import { Loader2, LockKeyhole, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { apiConfig } from "@/lib/api";
+import { resetBullExAccountState } from "@/hooks/useBullExAccount";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Configurações - BullEx AutoBot" }] }),
@@ -31,6 +32,7 @@ function SettingsPage() {
 
   async function logout() {
     await supabase.auth.signOut();
+    resetBullExAccountState(user?.id);
     queryClient.clear();
     navigate({ to: "/login", replace: true });
   }
