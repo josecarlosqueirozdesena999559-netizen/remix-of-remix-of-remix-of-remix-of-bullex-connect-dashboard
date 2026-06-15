@@ -28,9 +28,15 @@ function initializeAuth() {
     updateSnapshot(session?.user ?? null, false);
   });
 
-  void supabase.auth.getSession().then(({ data }) => {
-    updateSnapshot(data.session?.user ?? null, false);
-  });
+  void supabase.auth
+    .getSession()
+    .then(({ data }) => {
+      updateSnapshot(data.session?.user ?? null, false);
+    })
+    .catch((error) => {
+      console.error("[AUTH_INIT_ERROR]", error);
+      updateSnapshot(null, false);
+    });
 }
 
 function subscribe(listener: () => void) {
