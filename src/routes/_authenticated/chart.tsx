@@ -1,16 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import {
-  CandlestickSeries,
-  createChart,
-  CrosshairMode,
-  LineStyle,
-  type CandlestickData,
-  type MouseEventParams,
-  type UTCTimestamp,
-} from "lightweight-charts";
+import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { UTCTimestamp } from "lightweight-charts";
+import { TradingChart } from "@/components/TradingChart";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
@@ -18,7 +11,7 @@ import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated/chart")({
-  head: () => ({ meta: [{ title: "Gráfico em tempo real - BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "GrÃ¡fico em tempo real - BullEx AutoBot" }] }),
   component: MarketPage,
 });
 
@@ -29,52 +22,26 @@ type Asset = {
   payout: number | null;
 };
 
-type Candle = CandlestickData<UTCTimestamp>;
-type HoveredCandle = Candle | null;
-type ChartApi = ReturnType<typeof createChart>;
-type CandlestickSeriesApi = ReturnType<ChartApi["addSeries"]>;
 const EMPTY_ASSETS: Asset[] = [];
-const CHART_HEIGHT = 680;
-const MOBILE_CHART_HEIGHT = 560;
-const VISIBLE_CANDLE_COUNT = 32;
-const CHART_RIGHT_OFFSET = 4;
+const DEFAULT_SYMBOL = "EURUSD-OTC";
+const DEFAULT_TIMEFRAME = "M1";
 
 function MarketPage() {
   const { user } = useAuth();
-  const [selectedSymbol, setSelectedSymbol] = useState("EURUSD-OTC");
-  const [followPrice, setFollowPrice] = useState(true);
-  const [hoveredCandle, setHoveredCandle] = useState<HoveredCandle>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
   const now = useCurrentTime();
   const chartSelection = resolveChartSelection(robotState.data, selectedSymbol, now);
   const chartSymbol = chartSelection.symbol;
 
-  const chartContainerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<ChartApi | null>(null);
-  const seriesRef = useRef<CandlestickSeriesApi | null>(null);
-  const prevSymbolRef = useRef<string>("");
-  const prevCandlesLengthRef = useRef(0);
-
   const assetsQuery = useQuery({
     queryKey: ["bullex", user?.id, "assets"],
     queryFn: async () => {
-      try {
-        const assetsResponse = await apiRequest<unknown>("/bullex/assets");
-        console.log("[ASSETS RESPONSE]", assetsResponse);
-        console.log("[ASSETS DATA]", assetsResponse.ok ? assetsResponse.data : undefined);
-        console.log(
-          "[ASSETS LENGTH]",
-          assetsResponse.ok ? getCollectionLength(assetsResponse.data) : undefined,
-        );
-
-        return normalizeAssetsPayload(unwrap(assetsResponse))
-          .map(normalizeAsset)
-          .filter(Boolean) as Asset[];
-      } catch (error) {
-        console.error("[ASSETS ERROR]", error);
-        throw error;
-      }
+      const assetsResponse = await apiRequest<unknown>("/bullex/assets");
+      return normalizeAssetsPayload(unwrap(assetsResponse))
+        .map(normalizeAsset)
+        .filter(Boolean) as Asset[];
     },
     enabled: Boolean(user?.id),
     retry: 1,
@@ -94,17 +61,14 @@ function MarketPage() {
     payoutError,
     pollingStatus,
     selectedPayout,
-  } = useMarketData(chartSymbol || null);
+  } = useMarketData(chartSymbol || null, DEFAULT_TIMEFRAME);
+
   const realtimeAgeSeconds =
     lastCandleReceivedAt == null
       ? null
       : Math.max(0, Math.floor((now - lastCandleReceivedAt.getTime()) / 1000));
   const realtimeStatus =
     realtimeAgeSeconds == null ? "Atrasado" : realtimeAgeSeconds <= 3 ? "Tempo real" : "Atrasado";
-
-  useEffect(() => {
-    setFollowPrice(true);
-  }, [chartSymbol]);
 
   const lastRealtimeStatusRef = useRef<string | null>(null);
   useEffect(() => {
@@ -126,198 +90,11 @@ function MarketPage() {
     if (chartSelection.source !== "selected") return;
     if (assets.some((asset) => asset.symbol === selectedSymbol)) return;
 
-    const defaultAsset = assets.find((asset) => asset.symbol === "EURUSD-OTC") ?? assets[0];
-
+    const defaultAsset = assets.find((asset) => asset.symbol === DEFAULT_SYMBOL) ?? assets[0];
     if (defaultAsset?.symbol) {
       setSelectedSymbol(defaultAsset.symbol);
     }
   }, [assets, chartSelection.source, selectedSymbol]);
-
-  useEffect(() => {
-    const container = chartContainerRef.current;
-    if (!container || chartRef.current) return;
-
-    const chart = createChart(container, {
-      width: Math.max(1, Math.floor(container.getBoundingClientRect().width)),
-      height: CHART_HEIGHT,
-      layout: {
-        background: { color: "#111827" },
-        textColor: "#9CA3AF",
-      },
-      grid: {
-        vertLines: { color: "#1F2937", style: LineStyle.Solid },
-        horzLines: { color: "#1F2937", style: LineStyle.Solid },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: {
-          color: "#6B7280",
-          style: LineStyle.Dashed,
-          width: 1,
-          labelVisible: true,
-        },
-        horzLine: {
-          color: "#6B7280",
-          style: LineStyle.Dashed,
-          width: 1,
-          labelVisible: true,
-        },
-      },
-      rightPriceScale: {
-        visible: true,
-        autoScale: true,
-        borderVisible: false,
-        scaleMargins: {
-          top: 0.12,
-          bottom: 0.12,
-        },
-      },
-      timeScale: {
-        borderVisible: false,
-        timeVisible: true,
-        secondsVisible: true,
-        rightOffset: CHART_RIGHT_OFFSET,
-        barSpacing: 12,
-        minBarSpacing: 5,
-        fixLeftEdge: false,
-        fixRightEdge: false,
-      },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: true,
-      },
-      handleScale: {
-        axisPressedMouseMove: true,
-        mouseWheel: true,
-        pinch: true,
-      },
-    });
-
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#22C55E",
-      downColor: "#EF4444",
-      borderUpColor: "#22C55E",
-      borderDownColor: "#EF4444",
-      wickUpColor: "#22C55E",
-      wickDownColor: "#EF4444",
-      priceLineColor: "#22C55E",
-      lastValueVisible: true,
-      borderVisible: true,
-      wickVisible: true,
-      priceFormat: buildPriceFormat("", null),
-    });
-
-    chart.subscribeCrosshairMove((param: MouseEventParams<UTCTimestamp>) => {
-      const data = series.dataByIndex?.(0, 0); // noop access to satisfy typings on some builds
-      void data;
-
-      if (!param.point || !param.time) {
-        setHoveredCandle(null);
-        return;
-      }
-
-      const hovered = param.seriesData.get(series) as Candle | undefined;
-      setHoveredCandle(hovered ?? null);
-    });
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      chart.applyOptions({
-        width: Math.max(1, Math.floor(entry.contentRect.width)),
-        height: window.matchMedia("(min-width: 768px)").matches
-          ? CHART_HEIGHT
-          : MOBILE_CHART_HEIGHT,
-      });
-    });
-
-    resizeObserver.observe(container);
-
-    const stopFollowingPrice = () => {
-      setFollowPrice((current) => {
-        if (!current) return current;
-        console.log("[CHART FOLLOW PRICE]", { symbol: prevSymbolRef.current, enabled: false });
-        return false;
-      });
-    };
-
-    container.addEventListener("wheel", stopFollowingPrice, { passive: true });
-    container.addEventListener("mousedown", stopFollowingPrice);
-    container.addEventListener("touchstart", stopFollowingPrice, { passive: true });
-
-    chartRef.current = chart;
-    seriesRef.current = series;
-    console.log("[CHART INIT]");
-
-    return () => {
-      resizeObserver.disconnect();
-      container.removeEventListener("wheel", stopFollowingPrice);
-      container.removeEventListener("mousedown", stopFollowingPrice);
-      container.removeEventListener("touchstart", stopFollowingPrice);
-      chart.remove();
-      chartRef.current = null;
-      seriesRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    const series = seriesRef.current;
-    if (!chart || !series) return;
-
-    series.applyOptions({
-      priceFormat: buildPriceFormat(chartSymbol, lastPrice),
-    });
-    chart.priceScale("right").applyOptions({
-      autoScale: true,
-      borderVisible: false,
-      visible: true,
-      scaleMargins: {
-        top: 0.12,
-        bottom: 0.12,
-      },
-    });
-
-    const symbolChanged = prevSymbolRef.current !== chartSymbol;
-    console.log("[CHART UPDATE]", {
-      symbol: chartSymbol,
-      candles: candles.length,
-      symbolChanged,
-    });
-
-    if (symbolChanged) {
-      series.setData(candles);
-      focusLatestCandles(chart, candles.length);
-      prevSymbolRef.current = chartSymbol;
-      prevCandlesLengthRef.current = candles.length;
-    } else if (candles.length === 0) {
-      series.setData([]);
-      prevCandlesLengthRef.current = 0;
-    } else if (
-      prevCandlesLengthRef.current === 0 ||
-      candles.length < prevCandlesLengthRef.current
-    ) {
-      series.setData(candles);
-      focusLatestCandles(chart, candles.length);
-      prevCandlesLengthRef.current = candles.length;
-    } else if (followPrice && candles.length > 0) {
-      const latestCandle = candles[candles.length - 1];
-      if (latestCandle) {
-        series.update(latestCandle);
-      }
-      prevCandlesLengthRef.current = candles.length;
-      chart.timeScale().scrollToRealTime();
-      console.log("[CHART FOLLOW PRICE]", { symbol: chartSymbol, enabled: true });
-    } else {
-      const latestCandle = candles[candles.length - 1];
-      if (latestCandle) {
-        series.update(latestCandle);
-      }
-      prevCandlesLengthRef.current = candles.length;
-    }
-  }, [candles, chartSymbol, followPrice, lastPrice]);
 
   const sessionMissing =
     isSessionError(account.error) ||
@@ -330,14 +107,15 @@ function MarketPage() {
     isAssetNotAllowed(candlesError) ||
     isAssetNotAllowed(payoutError);
 
-  const displayedCandle = hoveredCandle ?? candles[candles.length - 1] ?? null;
+  const overlaySignal = robotState.data?.pending_signal ?? robotState.data?.best_candidate ?? null;
+  const overlayResult = robotState.data?.last_trade?.result ?? null;
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Mercado binário - 21 pares monitorados</h1>
+        <h1 className="text-2xl font-semibold">Mercado binÃ¡rio - 21 pares monitorados</h1>
         <p className="text-sm text-muted-foreground">
-          Selecione um ativo para acompanhar os candles retornados pela BullEx.
+          GrÃ¡fico prÃ³prio usando apenas os candles retornados pela BullEx.
         </p>
       </header>
 
@@ -363,7 +141,7 @@ function MarketPage() {
           </div>
         )}
 
-      <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
             <label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
@@ -381,7 +159,7 @@ function MarketPage() {
                 {assetsQuery.isLoading
                   ? "Carregando ativos..."
                   : assets.length === 0
-                    ? "Nenhum ativo binário disponível no momento."
+                    ? "Nenhum ativo binÃ¡rio disponÃ­vel no momento."
                     : "Selecione um ativo"}
               </option>
               {chartSelection.source !== "selected" &&
@@ -410,11 +188,11 @@ function MarketPage() {
             />
             <BadgeLabel label="Modo" value={formatAccountMode(account.data?.mode)} />
             <BadgeLabel
-              label="Último preço"
+              label="Ãšltimo preÃ§o"
               value={lastPrice != null ? formatNumber(lastPrice) : "-"}
             />
             <BadgeLabel
-              label="Último candle"
+              label="Ãšltimo candle"
               value={lastCandleTimestamp ? formatDateTimeFromTimestamp(lastCandleTimestamp) : "-"}
             />
             <BadgeLabel
@@ -427,12 +205,12 @@ function MarketPage() {
 
         {!assetsQuery.isLoading && assets.length === 0 && (
           <div className="rounded-xl border border-border p-4 text-sm text-muted-foreground">
-            Nenhum ativo binário disponível no momento.
+            Nenhum ativo binÃ¡rio disponÃ­vel no momento.
           </div>
         )}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card overflow-hidden">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
           <div>
             <h2 className="font-semibold">
@@ -441,35 +219,8 @@ function MarketPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const chart = chartRef.current;
-                if (chart) focusLatestCandles(chart, candles.length);
-                console.log("[CHART RESET ZOOM]");
-              }}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
-            >
-              Reset zoom
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFollowPrice((current) => {
-                  const next = !current;
-                  console.log("[CHART FOLLOW PRICE]", { symbol: chartSymbol, enabled: next });
-                  if (next) {
-                    chartRef.current?.timeScale().scrollToRealTime();
-                  }
-                  return next;
-                });
-              }}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
-            >
-              Seguir preço {followPrice ? "ON" : "OFF"}
-            </button>
             <span className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground">
-              Intervalo 60s
+              Timeframe {DEFAULT_TIMEFRAME}
             </span>
             {isCandlesLoading ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -485,57 +236,39 @@ function MarketPage() {
           </div>
         )}
 
-        <div className="relative min-h-[592px] p-4 md:min-h-[712px]">
-          <div
-            ref={chartContainerRef}
-            className="h-[560px] w-full overflow-hidden rounded-xl border border-border/60 bg-card md:h-[680px]"
-          />
+        <TradingChart
+          symbol={chartSymbol || DEFAULT_SYMBOL}
+          timeframe={DEFAULT_TIMEFRAME}
+          candles={candles}
+          overlay={{
+            currentPrice: lastPrice,
+            realtimeStatus: formatRealtimeStatus(realtimeStatus, realtimeAgeSeconds),
+            bestSymbol: robotState.data?.best_candidate?.symbol ?? null,
+            direction: overlaySignal?.direction ?? null,
+            confidence: overlaySignal?.confidence ?? null,
+            score: overlaySignal?.strategy_score ?? null,
+            strategy: overlaySignal?.strategy_name ?? null,
+            entryCountdown: formatEntryCountdown(robotState.data),
+            result: overlayResult,
+          }}
+        />
 
-          <div className="pointer-events-none absolute inset-4 z-10 flex select-none items-center justify-center overflow-hidden rounded-xl">
-            <div className="flex items-center gap-4 text-foreground/10">
-              <div className="hidden h-20 w-20 items-end gap-1.5 sm:flex" aria-hidden="true">
-                <span className="h-8 w-2.5 rounded-sm bg-current" />
-                <span className="h-14 w-2.5 rounded-sm bg-current" />
-                <span className="h-20 w-2.5 rounded-sm bg-current" />
-                <span className="h-11 w-2.5 rounded-sm bg-current" />
-              </div>
-              <span className="text-5xl font-black tracking-normal sm:text-7xl">BullEx</span>
-            </div>
+        {chartSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
+          <div className="pb-5 text-center text-sm text-muted-foreground">
+            Nenhum candle normalizado retornado
           </div>
+        )}
 
-          {displayedCandle && (
-            <div className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
-              <div className="font-semibold text-foreground">
-                {formatTime(displayedCandle.time)}
-              </div>
-              <div className="mt-1 text-muted-foreground">
-                Open {formatNumber(displayedCandle.open)}
-              </div>
-              <div className="text-muted-foreground">High {formatNumber(displayedCandle.high)}</div>
-              <div className="text-muted-foreground">Low {formatNumber(displayedCandle.low)}</div>
-              <div className="text-muted-foreground">
-                Close {formatNumber(displayedCandle.close)}
-              </div>
-            </div>
-          )}
-
-          {chartSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
-            <div className="mt-4 flex items-center justify-center text-sm text-muted-foreground">
-              Nenhum candle normalizado retornado
-            </div>
-          )}
-
-          {!chartSymbol && (
-            <div className="mt-4 flex items-center justify-center text-sm text-muted-foreground">
-              Selecione um ativo para abrir o gráfico.
-            </div>
-          )}
-        </div>
+        {!chartSymbol && (
+          <div className="pb-5 text-center text-sm text-muted-foreground">
+            Selecione um ativo para abrir o grÃ¡fico.
+          </div>
+        )}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card overflow-hidden">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border p-5">
-          <h2 className="font-semibold">Últimos 10 candles</h2>
+          <h2 className="font-semibold">Ãšltimos 10 candles</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -589,19 +322,6 @@ function BadgeLabel({ label, value }: { label: string; value: string }) {
   );
 }
 
-function focusLatestCandles(chart: ChartApi, candleCount: number) {
-  if (candleCount <= 0) {
-    chart.timeScale().fitContent();
-    return;
-  }
-
-  const lastIndex = candleCount - 1;
-  chart.timeScale().setVisibleLogicalRange({
-    from: Math.max(0, candleCount - VISIBLE_CANDLE_COUNT),
-    to: lastIndex + CHART_RIGHT_OFFSET,
-  });
-}
-
 function useCurrentTime() {
   const [now, setNow] = useState(() => Date.now());
 
@@ -618,19 +338,19 @@ function resolveChartSelection(
   selectedSymbol: string,
   now: number,
 ) {
-  if (robotState?.best_candidate?.symbol) {
-    return { symbol: robotState.best_candidate.symbol, source: "best_candidate" as const };
-  }
-
   if (robotState?.pending_signal?.symbol) {
     return { symbol: robotState.pending_signal.symbol, source: "pending_signal" as const };
+  }
+
+  if (robotState?.best_candidate?.symbol) {
+    return { symbol: robotState.best_candidate.symbol, source: "best_candidate" as const };
   }
 
   if (robotState?.last_trade && isRecentTrade(robotState.last_trade, now)) {
     return { symbol: robotState.last_trade.active, source: "last_trade" as const };
   }
 
-  return { symbol: selectedSymbol, source: "selected" as const };
+  return { symbol: selectedSymbol || DEFAULT_SYMBOL, source: "selected" as const };
 }
 
 function isRecentTrade(trade: NonNullable<RobotState["last_trade"]>, now: number) {
@@ -649,12 +369,12 @@ function parseTimestamp(value: string | null) {
 
 function formatChartSource(source: ReturnType<typeof resolveChartSelection>["source"]) {
   switch (source) {
-    case "best_candidate":
-      return "Melhor ativo";
     case "pending_signal":
       return "Sinal pendente";
+    case "best_candidate":
+      return "Melhor ativo";
     case "last_trade":
-      return "Última entrada";
+      return "Ãšltima entrada";
     default:
       return "Selecionado";
   }
@@ -683,14 +403,14 @@ function isAssetNotAllowed(error: unknown) {
 
 function getBinaryMarketErrorMessage(code?: string | null) {
   if (code === "ASSET_NOT_ALLOWED") {
-    return "Ativo não permitido para análise binária.";
+    return "Ativo nÃ£o permitido para anÃ¡lise binÃ¡ria.";
   }
 
   if (isSessionErrorCode(code)) {
     return "Conta BullEx desconectada. Reconecte sua conta.";
   }
 
-  return code ?? "Erro inesperado no mercado binário.";
+  return code ?? "Erro inesperado no mercado binÃ¡rio.";
 }
 
 function normalizeCollection(input: unknown) {
@@ -713,10 +433,6 @@ function normalizeAssetsPayload(input: unknown) {
   return normalizeCollection(input);
 }
 
-function getCollectionLength(input: unknown) {
-  return normalizeAssetsPayload(input).length;
-}
-
 function normalizeAsset(item: unknown): Asset | null {
   if (!item || typeof item !== "object") return null;
   const value = item as Record<string, unknown>;
@@ -737,30 +453,6 @@ function normalizeNumber(value: unknown) {
   if (value == null || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function buildPriceFormat(symbol: string, lastPrice: number | null) {
-  if (
-    symbol.includes("EUR") ||
-    symbol.includes("GBP") ||
-    symbol.includes("AUD") ||
-    symbol.includes("NZD")
-  ) {
-    return { type: "price" as const, precision: 5, minMove: 0.00001 };
-  }
-
-  if (symbol.includes("JPY")) {
-    return { type: "price" as const, precision: 3, minMove: 0.001 };
-  }
-
-  if (symbol.includes("BTC") || symbol.includes("ETH")) {
-    return { type: "price" as const, precision: 2, minMove: 0.01 };
-  }
-
-  const abs = Math.abs(lastPrice ?? 0);
-  if (abs >= 1000) return { type: "price" as const, precision: 2, minMove: 0.01 };
-  if (abs >= 1) return { type: "price" as const, precision: 4, minMove: 0.0001 };
-  return { type: "price" as const, precision: 6, minMove: 0.000001 };
 }
 
 function formatPollingStatus(status: string) {
@@ -818,4 +510,15 @@ function formatNumber(value: number) {
     maximumFractionDigits: 6,
     minimumFractionDigits: 0,
   }).format(value);
+}
+
+function formatEntryCountdown(robotState: RobotState | undefined) {
+  const seconds =
+    robotState?.display_countdown_seconds ?? robotState?.seconds_until_entry_window ?? null;
+  if (seconds == null) return null;
+
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }

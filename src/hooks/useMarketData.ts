@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CandlestickData, UTCTimestamp } from "lightweight-charts";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 
@@ -11,13 +11,13 @@ type Payout = {
 
 export type MarketPollingStatus = "idle" | "polling" | "error";
 
-const CANDLES_POLL_INTERVAL_MS = 250;
+const CANDLES_POLL_INTERVAL_MS = 1000;
 const PAYOUT_POLL_INTERVAL_MS = 5000;
 const MARKET_REQUEST_TIMEOUT_MS = 8000;
-const INITIAL_CANDLE_COUNT = 60;
+const INITIAL_CANDLE_COUNT = 100;
 const UPDATE_CANDLE_COUNT = 2;
 
-export function useMarketData(active: string | null) {
+export function useMarketData(symbol: string | null, timeframe = "M1") {
   const [candles, setCandles] = useState<MarketCandle[]>([]);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [selectedPayout, setSelectedPayout] = useState<number | null>(null);
@@ -28,9 +28,10 @@ export function useMarketData(active: string | null) {
   const [lastCandleReceivedAt, setLastCandleReceivedAt] = useState<Date | null>(null);
   const [lastCandleTimestamp, setLastCandleTimestamp] = useState<UTCTimestamp | null>(null);
   const [pollingStatus, setPollingStatus] = useState<MarketPollingStatus>("idle");
+  const candlesCacheRef = useRef(new Map<string, MarketCandle[]>());
 
   useEffect(() => {
-    if (!active) {
+    if (!symbol) {
       setCandles([]);
       setLastPrice(null);
       setSelectedPayout(null);
@@ -53,13 +54,19 @@ export function useMarketData(active: string | null) {
     let candlesController: AbortController | null = null;
     let payoutController: AbortController | null = null;
 
-    setCandles([]);
-    setLastPrice(null);
+    const cachedCandles = candlesCacheRef.current.get(symbol) ?? [];
+    if (cachedCandles.length > 0) {
+      setCandles(cachedCandles);
+      const latestCached = cachedCandles[cachedCandles.length - 1] ?? null;
+      setLastPrice(latestCached?.close ?? null);
+      setLastCandleTimestamp(latestCached?.time ?? null);
+      hasInitialCandles = true;
+    }
+
     setSelectedPayout(null);
     setCandlesError(null);
     setPayoutError(null);
     setLastCandleReceivedAt(null);
-    setLastCandleTimestamp(null);
     setIsCandlesLoading(true);
     setIsPayoutLoading(true);
     setPollingStatus("polling");
@@ -75,29 +82,34 @@ export function useMarketData(active: string | null) {
 
       try {
         const count = hasInitialCandles ? UPDATE_CANDLE_COUNT : INITIAL_CANDLE_COUNT;
-        const url = `/bullex/candles?active=${encodeURIComponent(active)}&interval=60&count=${count}`;
+        const url = `/bullex/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=${count}`;
         const candlesResponse = await apiRequest<unknown>(url, {
           signal: candlesController.signal,
         });
-        const nextCandles = normalizeCandlesPayload(active, unwrap(candlesResponse)).slice(-200);
+        const nextCandles = normalizeCandlesPayload(symbol, unwrap(candlesResponse)).slice(-200);
 
         if (cancelled) return;
 
-        const latestCandle = nextCandles[nextCandles.length - 1] ?? null;
         setCandles((currentCandles) => {
-          return mergeCandles(currentCandles, nextCandles).slice(-200);
+          const merged = mergeCandles(currentCandles, nextCandles).slice(-200);
+          candlesCacheRef.current.set(symbol, merged);
+          return merged;
         });
+
+        const latestCandle = nextCandles[nextCandles.length - 1] ?? null;
         console.log("[CHART_CANDLES_UPDATED]", {
-          active,
+          symbol,
           received: nextCandles.length,
           latest_time: latestCandle?.time ?? null,
         });
+
         if (latestCandle) {
           hasInitialCandles = true;
           setLastPrice(latestCandle.close);
           setLastCandleTimestamp(latestCandle.time);
           setLastCandleReceivedAt(new Date());
         }
+
         setCandlesError(null);
         setPollingStatus("polling");
       } catch (error) {
@@ -126,10 +138,10 @@ export function useMarketData(active: string | null) {
 
       try {
         const payoutResponse = await apiRequest<unknown>(
-          `/bullex/payouts?active=${encodeURIComponent(active)}`,
+          `/bullex/payouts?active=${encodeURIComponent(symbol)}`,
           { signal: payoutController.signal },
         );
-        const payout = normalizePayout(active, unwrap(payoutResponse)).payout;
+        const payout = normalizePayout(symbol, unwrap(payoutResponse)).payout;
 
         if (cancelled) return;
 
@@ -165,7 +177,7 @@ export function useMarketData(active: string | null) {
       if (candlesTimer != null) window.clearTimeout(candlesTimer);
       if (payoutTimer != null) window.clearTimeout(payoutTimer);
     };
-  }, [active]);
+  }, [symbol, timeframe]);
 
   return {
     candles,
@@ -227,12 +239,6 @@ function getPayoutResponseData(input: unknown): unknown[] | null {
 
   const value = input as Record<string, unknown>;
   return Array.isArray(value.data) ? value.data : null;
-}
-
-function normalizeNumber(value: unknown) {
-  if (value == null || value === "") return null;
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizeCandlesPayload(active: string, input: unknown): MarketCandle[] {
@@ -324,4 +330,10 @@ function hasCandlePrices(value: Record<string, unknown>) {
     (value.low != null || value.min != null) &&
     value.close != null
   );
+}
+
+function normalizeNumber(value: unknown) {
+  if (value == null || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
