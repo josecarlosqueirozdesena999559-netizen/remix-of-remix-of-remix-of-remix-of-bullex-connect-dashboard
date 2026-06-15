@@ -1,34 +1,28 @@
-const DEFAULT_API_BASE_URL = "https://api.elcapobot.online";
+const REQUIRED_API_BASE_URL = "https://api.elcapobot.online";
 
-function normalizeBaseUrl(value: string | undefined, fallback: string, label: string) {
-  const normalized = value?.trim().replace(/\/+$/, "");
+function resolveApiBaseUrl(value: string | undefined) {
+  const normalized = value?.trim().replace(/\/+$/, "") ?? "";
 
   if (!normalized) {
-    console.warn(`[config] ${label} not set, using fallback`, fallback);
-    return fallback;
+    return REQUIRED_API_BASE_URL;
   }
 
   try {
-    const url = new URL(
-      normalized.startsWith("http://") || normalized.startsWith("https://")
-        ? normalized
-        : `https://${normalized}`,
-    );
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("invalid protocol");
-    }
+    const url = new URL(normalized);
+    const isSecure = url.protocol === "https:";
+    const isExpectedHost = url.hostname === "api.elcapobot.online";
 
-    return url.toString().replace(/\/+$/, "");
+    if (isSecure && isExpectedHost) {
+      return REQUIRED_API_BASE_URL;
+    }
   } catch {
-    console.warn(`[config] ${label} invalid, using fallback`, normalized);
-    return fallback;
+    // Fall through to the required API base URL.
   }
+
+  return REQUIRED_API_BASE_URL;
 }
 
-export const API_BASE_URL = normalizeBaseUrl(
-  import.meta.env.VITE_API_BASE_URL,
-  DEFAULT_API_BASE_URL,
-  "VITE_API_BASE_URL",
-);
+export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
-console.log("API_BASE_URL", API_BASE_URL);
+console.log("[API_BASE_URL]");
+console.log(API_BASE_URL);
