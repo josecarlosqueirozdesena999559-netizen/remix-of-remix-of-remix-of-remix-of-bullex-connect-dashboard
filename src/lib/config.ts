@@ -8,12 +8,21 @@ function normalizeBaseUrl(value: string | undefined, fallback: string, label: st
     return fallback;
   }
 
-  if (normalized === fallback) {
-    return normalized;
-  }
+  try {
+    const url = new URL(
+      normalized.startsWith("http://") || normalized.startsWith("https://")
+        ? normalized
+        : `https://${normalized}`,
+    );
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("invalid protocol");
+    }
 
-  console.warn(`[config] ${label} invalid, using fallback`, normalized);
-  return fallback;
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    console.warn(`[config] ${label} invalid, using fallback`, normalized);
+    return fallback;
+  }
 }
 
 export const API_BASE_URL = normalizeBaseUrl(

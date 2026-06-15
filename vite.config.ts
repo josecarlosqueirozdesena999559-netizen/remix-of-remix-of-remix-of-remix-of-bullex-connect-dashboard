@@ -9,6 +9,12 @@ export default defineConfig({
   plugins: [
     tanstackStart({
       server: { entry: "server" },
+      prerender: {
+        enabled: true,
+        crawlLinks: true,
+        concurrency: 8,
+        failOnError: false,
+      },
     }),
     nitro({ preset: "vercel" }),
     react(),
