@@ -4,6 +4,7 @@ import { BarChart3, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { UTCTimestamp } from "lightweight-charts";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
+import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
@@ -15,7 +16,7 @@ const TradingChart = lazy(() =>
 
 export const Route = createFileRoute("/_authenticated/chart")({
   ssr: false,
-  head: () => ({ meta: [{ title: "GrÃ¡fico em tempo real - BullEx AutoBot" }] }),
+  head: () => ({ meta: [{ title: "Gráfico em tempo real - BullEx AutoBot" }] }),
   component: MarketPage,
 });
 
@@ -35,8 +36,9 @@ function MarketPage() {
   const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
+  const displayRobotState = useRobotDisplayState(robotState.data);
   const now = useCurrentTime();
-  const chartSelection = resolveChartSelection(robotState.data, selectedSymbol, now);
+  const chartSelection = resolveChartSelection(displayRobotState, selectedSymbol, now);
   const chartSymbol = chartSelection.symbol;
 
   const assetsQuery = useQuery({
@@ -111,15 +113,15 @@ function MarketPage() {
     isAssetNotAllowed(candlesError) ||
     isAssetNotAllowed(payoutError);
 
-  const overlaySignal = robotState.data?.pending_signal ?? robotState.data?.best_candidate ?? null;
-  const overlayResult = robotState.data?.last_trade?.result ?? null;
+  const overlaySignal = displayRobotState?.pending_signal ?? displayRobotState?.best_candidate ?? null;
+  const overlayResult = displayRobotState?.last_trade?.result ?? null;
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Mercado binÃ¡rio - 21 pares monitorados</h1>
+        <h1 className="text-2xl font-semibold">Mercado binário - 21 pares monitorados</h1>
         <p className="text-sm text-muted-foreground">
-          GrÃ¡fico prÃ³prio usando apenas os candles retornados pela BullEx.
+          Gráfico próprio usando apenas os candles retornados pela BullEx.
         </p>
       </header>
 
@@ -163,7 +165,7 @@ function MarketPage() {
                 {assetsQuery.isLoading
                   ? "Carregando ativos..."
                   : assets.length === 0
-                    ? "Nenhum ativo binÃ¡rio disponÃ­vel no momento."
+                    ? "Nenhum ativo binário disponível no momento."
                     : "Selecione um ativo"}
               </option>
               {chartSelection.source !== "selected" &&
@@ -192,11 +194,11 @@ function MarketPage() {
             />
             <BadgeLabel label="Modo" value={formatAccountMode(account.data?.mode)} />
             <BadgeLabel
-              label="Ãšltimo preÃ§o"
+              label="Último preço"
               value={lastPrice != null ? formatNumber(lastPrice) : "-"}
             />
             <BadgeLabel
-              label="Ãšltimo candle"
+              label="Último candle"
               value={lastCandleTimestamp ? formatDateTimeFromTimestamp(lastCandleTimestamp) : "-"}
             />
             <BadgeLabel
@@ -209,7 +211,7 @@ function MarketPage() {
 
         {!assetsQuery.isLoading && assets.length === 0 && (
           <div className="rounded-xl border border-border p-4 text-sm text-muted-foreground">
-            Nenhum ativo binÃ¡rio disponÃ­vel no momento.
+            Nenhum ativo binário disponível no momento.
           </div>
         )}
       </section>
@@ -244,7 +246,7 @@ function MarketPage() {
           fallback={
             <div className="p-4">
               <div className="flex h-[560px] w-full items-center justify-center rounded-xl border border-border/60 bg-card text-sm text-muted-foreground md:h-[680px]">
-                Carregando grÃ¡fico...
+                Carregando gráfico...
               </div>
             </div>
           }
@@ -253,7 +255,7 @@ function MarketPage() {
             fallback={
               <div className="p-4">
                 <div className="flex h-[560px] w-full items-center justify-center rounded-xl border border-border/60 bg-card text-sm text-muted-foreground md:h-[680px]">
-                  Carregando grÃ¡fico...
+                  Carregando gráfico...
                 </div>
               </div>
             }
@@ -265,12 +267,12 @@ function MarketPage() {
               overlay={{
                 currentPrice: lastPrice,
                 realtimeStatus: formatRealtimeStatus(realtimeStatus, realtimeAgeSeconds),
-                bestSymbol: robotState.data?.best_candidate?.symbol ?? null,
+                bestSymbol: displayRobotState?.best_candidate?.symbol ?? null,
                 direction: overlaySignal?.direction ?? null,
                 confidence: overlaySignal?.confidence ?? null,
                 score: overlaySignal?.strategy_score ?? null,
                 strategy: overlaySignal?.strategy_name ?? null,
-                entryCountdown: formatEntryCountdown(robotState.data),
+                entryCountdown: formatEntryCountdown(displayRobotState),
                 result: overlayResult,
               }}
             />
@@ -285,14 +287,14 @@ function MarketPage() {
 
         {!chartSymbol && (
           <div className="pb-5 text-center text-sm text-muted-foreground">
-            Selecione um ativo para abrir o grÃ¡fico.
+            Selecione um ativo para abrir o gráfico.
           </div>
         )}
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border p-5">
-          <h2 className="font-semibold">Ãšltimos 10 candles</h2>
+          <h2 className="font-semibold">Últimos 10 candles</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -398,7 +400,7 @@ function formatChartSource(source: ReturnType<typeof resolveChartSelection>["sou
     case "best_candidate":
       return "Melhor ativo";
     case "last_trade":
-      return "Ãšltima entrada";
+      return "Última entrada";
     default:
       return "Selecionado";
   }
@@ -427,14 +429,14 @@ function isAssetNotAllowed(error: unknown) {
 
 function getBinaryMarketErrorMessage(code?: string | null) {
   if (code === "ASSET_NOT_ALLOWED") {
-    return "Ativo nÃ£o permitido para anÃ¡lise binÃ¡ria.";
+    return "Ativo não permitido para análise binária.";
   }
 
   if (isSessionErrorCode(code)) {
     return "Conta BullEx desconectada. Reconecte sua conta.";
   }
 
-  return code ?? "Erro inesperado no mercado binÃ¡rio.";
+  return code ?? "Erro inesperado no mercado binário.";
 }
 
 function normalizeCollection(input: unknown) {
@@ -538,8 +540,14 @@ function formatNumber(value: number) {
 
 function formatEntryCountdown(robotState: RobotState | undefined) {
   const seconds =
-    robotState?.display_countdown_seconds ?? robotState?.seconds_until_entry_window ?? null;
+    robotState?.status === "WAITING_NEXT_CANDLE_ENTRY"
+      ? robotState.seconds_until_entry ?? robotState.seconds_until_entry_window
+      : robotState?.display_countdown_seconds ?? robotState?.seconds_until_entry_window ?? null;
   if (seconds == null) return null;
+
+  if (robotState?.status === "WAITING_NEXT_CANDLE_ENTRY" && seconds <= 0) {
+    return "Aguardando abertura da vela...";
+  }
 
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safeSeconds / 60);

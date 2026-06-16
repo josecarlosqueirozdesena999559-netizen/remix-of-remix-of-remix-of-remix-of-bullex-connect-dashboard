@@ -43,14 +43,14 @@ export function getRobotPresentation(
   options: RobotPresentationOptions = {},
 ): RobotPresentation {
   if (!robotState) {
-    return createPresentation("loading", "Consultando robô...");
+    return createPresentation("loading", "Consultando robo...");
   }
 
   if (isDisconnected(robotState)) {
     return createPresentation(
       "stopped",
       "Conta BullEx desconectada",
-      "Reconecte para o robô operar",
+      "Reconecte para o robo operar",
     );
   }
 
@@ -77,11 +77,11 @@ export function getRobotPresentation(
   }
 
   if (!robotState.enabled || status === "STOPPED") {
-    return createPresentation("stopped", "Robô parado");
+    return createPresentation("stopped", "Robo parado");
   }
 
   if (status === "SIGNAL_REJECTED") {
-    return createNextCyclePresentation(robotState, now, options);
+    return createNextCyclePresentation(robotState, options);
   }
 
   const orderRejected = status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED";
@@ -112,7 +112,7 @@ export function getRobotPresentation(
   }
 
   if (orderRejected) {
-    return createNextCyclePresentation(robotState, now, options);
+    return createNextCyclePresentation(robotState, options);
   }
 
   if (!orderRejected) {
@@ -120,7 +120,7 @@ export function getRobotPresentation(
   }
 
   if (isOrderFallbackInProgress(robotState)) {
-    return createPresentation("analyzing", "Ativo indisponível, tentando próximo melhor ativo...");
+    return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
   }
 
   if (status === "SENDING_ORDER") {
@@ -136,7 +136,7 @@ export function getRobotPresentation(
     return {
       ...createPresentation(
         "operation",
-        remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
+        "Aguardando resultado",
         null,
         remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
       ),
@@ -151,7 +151,7 @@ export function getRobotPresentation(
 
   if (resultWaiting) {
     return {
-      ...createPresentation("operation", "Aguardando resultado..."),
+      ...createPresentation("operation", "Aguardando resultado"),
       trade,
       signal: trade ? null : signal,
       direction: trade?.direction ?? signal?.direction ?? null,
@@ -167,20 +167,12 @@ export function getRobotPresentation(
     return {
       ...createPresentation(
         "operation",
-        remainingSeconds > 0 ? "Operação em andamento" : "Aguardando resultado...",
+        "Aguardando resultado",
         null,
         remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
       ),
       trade,
       direction: trade?.direction ?? null,
-    };
-  }
-
-  if (robotState.entry_window_open) {
-    return {
-      ...createPresentation("entry", "Entrada liberada", "Enviando ordem..."),
-      signal: signal ?? bestCandidate,
-      direction: signal?.direction ?? bestCandidate?.direction ?? null,
     };
   }
 
@@ -196,6 +188,23 @@ export function getRobotPresentation(
         "Sinal encontrado",
         null,
         `Entrada em ${formatDuration(remainingSeconds)}`,
+      ),
+      signal,
+      direction: signal?.direction ?? null,
+    };
+  }
+
+  if (status === "WAITING_NEXT_CANDLE_ENTRY") {
+    const remainingSeconds = Math.max(0, Math.ceil(resolveEntrySeconds(robotState, options)));
+
+    return {
+      ...createPresentation(
+        "entry",
+        "Sinal preparado",
+        null,
+        remainingSeconds > 0
+          ? `Entrada no inicio da proxima vela em ${formatDuration(remainingSeconds)}`
+          : "Aguardando abertura da vela...",
       ),
       signal,
       direction: signal?.direction ?? null,
@@ -233,18 +242,18 @@ export function getRobotPresentation(
   }
 
   if (trade && result) {
-    return createNextCyclePresentation(robotState, now, options);
+    return createNextCyclePresentation(robotState, options);
   }
 
   if (status === "ERROR") {
     return createPresentation(
       "analyzing",
-      "Erro no robô",
-      formatFriendlyRobotText(robotState.rejection_reason ?? "Não foi possível concluir o ciclo."),
+      "Erro no robo",
+      formatFriendlyRobotText(robotState.rejection_reason ?? "Nao foi possivel concluir o ciclo."),
     );
   }
 
-  return createNextCyclePresentation(robotState, now, options, "Robô ativo");
+  return createNextCyclePresentation(robotState, options, "Robo ativo");
 }
 
 export function formatDuration(totalSeconds: number) {
@@ -255,12 +264,12 @@ export function formatDuration(totalSeconds: number) {
 }
 
 export function formatFriendlyRobotText(value: string | null | undefined) {
-  if (!value) return "Motivo não informado.";
+  if (!value) return "Motivo nao informado.";
 
   const replacements: Record<string, string> = {
-    TREND_CLEAR: "Tendência clara",
+    TREND_CLEAR: "Tendencia clara",
     SIDEWAYS: "Mercado lateral",
-    WAITING_NEXT_CYCLE: "Aguardando próxima análise",
+    WAITING_NEXT_CYCLE: "Aguardando proxima analise",
     SIGNAL_REJECTED: "Nenhum sinal aprovado",
   };
 
@@ -328,7 +337,6 @@ function isOrderFallbackInProgress(robotState: RobotState) {
 
 function createNextCyclePresentation(
   robotState: RobotState,
-  now: number,
   options: RobotPresentationOptions = {},
   title = "Analisando...",
   fallbackSeconds = 0,
@@ -336,25 +344,10 @@ function createNextCyclePresentation(
   const remainingSeconds = resolveNextCycleSeconds(robotState, options, fallbackSeconds);
 
   if (remainingSeconds <= 0) {
-    if (title === "Próxima entrada em") {
-      return createPresentation("analyzing", "Próxima entrada em 00:00");
-    }
-
     return createPresentation("analyzing", title);
   }
 
-  if (title === "Próxima entrada em") {
-    return createPresentation(
-      "analyzing",
-      `Próxima entrada em ${formatDuration(remainingSeconds)}`,
-    );
-  }
-
-  return createPresentation(
-    "analyzing",
-    title,
-    `Próxima entrada em ${formatDuration(remainingSeconds)}`,
-  );
+  return createPresentation("analyzing", title, `Proxima entrada em ${formatDuration(remainingSeconds)}`);
 }
 
 function createWaitingNextCyclePresentation(
@@ -371,26 +364,24 @@ function createWaitingNextCyclePresentation(
   );
   const bestCandidate = robotState.best_candidate;
 
-  if (remainingSeconds <= 0) {
-    return {
-      ...createPresentation("entry", "Entrada liberada", "Enviando ordem..."),
-      signal: bestCandidate,
-      direction: bestCandidate?.direction ?? null,
-    };
-  }
-
-  const label = robotState.display_countdown_label?.trim() || "Entrada em";
-
   return {
     ...createPresentation(
       "analyzing",
       "Analisando mercado...",
       bestCandidate ? `Melhor ativo: ${bestCandidate.symbol}` : null,
-      `${label} ${formatDuration(remainingSeconds)}`,
+      remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
     ),
     signal: bestCandidate,
     direction: bestCandidate?.direction ?? null,
   };
+}
+
+function resolveEntrySeconds(robotState: RobotState, options: RobotPresentationOptions) {
+  return (
+    options.entryWindowSeconds ??
+    robotState.seconds_until_entry ??
+    robotState.seconds_until_entry_window
+  );
 }
 
 function resolveNextCycleSeconds(

@@ -3,6 +3,7 @@ import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
+import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotNarrator } from "@/hooks/useRobotNarrator";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
@@ -17,22 +18,19 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     accountConnected: account.data?.connected === true,
     robotState: robotState.data,
   });
+  const displayRobotState = useRobotDisplayState(effectiveRobotState);
   const { settings, saveSettings } = useRobotSettings(userId);
   const nextCycleSeconds = useSmoothCountdown(
-    effectiveRobotState?.display_countdown_seconds ?? effectiveRobotState?.seconds_until_next_cycle,
-    getNextCycleResetKey(effectiveRobotState),
+    displayRobotState?.display_countdown_seconds ?? displayRobotState?.seconds_until_next_cycle,
+    getNextCycleResetKey(displayRobotState),
     Boolean(
-      effectiveRobotState?.enabled &&
-        ((effectiveRobotState.display_countdown_seconds ??
-          effectiveRobotState.seconds_until_next_cycle) > 0),
+      displayRobotState?.enabled &&
+        ((displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
+          0),
     ),
-    effectiveRobotState?.fetched_at,
+    displayRobotState?.fetched_at,
   );
-  const narrator = useRobotNarrator(
-    effectiveRobotState,
-    settings.narratorEnabled,
-    nextCycleSeconds,
-  );
+  const narrator = useRobotNarrator(displayRobotState, settings.narratorEnabled, nextCycleSeconds);
 
   function setOverlayVisible(nextVisible: boolean) {
     setVisible(nextVisible);
@@ -53,7 +51,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
 
   return (
     <RobotOverlay
-      robotState={effectiveRobotState}
+      robotState={displayRobotState}
       account={account.data}
       narratorEnabled={settings.narratorEnabled}
       narratorSpeaking={narrator.speaking}
@@ -61,8 +59,8 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       settings={settings}
       onSettingsChange={(nextSettings) =>
         saveSettings(nextSettings, {
-          enabled: effectiveRobotState?.enabled ?? false,
-          cycleMinutes: effectiveRobotState?.cycle_minutes ?? 5,
+          enabled: displayRobotState?.enabled ?? false,
+          cycleMinutes: displayRobotState?.cycle_minutes ?? 5,
         })
       }
       onClose={() => setOverlayVisible(false)}

@@ -72,9 +72,12 @@ export function RobotOverlay({
     robotState?.fetched_at,
   );
   const smoothEntryWindowSeconds = useSmoothCountdown(
-    robotState?.seconds_until_entry_window,
+    robotState?.seconds_until_entry ?? robotState?.seconds_until_entry_window,
     getEntryWindowResetKey(robotState),
-    Boolean(robotState?.enabled && robotState.seconds_until_entry_window > 0),
+    Boolean(
+      robotState?.enabled &&
+        ((robotState.seconds_until_entry ?? robotState.seconds_until_entry_window) > 0),
+    ),
     robotState?.fetched_at,
   );
   const smoothExpirationSeconds = useSmoothCountdown(
@@ -99,6 +102,57 @@ export function RobotOverlay({
   useEffect(() => {
     setSettings(savedSettings);
   }, [savedSettings]);
+
+  const lastCountdownLogRef = useRef<string | null>(null);
+  const lastWaitingUiLogRef = useRef<string | null>(null);
+  const lastSendingUiLogRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!robotState || robotState.status !== "WAITING_NEXT_CANDLE_ENTRY") return;
+    const logKey = [
+      robotState.status,
+      robotState.cycle_id ?? "-",
+      robotState.pending_signal?.symbol ?? "-",
+      robotState.pending_signal?.direction ?? "-",
+    ].join("|");
+    if (lastWaitingUiLogRef.current === logKey) return;
+    lastWaitingUiLogRef.current = logKey;
+    console.log("[WAITING_NEXT_CANDLE_ENTRY_UI]", {
+      cycleId: robotState.cycle_id ?? null,
+      symbol: robotState.pending_signal?.symbol ?? null,
+      direction: robotState.pending_signal?.direction ?? null,
+    });
+  }, [robotState]);
+
+  useEffect(() => {
+    if (!robotState || robotState.status !== "WAITING_NEXT_CANDLE_ENTRY") return;
+    const logKey = [robotState.cycle_id ?? "-", smoothEntryWindowSeconds ?? "null"].join("|");
+    if (lastCountdownLogRef.current === logKey) return;
+    lastCountdownLogRef.current = logKey;
+    console.log("[NEXT_CANDLE_COUNTDOWN]", {
+      cycleId: robotState.cycle_id ?? null,
+      secondsUntilEntry: smoothEntryWindowSeconds,
+    });
+  }, [robotState, smoothEntryWindowSeconds]);
+
+  useEffect(() => {
+    if (!robotState || robotState.status !== "SENDING_ORDER") return;
+    const logKey = [
+      robotState.status,
+      robotState.cycle_id ?? "-",
+      robotState.pending_signal?.symbol ?? "-",
+      robotState.pending_signal?.direction ?? "-",
+      robotState.last_trade?.order_id ?? "-",
+    ].join("|");
+    if (lastSendingUiLogRef.current === logKey) return;
+    lastSendingUiLogRef.current = logKey;
+    console.log("[SENDING_ORDER_UI]", {
+      cycleId: robotState.cycle_id ?? null,
+      symbol: robotState.pending_signal?.symbol ?? null,
+      direction: robotState.pending_signal?.direction ?? null,
+      orderId: robotState.last_trade?.order_id ?? null,
+    });
+  }, [robotState]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -300,6 +354,7 @@ function getEntryWindowResetKey(robotState: RobotState | undefined) {
   if (!robotState) return null;
   return [
     robotState.status,
+    robotState.cycle_id ?? "-",
     robotState.pending_signal?.created_at ?? "-",
     robotState.pending_signal?.symbol ?? "-",
     robotState.pending_signal?.direction ?? "-",
@@ -380,6 +435,9 @@ function getOverlayContent(
         ) : null}
         {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
         <span>Estratégia: {usedStrategies.join(", ")}</span>
+        {signal.reason || signal.strategy_reason ? (
+          <span>Motivo: {signal.reason ?? signal.strategy_reason ?? "Nao informado"}</span>
+        ) : null}
       </>
     );
   }

@@ -49,6 +49,15 @@ export function useRobotNarrator(
     ).find((nextEvent) => !spokenKeysRef.current.has(nextEvent.key));
     if (!event || spokenKeysRef.current.has(event.key)) return;
 
+    if (robotState.status === "WAITING_NEXT_CANDLE_ENTRY") {
+      console.log("[NEXT_CANDLE_NARRATION_SENT]", {
+        eventKey: event.key,
+        cycleId: robotState.cycle_id ?? null,
+        symbol: robotState.pending_signal?.symbol ?? null,
+        direction: robotState.pending_signal?.direction ?? null,
+      });
+    }
+
     const utterance = new SpeechSynthesisUtterance(event.text);
     utterance.lang = "pt-BR";
     utterance.voice = getPortugueseVoice();
@@ -117,8 +126,8 @@ function getNarrationEvents(
       ),
       text:
         stopLimit === "STOP_WIN"
-          ? `Stop win atingido. Meta de ganho alcançada. Lucro atual de ${formatProfit(robotState.profit)}. Robô pausado.`
-          : `Stop loss atingido. Limite de perda alcançado. Prejuízo atual de ${formatProfit(robotState.profit)}. Robô pausado.`,
+          ? `Stop win atingido. Meta de ganho alcancada. Lucro atual de ${formatProfit(robotState.profit)}. Robo pausado.`
+          : `Stop loss atingido. Limite de perda alcancado. Prejuizo atual de ${formatProfit(robotState.profit)}. Robo pausado.`,
     });
     return events;
   }
@@ -126,24 +135,36 @@ function getNarrationEvents(
   if (signal && status === "WAITING_ENTRY_WINDOW") {
     events.push({
       key: createSignalEventKey(signal),
-      text: `Melhor ativo encontrado: ${formatSpokenActive(signal.symbol)}. Direção ${
+      text: `Melhor ativo encontrado: ${formatSpokenActive(signal.symbol)}. Direcao ${
         signal.direction
-      }. Score ${formatScore(signal.strategy_score)}. Estratégias usadas: ${formatUsedStrategies(
+      }. Score ${formatScore(signal.strategy_score)}. Estrategias usadas: ${formatUsedStrategies(
         signal,
       )}. Aguardando janela de entrada.`,
+    });
+  }
+
+  if (signal && status === "WAITING_NEXT_CANDLE_ENTRY") {
+    events.push({
+      key: createStatusSignalCycleEventKey(status, signal, robotState.cycle_id),
+      text: "Entrada preparada. Vamos entrar no inicio da proxima vela.",
     });
   }
 
   if (status === "ANALYZING" && !operationOpen) {
     events.push({
       key: `ANALYSIS_STARTED|${analysisSequence}`,
-      text: "Iniciando nova análise de mercado.",
+      text: "Iniciando nova analise de mercado.",
     });
   }
 
   if (status === "SENDING_ORDER") {
     events.push({
-      key: createEventKey(status, orderId, signalCreatedAt, signal),
+      key: createStatusSignalCycleEventKey(
+        status,
+        signal,
+        robotState.cycle_id,
+        `${trade?.order_id ?? "-"}|${signalCreatedAt}`,
+      ),
       text: "Entrada liberada. Enviando ordem agora.",
     });
   }
@@ -153,7 +174,7 @@ function getNarrationEvents(
     if (active) {
       events.push({
         key: createEventKey("PENDING_RESULT", orderId, signalCreatedAt, signal),
-        text: `Operação aberta em ${formatSpokenActive(active)}. Aguardando resultado.`,
+        text: `Operacao aberta em ${formatSpokenActive(active)}. Aguardando resultado.`,
       });
     }
   }
@@ -186,7 +207,7 @@ function getNarrationEvents(
     if (remainingSeconds > 0) {
       events.push({
         key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
-        text: `Robô vai analisar o mercado. A próxima entrada está prevista para daqui a ${formatSpokenDuration(
+        text: `Robo vai analisar o mercado. A proxima entrada esta prevista para daqui a ${formatSpokenDuration(
           remainingSeconds,
         )}.`,
       });
@@ -211,6 +232,17 @@ function createEventKey(
     signal?.direction ?? "-",
     extra,
   ].join("|");
+}
+
+function createStatusSignalCycleEventKey(
+  status: string,
+  signal: RobotSignal | null,
+  cycleId: string | null,
+  extra = "",
+) {
+  return [status, signal?.symbol ?? "-", signal?.direction ?? "-", cycleId ?? "-", extra].join(
+    "|",
+  );
 }
 
 function createSignalEventKey(signal: RobotSignal) {
@@ -305,19 +337,19 @@ function formatUsedStrategies(signal: RobotSignal) {
   const strategies =
     signal.used_strategies.length > 0
       ? signal.used_strategies
-      : [signal.strategy_name ?? "não informada"];
+      : [signal.strategy_name ?? "nao informada"];
 
   return strategies.map(formatSpokenStrategy).join(", ");
 }
 
 function formatScore(value: number | null) {
-  if (value == null) return "não informado";
+  if (value == null) return "nao informado";
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
 }
 
 function formatTechnicalSpeech(value: string) {
   return value
-    .replace(/([a-zà-öø-ÿ])([A-Z])/g, "$1 $2")
+    .replace(/([a-zA-Z])([A-Z])/g, "$1 $2")
     .replace(/[_/\\-]+/g, " ")
     .replace(/\bRSI\b/gi, "R S I")
     .replace(/\bMACD\b/gi, "M A C D")
@@ -351,15 +383,15 @@ function formatProfit(value: number | null | undefined) {
 }
 
 const CURRENCY_NAMES: Record<string, string> = {
-  AED: "dirrã",
+  AED: "dirra",
   ARS: "peso argentino",
-  AUD: "dólar australiano",
+  AUD: "dolar australiano",
   BCH: "bitcoin cash",
   BNB: "binance coin",
   BRL: "real",
   BTC: "bitcoin",
-  CAD: "dólar canadense",
-  CHF: "franco suíço",
+  CAD: "dolar canadense",
+  CHF: "franco suico",
   CLP: "peso chileno",
   CNY: "yuan",
   COP: "peso colombiano",
@@ -370,11 +402,11 @@ const CURRENCY_NAMES: Record<string, string> = {
   JPY: "iene",
   LTC: "litecoin",
   MXN: "peso mexicano",
-  NZD: "dólar neozelandês",
+  NZD: "dolar neozelandes",
   PEN: "sol peruano",
   SOL: "solana",
   TRY: "lira turca",
-  USD: "dólar",
+  USD: "dolar",
   USDT: "tether",
   XRP: "ripple",
   ZAR: "rand sul-africano",

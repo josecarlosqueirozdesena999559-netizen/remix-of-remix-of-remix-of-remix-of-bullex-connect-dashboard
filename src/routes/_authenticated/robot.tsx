@@ -5,6 +5,7 @@ import { useBullExAccount } from "@/hooks/useBullExAccount";
 import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
+import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
@@ -35,56 +36,59 @@ function RobotPage() {
     accountConnected: account.data?.connected === true,
     robotState: robotState.data,
   });
+  const displayRobotState = useRobotDisplayState(effectiveRobotState);
   const { settings, setSettings } = useRobotSettings(user?.id);
   const now = useCurrentTime();
   const analysisWindowSeconds = useSmoothCountdown(
-    effectiveRobotState?.seconds_until_analysis_window,
-    getAnalysisWindowResetKey(effectiveRobotState),
-    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_analysis_window > 0),
-    effectiveRobotState?.fetched_at,
+    displayRobotState?.seconds_until_analysis_window,
+    getAnalysisWindowResetKey(displayRobotState),
+    Boolean(displayRobotState?.enabled && displayRobotState.seconds_until_analysis_window > 0),
+    displayRobotState?.fetched_at,
   );
   const nextCycleSeconds = useSmoothCountdown(
-    effectiveRobotState?.display_countdown_seconds ??
-      effectiveRobotState?.seconds_until_next_cycle,
-    getNextCycleResetKey(effectiveRobotState),
+    displayRobotState?.display_countdown_seconds ?? displayRobotState?.seconds_until_next_cycle,
+    getNextCycleResetKey(displayRobotState),
     Boolean(
-      effectiveRobotState?.enabled &&
-        ((effectiveRobotState.display_countdown_seconds ??
-          effectiveRobotState.seconds_until_next_cycle) > 0),
+      displayRobotState?.enabled &&
+        ((displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
+          0),
     ),
-    effectiveRobotState?.fetched_at,
+    displayRobotState?.fetched_at,
   );
   const smoothEntryWindowSeconds = useSmoothCountdown(
-    effectiveRobotState?.seconds_until_entry_window,
-    getEntryWindowResetKey(effectiveRobotState),
-    Boolean(effectiveRobotState?.enabled && effectiveRobotState.seconds_until_entry_window > 0),
-    effectiveRobotState?.fetched_at,
+    displayRobotState?.seconds_until_entry ?? displayRobotState?.seconds_until_entry_window,
+    getEntryWindowResetKey(displayRobotState),
+    Boolean(
+      displayRobotState?.enabled &&
+        ((displayRobotState.seconds_until_entry ?? displayRobotState.seconds_until_entry_window) > 0),
+    ),
+    displayRobotState?.fetched_at,
   );
   const smoothExpirationSeconds = useSmoothCountdown(
-    effectiveRobotState?.expiration_seconds,
-    getExpirationResetKey(effectiveRobotState),
+    displayRobotState?.expiration_seconds,
+    getExpirationResetKey(displayRobotState),
     Boolean(
-      effectiveRobotState?.enabled &&
-      (effectiveRobotState.operation_in_progress ||
-        effectiveRobotState.status === "PENDING_RESULT" ||
-        effectiveRobotState.last_trade?.result === "PENDING_RESULT") &&
-      effectiveRobotState.expiration_seconds > 0,
+      displayRobotState?.enabled &&
+      (displayRobotState.operation_in_progress ||
+        displayRobotState.status === "PENDING_RESULT" ||
+        displayRobotState.last_trade?.result === "PENDING_RESULT") &&
+      displayRobotState.expiration_seconds > 0,
     ),
-    effectiveRobotState?.fetched_at,
+    displayRobotState?.fetched_at,
   );
-  const robotPresentation = getRobotPresentation(effectiveRobotState, now, {
+  const robotPresentation = getRobotPresentation(displayRobotState, now, {
     analysisWindowSeconds,
     nextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
   const syncing = account.isLoading || robotState.isLoading;
-  const cachedGrace = effectiveRobotState?.connection_status_source === "cached_grace";
+  const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
   const connected = account.data?.connected === true || cachedGrace;
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
   const robotEnabled =
-    effectiveRobotState?.enabled === true && effectiveRobotState.status !== "STOPPED";
+    displayRobotState?.enabled === true && displayRobotState.status !== "STOPPED";
   const hasBackend = !!apiConfig.BASE_URL;
 
   async function refreshAccountAndRobot() {
@@ -314,6 +318,14 @@ function RobotPage() {
                 }
               />
             </div>
+            {(robotPresentation.signal.reason || robotPresentation.signal.strategy_reason) && (
+              <p className="text-muted-foreground">
+                Motivo da entrada:{" "}
+                {robotPresentation.signal.reason ??
+                  robotPresentation.signal.strategy_reason ??
+                  "Nao informado"}
+              </p>
+            )}
           </div>
         ) : null}
 
@@ -468,6 +480,7 @@ function getEntryWindowResetKey(robotState: RobotState | undefined) {
   if (!robotState) return null;
   return [
     robotState.status,
+    robotState.cycle_id ?? "-",
     robotState.pending_signal?.created_at ?? "-",
     robotState.pending_signal?.symbol ?? "-",
     robotState.pending_signal?.direction ?? "-",

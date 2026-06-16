@@ -102,6 +102,7 @@ export function normalizeRobotState(input: unknown): RobotState {
     enabled: normalizeBoolean(value.enabled),
     connected: !disconnected,
     status,
+    cycle_id: normalizeOptionalText(value.cycle_id ?? value.cycleId),
     allow_real: normalizeBoolean(value.allow_real ?? value.allowReal),
     confirm_real: normalizeBoolean(value.confirm_real ?? value.confirmReal),
     account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode),
@@ -126,6 +127,15 @@ export function normalizeRobotState(input: unknown): RobotState {
     stop_win: normalizeNumber(value.stop_win ?? value.stopWin ?? config.stop_win ?? config.stopWin),
     stop_loss: normalizeNumber(
       value.stop_loss ?? value.stopLoss ?? config.stop_loss ?? config.stopLoss,
+    ),
+    seconds_until_entry: Math.max(
+      0,
+      normalizeNumber(
+        value.seconds_until_entry ??
+          value.secondsUntilEntry ??
+          value.seconds_until_entry_window ??
+          value.secondsUntilEntryWindow,
+      ) ?? 0,
     ),
     seconds_until_next_cycle: Math.max(
       0,

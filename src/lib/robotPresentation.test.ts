@@ -18,7 +18,7 @@ test("primeiro ativo indisponivel mostra fallback para tentar o segundo", () => 
     now,
   );
 
-  assert.equal(presentation.title, "Ativo indisponível, tentando próximo melhor ativo...");
+  assert.equal(presentation.title, "Ativo indisponivel, tentando proximo melhor ativo...");
   assert.equal(presentation.kind, "analyzing");
 });
 
@@ -35,7 +35,7 @@ test("fallback permanece visivel ate 3 tentativas", () => {
       now,
     );
 
-    assert.equal(presentation.title, "Ativo indisponível, tentando próximo melhor ativo...");
+    assert.equal(presentation.title, "Ativo indisponivel, tentando proximo melhor ativo...");
   }
 });
 
@@ -89,6 +89,81 @@ test("polling acelera enquanto aguarda resultado", () => {
   assert.equal(getRobotStateRefetchInterval(createRobotState()), 2000);
 });
 
+test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima vela", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "WAITING_NEXT_CANDLE_ENTRY",
+      seconds_until_entry: 17,
+      pending_signal: createSignal(),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Sinal preparado");
+  assert.equal(presentation.footer, "Entrada no inicio da proxima vela em 00:17");
+  assert.equal(presentation.signal?.symbol, "EURUSD-OTC");
+});
+
+test("WAITING_NEXT_CANDLE_ENTRY nao mostra 00:00 enquanto aguarda a vela", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "WAITING_NEXT_CANDLE_ENTRY",
+      seconds_until_entry: 0,
+      pending_signal: createSignal(),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Sinal preparado");
+  assert.equal(presentation.footer, "Aguardando abertura da vela...");
+});
+
+test("WAITING_NEXT_CYCLE nao mostra entrada liberada antes de SENDING_ORDER", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "WAITING_NEXT_CYCLE",
+      display_countdown_seconds: 0,
+      seconds_until_next_cycle: 0,
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Analisando mercado...");
+  assert.equal(presentation.footer, null);
+});
+
+test("SENDING_ORDER e PENDING_RESULT usam os novos textos de operacao", () => {
+  const sending = getRobotPresentation(createRobotState({ status: "SENDING_ORDER" }), now);
+  const pending = getRobotPresentation(
+    createRobotState({
+      status: "PENDING_RESULT",
+      expiration_seconds: 29,
+      last_trade: createTrade(),
+    }),
+    now,
+  );
+
+  assert.equal(sending.title, "Entrada liberada");
+  assert.equal(sending.detail, "Enviando ordem...");
+  assert.equal(pending.title, "Aguardando resultado");
+  assert.equal(pending.footer, "Expira em 00:29");
+});
+
+function createSignal() {
+  return {
+    symbol: "EURUSD-OTC",
+    direction: "CALL" as const,
+    confidence: 92,
+    strategy_score: 88,
+    strategy_name: "Trend",
+    used_strategies: ["Trend"],
+    strategy_reason: "Confluencia de tendencia",
+    payout: 84,
+    reason: "Rompimento com confirmacao",
+    created_at: "2026-06-14T12:00:00Z",
+  };
+}
+
 function createTrade(overrides: Partial<NonNullable<RobotState["last_trade"]>> = {}) {
   return {
     active: "EURUSD",
@@ -111,6 +186,7 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     enabled: true,
     connected: true,
     status: "WAITING_NEXT_CYCLE",
+    cycle_id: null,
     allow_real: false,
     confirm_real: false,
     account_mode: "DEMO",
@@ -125,6 +201,7 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     entry_value: null,
     stop_win: null,
     stop_loss: null,
+    seconds_until_entry: 0,
     seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,

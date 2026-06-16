@@ -41,6 +41,7 @@ export type RobotState = {
   enabled: boolean;
   connected: boolean;
   status: string;
+  cycle_id: string | null;
   allow_real: boolean;
   confirm_real: boolean;
   account_mode: "DEMO" | "REAL";
@@ -55,6 +56,7 @@ export type RobotState = {
   entry_value: number | null;
   stop_win: number | null;
   stop_loss: number | null;
+  seconds_until_entry: number;
   seconds_until_analysis_window: number;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
@@ -127,6 +129,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     enabled: false,
     connected: !disconnected,
     status: "STOPPED",
+    cycle_id: null,
     allow_real: false,
     confirm_real: false,
     account_mode: "DEMO",
@@ -141,6 +144,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     entry_value: null,
     stop_win: null,
     stop_loss: null,
+    seconds_until_entry: 0,
     seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
