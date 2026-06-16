@@ -79,6 +79,86 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
   assert.equal(afterTimeout.footer, "Entrada em 00:42");
 });
 
+test("WAITING_GALE_ENTRY mostra Gale preparado sem tratar loss inicial como final", () => {
+  resetRobotPresentationState();
+
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "WAITING_GALE_ENTRY",
+      cycle_id: "cycle-1",
+      gale_step: 1,
+      gale_active: "EURUSD",
+      gale_direction: "CALL",
+      gale_amount: 20,
+      last_trade: createTrade({ result: "LOSS", order_id: "order-initial" }),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Gale 1 preparado");
+  assert.equal(presentation.kind, "gale");
+  assert.equal(presentation.gale?.active, "EURUSD");
+  assert.equal(presentation.gale?.direction, "CALL");
+  assert.equal(presentation.gale?.amount, 20);
+  assert.equal(presentation.result, null);
+});
+
+test("status de envio e resultado pendente do Gale mostram textos especificos", () => {
+  resetRobotPresentationState();
+
+  const sending = getRobotPresentation(
+    createRobotState({
+      status: "SENDING_GALE_ORDER",
+      gale_active: "EURUSD",
+      gale_direction: "PUT",
+    }),
+    now,
+  );
+  const pending = getRobotPresentation(
+    createRobotState({
+      status: "PENDING_GALE_RESULT",
+      gale_active: "EURUSD",
+      gale_direction: "PUT",
+    }),
+    now,
+  );
+
+  assert.equal(sending.title, "Enviando Gale 1...");
+  assert.equal(pending.title, "Aguardando resultado do Gale 1");
+});
+
+test("cycle_result final de Gale mostra WIN ou LOSS final", () => {
+  resetRobotPresentationState();
+
+  const galeWin = getRobotPresentation(
+    createRobotState({
+      status: "GALE_RESULT_RECEIVED",
+      cycle_id: "cycle-win",
+      cycle_result: "GALE_WIN",
+      gale_step: 1,
+      last_trade: createTrade({ result: "WIN", order_id: "order-gale-win" }),
+    }),
+    now,
+  );
+
+  resetRobotPresentationState();
+
+  const galeLoss = getRobotPresentation(
+    createRobotState({
+      status: "GALE_RESULT_RECEIVED",
+      cycle_id: "cycle-loss",
+      cycle_result: "GALE_LOSS",
+      gale_step: 1,
+      last_trade: createTrade({ result: "LOSS", order_id: "order-gale-loss" }),
+    }),
+    now,
+  );
+
+  assert.equal(galeWin.title, "WIN no Gale 1");
+  assert.equal(galeLoss.title, "LOSS final no Gale 1");
+  resetRobotPresentationState();
+});
+
 test("polling acelera enquanto aguarda resultado", () => {
   assert.equal(
     getRobotStateRefetchInterval(createRobotState({ operation_in_progress: true })),
@@ -177,6 +257,7 @@ function createTrade(overrides: Partial<NonNullable<RobotState["last_trade"]>> =
     sent_at: null,
     finished_at: null,
     profit: null,
+    gale_step: null,
     ...overrides,
   };
 }
@@ -202,6 +283,14 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     stop_win: null,
     stop_loss: null,
     seconds_until_entry: 0,
+    martingale_enabled: false,
+    martingale_multiplier: 2,
+    martingale_steps: 1,
+    cycle_result: null,
+    gale_step: null,
+    gale_active: null,
+    gale_direction: null,
+    gale_amount: null,
     seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,

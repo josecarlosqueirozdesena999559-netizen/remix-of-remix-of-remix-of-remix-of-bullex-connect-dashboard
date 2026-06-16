@@ -35,6 +35,9 @@ export function useRobotSettings(userId?: string) {
       cycle_minutes: robotConfigState.cycleMinutes,
       stop_win: nextSettings.stopWin,
       stop_loss: nextSettings.stopLoss,
+      martingale_enabled: nextSettings.martingaleEnabled,
+      martingale_steps: 1,
+      martingale_multiplier: nextSettings.martingaleMultiplier,
     });
     if (!response.ok) {
       throw new ApiError(response.error, response.code);

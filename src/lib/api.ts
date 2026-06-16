@@ -133,6 +133,9 @@ export type RobotConfigPayload = {
   min_payout?: number;
   stop_win?: number;
   stop_loss?: number;
+  martingale_enabled?: boolean;
+  martingale_steps?: number;
+  martingale_multiplier?: number;
 };
 
 export function robotConfig(payload: RobotConfigPayload) {

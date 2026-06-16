@@ -50,8 +50,8 @@ function RobotPage() {
     getNextCycleResetKey(displayRobotState),
     Boolean(
       displayRobotState?.enabled &&
-        ((displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
-          0),
+      (displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
+        0,
     ),
     displayRobotState?.fetched_at,
   );
@@ -60,7 +60,7 @@ function RobotPage() {
     getEntryWindowResetKey(displayRobotState),
     Boolean(
       displayRobotState?.enabled &&
-        ((displayRobotState.seconds_until_entry ?? displayRobotState.seconds_until_entry_window) > 0),
+      (displayRobotState.seconds_until_entry ?? displayRobotState.seconds_until_entry_window) > 0,
     ),
     displayRobotState?.fetched_at,
   );
@@ -167,6 +167,9 @@ function RobotPage() {
             min_payout: FIXED_MIN_PAYOUT,
             stop_win: settings.stopWin,
             stop_loss: settings.stopLoss,
+            martingale_enabled: settings.martingaleEnabled,
+            martingale_steps: 1,
+            martingale_multiplier: settings.martingaleMultiplier,
           }),
         );
         unwrapApiResult(await robotStart());
@@ -288,6 +291,16 @@ function RobotPage() {
             ) : null}
             {robotPresentation.trade.order_id ? (
               <Pill label="Ordem" value={robotPresentation.trade.order_id} />
+            ) : null}
+          </div>
+        ) : null}
+
+        {robotPresentation.gale ? (
+          <div className="mt-5 flex flex-wrap gap-2 text-sm">
+            <Pill label="Mesmo ativo" value={robotPresentation.gale.active} />
+            <Pill label="Mesma direção" value={robotPresentation.gale.direction} />
+            {robotPresentation.gale.amount != null ? (
+              <Pill label="Valor" value={`$${formatAmount(robotPresentation.gale.amount)}`} />
             ) : null}
           </div>
         ) : null}

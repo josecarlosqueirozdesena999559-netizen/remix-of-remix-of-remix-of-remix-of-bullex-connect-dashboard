@@ -113,6 +113,9 @@ function getNarrationEvents(
     robotState.result_waiting ||
     status === "SENDING_ORDER" ||
     status === "PENDING_RESULT" ||
+    status === "WAITING_GALE_ENTRY" ||
+    status === "SENDING_GALE_ORDER" ||
+    status === "PENDING_GALE_RESULT" ||
     trade?.result === "PENDING_RESULT";
 
   if (stopLimit) {
@@ -169,6 +172,27 @@ function getNarrationEvents(
     });
   }
 
+  if (status === "WAITING_GALE_ENTRY") {
+    events.push({
+      key: createGaleEventKey(robotState, orderId),
+      text: "Loss na primeira entrada. Gale 1 preparado no mesmo ativo e mesma direção.",
+    });
+  }
+
+  if (status === "SENDING_GALE_ORDER") {
+    events.push({
+      key: createGaleEventKey(robotState, orderId),
+      text: "Enviando Gale 1 agora.",
+    });
+  }
+
+  if (status === "PENDING_GALE_RESULT") {
+    events.push({
+      key: createGaleEventKey(robotState, orderId),
+      text: "Aguardando resultado do Gale 1.",
+    });
+  }
+
   if (!result && (status === "PENDING_RESULT" || robotState.operation_in_progress)) {
     const active = trade?.active;
     if (active) {
@@ -199,6 +223,26 @@ function getNarrationEvents(
     events.push({
       key: createResultKey("LOSS", trade),
       text: "Resultado: LOSS",
+    });
+  }
+
+  if (
+    isGaleResultReceived(status, robotState.cycle_result) &&
+    robotState.cycle_result === "GALE_WIN"
+  ) {
+    events.push({
+      key: createGaleEventKey(robotState, orderId),
+      text: "Resultado do Gale: WIN.",
+    });
+  }
+
+  if (
+    isGaleResultReceived(status, robotState.cycle_result) &&
+    robotState.cycle_result === "GALE_LOSS"
+  ) {
+    events.push({
+      key: createGaleEventKey(robotState, orderId),
+      text: "Resultado do Gale: LOSS final.",
     });
   }
 
@@ -253,8 +297,24 @@ function createResultKey(result: "WIN" | "LOSS", trade: RobotTrade | null) {
   return `${trade?.order_id ?? "-"}|${result}`;
 }
 
+function createGaleEventKey(robotState: RobotState, orderId: string) {
+  return [
+    robotState.cycle_id ?? "-",
+    robotState.status,
+    robotState.gale_step ?? robotState.last_trade?.gale_step ?? "-",
+    orderId,
+  ].join("|");
+}
+
 function getTradeResult(trade: RobotTrade | null) {
   return trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+}
+
+function isGaleResultReceived(status: string, cycleResult: string | null) {
+  return (
+    (status === "RESULT_RECEIVED" || status === "GALE_RESULT_RECEIVED") &&
+    (cycleResult === "GALE_WIN" || cycleResult === "GALE_LOSS")
+  );
 }
 
 function getStopLimit(robotState: RobotState): "STOP_WIN" | "STOP_LOSS" | null {

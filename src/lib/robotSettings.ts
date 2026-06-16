@@ -2,7 +2,8 @@ export type RobotSettings = {
   entryValue: number;
   stopWin: number;
   stopLoss: number;
-  g1: boolean;
+  martingaleEnabled: boolean;
+  martingaleMultiplier: number;
   narratorEnabled: boolean;
 };
 
@@ -10,7 +11,8 @@ export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   entryValue: 2,
   stopWin: 50,
   stopLoss: 30,
-  g1: false,
+  martingaleEnabled: false,
+  martingaleMultiplier: 2,
   narratorEnabled: true,
 };
 
@@ -21,6 +23,8 @@ let pendingConfig: {
   entryValue: number;
   stopWin: number;
   stopLoss: number;
+  martingaleEnabled: boolean;
+  martingaleMultiplier: number;
   savedAt: number;
 } | null = null;
 const listeners = new Set<() => void>();
@@ -44,6 +48,8 @@ export function markRobotConfigPending(userId: string, settings: RobotSettings) 
     entryValue: currentSettings.entryValue,
     stopWin: currentSettings.stopWin,
     stopLoss: currentSettings.stopLoss,
+    martingaleEnabled: currentSettings.martingaleEnabled,
+    martingaleMultiplier: currentSettings.martingaleMultiplier,
     savedAt: Date.now(),
   };
   emitChange();
@@ -55,6 +61,8 @@ export function syncRobotSettings(
     entryValue: number | null;
     stopWin: number | null;
     stopLoss: number | null;
+    martingaleEnabled?: boolean | null;
+    martingaleMultiplier?: number | null;
   },
 ) {
   const previous = readRobotSettings(userId);
@@ -62,10 +70,15 @@ export function syncRobotSettings(
     settings.entryValue != null && settings.stopWin != null && settings.stopLoss != null;
 
   if (pendingConfig?.userId === userId && backendHasConfig) {
+    const backendMartingaleEnabled = settings.martingaleEnabled ?? pendingConfig.martingaleEnabled;
+    const backendMartingaleMultiplier =
+      settings.martingaleMultiplier ?? pendingConfig.martingaleMultiplier;
     const backendConfirmed =
       settings.entryValue === pendingConfig.entryValue &&
       settings.stopWin === pendingConfig.stopWin &&
-      settings.stopLoss === pendingConfig.stopLoss;
+      settings.stopLoss === pendingConfig.stopLoss &&
+      backendMartingaleEnabled === pendingConfig.martingaleEnabled &&
+      backendMartingaleMultiplier === pendingConfig.martingaleMultiplier;
 
     if (backendConfirmed) {
       pendingConfig = null;
@@ -81,13 +94,17 @@ export function syncRobotSettings(
     entryValue: settings.entryValue ?? previous.entryValue,
     stopWin: settings.stopWin ?? previous.stopWin,
     stopLoss: settings.stopLoss ?? previous.stopLoss,
+    martingaleEnabled: settings.martingaleEnabled ?? previous.martingaleEnabled,
+    martingaleMultiplier: settings.martingaleMultiplier ?? previous.martingaleMultiplier,
   });
 
   if (
     settingsUserId === userId &&
     currentSettings.entryValue === next.entryValue &&
     currentSettings.stopWin === next.stopWin &&
-    currentSettings.stopLoss === next.stopLoss
+    currentSettings.stopLoss === next.stopLoss &&
+    currentSettings.martingaleEnabled === next.martingaleEnabled &&
+    currentSettings.martingaleMultiplier === next.martingaleMultiplier
   ) {
     return;
   }
@@ -116,7 +133,13 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
     entryValue: positiveNumber(settings?.entryValue, DEFAULT_ROBOT_SETTINGS.entryValue),
     stopWin: positiveNumber(settings?.stopWin, DEFAULT_ROBOT_SETTINGS.stopWin),
     stopLoss: positiveNumber(settings?.stopLoss, DEFAULT_ROBOT_SETTINGS.stopLoss),
-    g1: settings?.g1 === true,
+    martingaleEnabled:
+      settings?.martingaleEnabled === true ||
+      (settings as { g1?: boolean } | null | undefined)?.g1 === true,
+    martingaleMultiplier: positiveNumber(
+      settings?.martingaleMultiplier,
+      DEFAULT_ROBOT_SETTINGS.martingaleMultiplier,
+    ),
     narratorEnabled:
       typeof settings?.narratorEnabled === "boolean"
         ? settings.narratorEnabled

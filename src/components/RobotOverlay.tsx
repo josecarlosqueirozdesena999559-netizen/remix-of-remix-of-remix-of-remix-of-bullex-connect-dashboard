@@ -67,7 +67,7 @@ export function RobotOverlay({
     getNextCycleResetKey(robotState),
     Boolean(
       robotState?.enabled &&
-        ((robotState.display_countdown_seconds ?? robotState.seconds_until_next_cycle) > 0),
+      (robotState.display_countdown_seconds ?? robotState.seconds_until_next_cycle) > 0,
     ),
     robotState?.fetched_at,
   );
@@ -389,9 +389,11 @@ function getOverlayContent(
   });
   const trade = presentation.trade;
   const signal = presentation.signal;
+  const isPositiveResult = presentation.result === "WIN" || presentation.result === "GALE_WIN";
+  const isNegativeResult = presentation.result === "LOSS" || presentation.result === "GALE_LOSS";
   const tone =
     presentation.kind === "result"
-      ? presentation.result === "WIN"
+      ? isPositiveResult
         ? "text-emerald-300"
         : "text-red-300"
       : presentation.kind === "operation"
@@ -412,9 +414,23 @@ function getOverlayContent(
         ) : null}
         {presentation.kind === "result" && trade.profit != null ? (
           <span>
-            {presentation.result === "WIN" ? "Lucro" : "Prejuízo"}:{" "}
-            {formatMoney(presentation.result === "LOSS" ? Math.abs(trade.profit) : trade.profit)}
+            {isPositiveResult ? "Lucro" : "Prejuízo"}:{" "}
+            {formatMoney(isNegativeResult ? Math.abs(trade.profit) : trade.profit)}
           </span>
+        ) : null}
+      </>
+    );
+  } else if (presentation.gale) {
+    details = (
+      <>
+        <span>Mesmo ativo: {presentation.gale.active}</span>
+        <span
+          className={presentation.gale.direction === "CALL" ? "text-emerald-300" : "text-red-300"}
+        >
+          Mesma direção: {presentation.gale.direction}
+        </span>
+        {presentation.gale.amount != null ? (
+          <span>Valor: {formatEntryAmount(presentation.gale.amount)}</span>
         ) : null}
       </>
     );
@@ -472,7 +488,10 @@ function RobotConfigMenu({
   onSave: () => void;
   onClose: () => void;
 }) {
-  function updateNumber(key: "entryValue" | "stopWin" | "stopLoss", value: string) {
+  function updateNumber(
+    key: "entryValue" | "stopWin" | "stopLoss" | "martingaleMultiplier",
+    value: string,
+  ) {
     const next = Number(value);
     onChange({ ...settings, [key]: Number.isFinite(next) ? next : 0 });
   }
@@ -514,14 +533,22 @@ function RobotConfigMenu({
         />
 
         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-xs font-semibold">
-          <span>Usar G1</span>
+          <span>Usar Martingale / Gale 1</span>
           <input
             type="checkbox"
-            checked={settings.g1}
-            onChange={(event) => onChange({ ...settings, g1: event.target.checked })}
+            checked={settings.martingaleEnabled}
+            onChange={(event) => onChange({ ...settings, martingaleEnabled: event.target.checked })}
             className="h-4 w-4 accent-white"
           />
         </label>
+        {settings.martingaleEnabled ? (
+          <ConfigNumber
+            label="Multiplicador Gale"
+            value={settings.martingaleMultiplier}
+            step="0.1"
+            onChange={(value) => updateNumber("martingaleMultiplier", value)}
+          />
+        ) : null}
       </div>
 
       <button

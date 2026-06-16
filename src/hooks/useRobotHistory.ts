@@ -15,6 +15,7 @@ export type RobotHistoryItem = {
   payout: number | null;
   orderId: string | null;
   result: "WIN" | "LOSS";
+  badge: "NORMAL" | "GALE 1" | "GALE WIN" | "GALE LOSS";
   profit: number;
   openedAt: string | null;
   finishedAt: string | null;
@@ -112,11 +113,28 @@ function normalizeHistoryItem(input: unknown): RobotHistoryItem | null {
     payout: percentage(value.payout),
     orderId: optionalText(value.order_id ?? value.orderId),
     result,
+    badge: normalizeBadge(value),
     profit: number(value.profit) ?? 0,
     openedAt: optionalText(value.opened_at ?? value.openedAt),
     finishedAt: optionalText(value.finished_at ?? value.finishedAt),
     timeframe: optionalText(value.timeframe),
   };
+}
+
+function normalizeBadge(value: Record<string, unknown>): RobotHistoryItem["badge"] {
+  const cycleResult = text(value.cycle_result ?? value.cycleResult).toUpperCase();
+  if (cycleResult === "GALE_WIN") return "GALE WIN";
+  if (cycleResult === "GALE_LOSS") return "GALE LOSS";
+
+  const tradeType = text(value.trade_type ?? value.tradeType ?? value.badge).toUpperCase();
+  if (tradeType === "GALE_WIN") return "GALE WIN";
+  if (tradeType === "GALE_LOSS") return "GALE LOSS";
+  if (tradeType === "GALE 1" || tradeType === "GALE_1") return "GALE 1";
+
+  const galeStep = number(
+    value.gale_step ?? value.galeStep ?? value.martingale_step ?? value.martingaleStep,
+  );
+  return galeStep === 1 ? "GALE 1" : "NORMAL";
 }
 
 function normalizeStats(input: unknown): RobotStats {

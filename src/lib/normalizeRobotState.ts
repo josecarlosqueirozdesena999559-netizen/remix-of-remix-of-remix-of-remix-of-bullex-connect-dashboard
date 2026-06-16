@@ -137,6 +137,59 @@ export function normalizeRobotState(input: unknown): RobotState {
           value.secondsUntilEntryWindow,
       ) ?? 0,
     ),
+    martingale_enabled: normalizeBoolean(
+      value.martingale_enabled ??
+        value.martingaleEnabled ??
+        config.martingale_enabled ??
+        config.martingaleEnabled,
+    ),
+    martingale_multiplier:
+      normalizeNumber(
+        value.martingale_multiplier ??
+          value.martingaleMultiplier ??
+          config.martingale_multiplier ??
+          config.martingaleMultiplier,
+      ) ?? 2,
+    martingale_steps: Math.max(
+      1,
+      normalizeNumber(
+        value.martingale_steps ??
+          value.martingaleSteps ??
+          config.martingale_steps ??
+          config.martingaleSteps,
+      ) ?? 1,
+    ),
+    cycle_result:
+      normalizeOptionalText(value.cycle_result ?? value.cycleResult)?.toUpperCase() ?? null,
+    gale_step: normalizeNumber(
+      value.gale_step ?? value.galeStep ?? tradeValue.gale_step ?? tradeValue.galeStep,
+    ),
+    gale_active: normalizeOptionalText(
+      value.gale_active ??
+        value.galeActive ??
+        value.gale_asset ??
+        value.galeAsset ??
+        tradeValue.gale_active ??
+        tradeValue.galeActive ??
+        tradeValue.active ??
+        tradeValue.symbol,
+    ),
+    gale_direction: normalizeDirection(
+      value.gale_direction ??
+        value.galeDirection ??
+        tradeValue.gale_direction ??
+        tradeValue.galeDirection ??
+        tradeValue.direction,
+    ),
+    gale_amount: normalizeNumber(
+      value.gale_amount ??
+        value.galeAmount ??
+        value.next_gale_amount ??
+        value.nextGaleAmount ??
+        tradeValue.gale_amount ??
+        tradeValue.galeAmount ??
+        tradeValue.amount,
+    ),
     seconds_until_next_cycle: Math.max(
       0,
       secondsUntilNextCycle ?? secondsUntilNextCycleFromClock ?? 0,
@@ -261,6 +314,7 @@ function normalizeTrade(input: unknown): RobotTrade | null {
     sent_at: normalizeOptionalText(value.sent_at ?? value.sentAt),
     finished_at: normalizeOptionalText(value.finished_at ?? value.finishedAt),
     profit: normalizeNumber(value.profit ?? value.pnl ?? value.result_amount ?? value.resultAmount),
+    gale_step: normalizeNumber(value.gale_step ?? value.galeStep),
   };
 }
 

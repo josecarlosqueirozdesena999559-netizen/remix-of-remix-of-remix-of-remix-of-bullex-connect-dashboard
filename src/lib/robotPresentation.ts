@@ -1,6 +1,6 @@
 import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
 
-type RobotResult = "WIN" | "LOSS" | null;
+type RobotResult = "WIN" | "LOSS" | "GALE_WIN" | "GALE_LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
 let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
@@ -15,8 +15,15 @@ type OrderRejectionSnapshot = {
 type ResultSnapshot = {
   key: string;
   result: Exclude<RobotResult, null>;
-  trade: RobotTrade;
+  trade: RobotTrade | null;
   observedAt: number;
+};
+
+export type RobotGale = {
+  active: string;
+  direction: RobotDirection;
+  amount: number | null;
+  step: number;
 };
 
 type RobotPresentationOptions = {
@@ -27,12 +34,21 @@ type RobotPresentationOptions = {
 };
 
 export type RobotPresentation = {
-  kind: "loading" | "stopped" | "analyzing" | "entry" | "operation" | "rejected" | "result";
+  kind:
+    | "loading"
+    | "stopped"
+    | "analyzing"
+    | "entry"
+    | "operation"
+    | "rejected"
+    | "result"
+    | "gale";
   title: string;
   detail: string | null;
   footer: string | null;
   signal: RobotSignal | null;
   trade: RobotTrade | null;
+  gale: RobotGale | null;
   direction: RobotDirection | null;
   result: RobotResult;
 };
@@ -58,10 +74,10 @@ export function getRobotPresentation(
   const trade = robotState.last_trade;
   const signal = robotState.pending_signal;
   const bestCandidate = robotState.best_candidate;
-  const result = trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+  const result = getCycleResult(robotState) ?? getTradeResult(trade);
 
-  if (status === "RESULT_RECEIVED" && trade && result) {
-    const key = createResultEventKey(trade, result);
+  if (isResultStatus(status) && result) {
+    const key = createResultEventKey(robotState, trade, result);
     if (resultSnapshot?.key !== key) {
       resultSnapshot = { key, result, trade, observedAt: now };
     }
@@ -69,9 +85,9 @@ export function getRobotPresentation(
 
   if (resultSnapshot && now - resultSnapshot.observedAt < RESULT_DISPLAY_MS) {
     return {
-      ...createPresentation("result", resultSnapshot.result),
+      ...createPresentation("result", formatResultTitle(resultSnapshot.result)),
       trade: resultSnapshot.trade,
-      direction: resultSnapshot.trade.direction,
+      direction: resultSnapshot.trade?.direction ?? null,
       result: resultSnapshot.result,
     };
   }
@@ -121,6 +137,33 @@ export function getRobotPresentation(
 
   if (isOrderFallbackInProgress(robotState)) {
     return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
+  }
+
+  if (status === "WAITING_GALE_ENTRY") {
+    const gale = getGale(robotState);
+    return {
+      ...createPresentation("gale", "Gale 1 preparado", null, "Entrada no início da próxima vela"),
+      gale,
+      direction: gale?.direction ?? null,
+    };
+  }
+
+  if (status === "SENDING_GALE_ORDER") {
+    const gale = getGale(robotState);
+    return {
+      ...createPresentation("operation", "Enviando Gale 1..."),
+      gale,
+      direction: gale?.direction ?? null,
+    };
+  }
+
+  if (status === "PENDING_GALE_RESULT") {
+    const gale = getGale(robotState);
+    return {
+      ...createPresentation("operation", "Aguardando resultado do Gale 1"),
+      gale,
+      direction: gale?.direction ?? null,
+    };
   }
 
   if (status === "SENDING_ORDER") {
@@ -230,7 +273,9 @@ export function getRobotPresentation(
         "analyzing",
         "Analisando mercado...",
         bestCandidate ? `Melhor ativo: ${bestCandidate.symbol}` : "Escolhendo melhor ativo...",
-        remainingSeconds > 0 ? `Analise em ${formatDuration(remainingSeconds)}` : "Analise em 00:00",
+        remainingSeconds > 0
+          ? `Analise em ${formatDuration(remainingSeconds)}`
+          : "Analise em 00:00",
       ),
       signal: bestCandidate,
       direction: bestCandidate?.direction ?? null,
@@ -398,8 +443,17 @@ function resolveNextCycleSeconds(
     : fallbackSeconds;
 }
 
-function createResultEventKey(trade: RobotTrade, result: Exclude<RobotResult, null>) {
-  return `${trade.order_id ?? "-"}|${result}`;
+function createResultEventKey(
+  robotState: RobotState,
+  trade: RobotTrade | null,
+  result: Exclude<RobotResult, null>,
+) {
+  return [
+    robotState.cycle_id ?? "-",
+    trade?.order_id ?? "-",
+    robotState.gale_step ?? trade?.gale_step ?? "-",
+    result,
+  ].join("|");
 }
 
 function createPresentation(
@@ -415,7 +469,44 @@ function createPresentation(
     footer,
     signal: null,
     trade: null,
+    gale: null,
     direction: null,
     result: null,
   };
+}
+
+function getGale(robotState: RobotState): RobotGale | null {
+  const active = robotState.gale_active ?? robotState.last_trade?.active;
+  const direction = robotState.gale_direction ?? robotState.last_trade?.direction;
+  if (!active || !direction) return null;
+
+  return {
+    active,
+    direction,
+    amount: robotState.gale_amount ?? robotState.last_trade?.amount ?? null,
+    step: robotState.gale_step ?? robotState.last_trade?.gale_step ?? 1,
+  };
+}
+
+function getCycleResult(robotState: RobotState): Exclude<RobotResult, null> | null {
+  if (robotState.cycle_result === "GALE_WIN") return "GALE_WIN";
+  if (robotState.cycle_result === "GALE_LOSS") return "GALE_LOSS";
+  if (robotState.cycle_result === "WIN") return "WIN";
+  if (robotState.cycle_result === "LOSS") return "LOSS";
+  return null;
+}
+
+function getTradeResult(trade: RobotTrade | null): Exclude<RobotResult, null> | null {
+  if (trade?.result === "WIN" || trade?.result === "LOSS") return trade.result;
+  return null;
+}
+
+function isResultStatus(status: string) {
+  return status === "RESULT_RECEIVED" || status === "GALE_RESULT_RECEIVED";
+}
+
+function formatResultTitle(result: Exclude<RobotResult, null>) {
+  if (result === "GALE_WIN") return "WIN no Gale 1";
+  if (result === "GALE_LOSS") return "LOSS final no Gale 1";
+  return result;
 }

@@ -125,6 +125,7 @@ function HistoryPage() {
                 <TableHead>Direção</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Payout</TableHead>
+                <TableHead>Selo</TableHead>
                 <TableHead>Confiança</TableHead>
                 <TableHead>Resultado</TableHead>
                 <TableHead className="text-right">Lucro</TableHead>
@@ -176,6 +177,14 @@ function StatCard({
 function HistoryRow({ item }: { item: RobotHistoryItem }) {
   const isWin = item.result === "WIN";
   const resultClass = isWin ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400";
+  const badgeClass =
+    item.badge === "NORMAL"
+      ? "bg-muted text-muted-foreground"
+      : item.badge === "GALE WIN"
+        ? "bg-emerald-500/15 text-emerald-400"
+        : item.badge === "GALE LOSS"
+          ? "bg-red-500/15 text-red-400"
+          : "bg-amber-500/15 text-amber-300";
   const directionClass = item.direction === "CALL" ? "text-emerald-400" : "text-red-400";
 
   return (
@@ -187,6 +196,11 @@ function HistoryRow({ item }: { item: RobotHistoryItem }) {
       <TableCell className={`font-semibold ${directionClass}`}>{item.direction}</TableCell>
       <TableCell>{formatMoney(item.amount)}</TableCell>
       <TableCell>{formatPercentage(item.payout)}</TableCell>
+      <TableCell>
+        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${badgeClass}`}>
+          {item.badge}
+        </span>
+      </TableCell>
       <TableCell>{formatPercentage(item.confidence)}</TableCell>
       <TableCell>
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${resultClass}`}>

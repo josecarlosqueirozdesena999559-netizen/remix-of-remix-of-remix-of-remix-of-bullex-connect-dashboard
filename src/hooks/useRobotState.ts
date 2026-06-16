@@ -35,6 +35,7 @@ export type RobotTrade = {
   sent_at: string | null;
   finished_at: string | null;
   profit: number | null;
+  gale_step: number | null;
 };
 
 export type RobotState = {
@@ -57,6 +58,14 @@ export type RobotState = {
   stop_win: number | null;
   stop_loss: number | null;
   seconds_until_entry: number;
+  martingale_enabled: boolean;
+  martingale_multiplier: number;
+  martingale_steps: number;
+  cycle_result: string | null;
+  gale_step: number | null;
+  gale_active: string | null;
+  gale_direction: RobotDirection | null;
+  gale_amount: number | null;
   seconds_until_analysis_window: number;
   seconds_until_next_cycle: number;
   seconds_until_entry_window: number;
@@ -111,6 +120,8 @@ export function useRobotState(userId?: string) {
         entryValue: nextState.entry_value,
         stopWin: nextState.stop_win,
         stopLoss: nextState.stop_loss,
+        martingaleEnabled: nextState.martingale_enabled,
+        martingaleMultiplier: nextState.martingale_multiplier,
       });
       console.log("[ROBOT STATE UPDATED]", nextState);
       return nextState;
@@ -145,6 +156,14 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     stop_win: null,
     stop_loss: null,
     seconds_until_entry: 0,
+    martingale_enabled: false,
+    martingale_multiplier: 2,
+    martingale_steps: 1,
+    cycle_result: null,
+    gale_step: null,
+    gale_active: null,
+    gale_direction: null,
+    gale_amount: null,
     seconds_until_analysis_window: 0,
     seconds_until_next_cycle: 0,
     seconds_until_entry_window: 0,
