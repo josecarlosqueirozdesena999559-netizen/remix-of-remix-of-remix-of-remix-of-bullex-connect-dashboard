@@ -4,6 +4,9 @@ export type RobotSettings = {
   stopLoss: number;
   martingaleEnabled: boolean;
   martingaleMultiplier: number;
+  aiAnalysisEnabled: boolean;
+  aiConfirmationRequired: boolean;
+  aiMinConfidence: number;
   narratorEnabled: boolean;
 };
 
@@ -13,6 +16,9 @@ export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   stopLoss: 30,
   martingaleEnabled: false,
   martingaleMultiplier: 2,
+  aiAnalysisEnabled: false,
+  aiConfirmationRequired: false,
+  aiMinConfidence: 80,
   narratorEnabled: true,
 };
 
@@ -25,6 +31,9 @@ let pendingConfig: {
   stopLoss: number;
   martingaleEnabled: boolean;
   martingaleMultiplier: number;
+  aiAnalysisEnabled: boolean;
+  aiConfirmationRequired: boolean;
+  aiMinConfidence: number;
   savedAt: number;
 } | null = null;
 const listeners = new Set<() => void>();
@@ -50,6 +59,9 @@ export function markRobotConfigPending(userId: string, settings: RobotSettings) 
     stopLoss: currentSettings.stopLoss,
     martingaleEnabled: currentSettings.martingaleEnabled,
     martingaleMultiplier: currentSettings.martingaleMultiplier,
+    aiAnalysisEnabled: currentSettings.aiAnalysisEnabled,
+    aiConfirmationRequired: currentSettings.aiConfirmationRequired,
+    aiMinConfidence: currentSettings.aiMinConfidence,
     savedAt: Date.now(),
   };
   emitChange();
@@ -63,6 +75,9 @@ export function syncRobotSettings(
     stopLoss: number | null;
     martingaleEnabled?: boolean | null;
     martingaleMultiplier?: number | null;
+    aiAnalysisEnabled?: boolean | null;
+    aiConfirmationRequired?: boolean | null;
+    aiMinConfidence?: number | null;
   },
 ) {
   const previous = readRobotSettings(userId);
@@ -73,12 +88,20 @@ export function syncRobotSettings(
     const backendMartingaleEnabled = settings.martingaleEnabled ?? pendingConfig.martingaleEnabled;
     const backendMartingaleMultiplier =
       settings.martingaleMultiplier ?? pendingConfig.martingaleMultiplier;
+    const backendAiAnalysisEnabled =
+      settings.aiAnalysisEnabled ?? pendingConfig.aiAnalysisEnabled;
+    const backendAiConfirmationRequired =
+      settings.aiConfirmationRequired ?? pendingConfig.aiConfirmationRequired;
+    const backendAiMinConfidence = settings.aiMinConfidence ?? pendingConfig.aiMinConfidence;
     const backendConfirmed =
       settings.entryValue === pendingConfig.entryValue &&
       settings.stopWin === pendingConfig.stopWin &&
       settings.stopLoss === pendingConfig.stopLoss &&
       backendMartingaleEnabled === pendingConfig.martingaleEnabled &&
-      backendMartingaleMultiplier === pendingConfig.martingaleMultiplier;
+      backendMartingaleMultiplier === pendingConfig.martingaleMultiplier &&
+      backendAiAnalysisEnabled === pendingConfig.aiAnalysisEnabled &&
+      backendAiConfirmationRequired === pendingConfig.aiConfirmationRequired &&
+      backendAiMinConfidence === pendingConfig.aiMinConfidence;
 
     if (backendConfirmed) {
       pendingConfig = null;
@@ -96,6 +119,10 @@ export function syncRobotSettings(
     stopLoss: settings.stopLoss ?? previous.stopLoss,
     martingaleEnabled: settings.martingaleEnabled ?? previous.martingaleEnabled,
     martingaleMultiplier: settings.martingaleMultiplier ?? previous.martingaleMultiplier,
+    aiAnalysisEnabled: settings.aiAnalysisEnabled ?? previous.aiAnalysisEnabled,
+    aiConfirmationRequired:
+      settings.aiConfirmationRequired ?? previous.aiConfirmationRequired,
+    aiMinConfidence: settings.aiMinConfidence ?? previous.aiMinConfidence,
   });
 
   if (
@@ -104,7 +131,10 @@ export function syncRobotSettings(
     currentSettings.stopWin === next.stopWin &&
     currentSettings.stopLoss === next.stopLoss &&
     currentSettings.martingaleEnabled === next.martingaleEnabled &&
-    currentSettings.martingaleMultiplier === next.martingaleMultiplier
+    currentSettings.martingaleMultiplier === next.martingaleMultiplier &&
+    currentSettings.aiAnalysisEnabled === next.aiAnalysisEnabled &&
+    currentSettings.aiConfirmationRequired === next.aiConfirmationRequired &&
+    currentSettings.aiMinConfidence === next.aiMinConfidence
   ) {
     return;
   }
@@ -139,6 +169,18 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
     martingaleMultiplier: positiveNumber(
       settings?.martingaleMultiplier,
       DEFAULT_ROBOT_SETTINGS.martingaleMultiplier,
+    ),
+    aiAnalysisEnabled:
+      typeof settings?.aiAnalysisEnabled === "boolean"
+        ? settings.aiAnalysisEnabled
+        : DEFAULT_ROBOT_SETTINGS.aiAnalysisEnabled,
+    aiConfirmationRequired:
+      typeof settings?.aiConfirmationRequired === "boolean"
+        ? settings.aiConfirmationRequired
+        : DEFAULT_ROBOT_SETTINGS.aiConfirmationRequired,
+    aiMinConfidence: positiveNumber(
+      settings?.aiMinConfidence,
+      DEFAULT_ROBOT_SETTINGS.aiMinConfidence,
     ),
     narratorEnabled:
       typeof settings?.narratorEnabled === "boolean"

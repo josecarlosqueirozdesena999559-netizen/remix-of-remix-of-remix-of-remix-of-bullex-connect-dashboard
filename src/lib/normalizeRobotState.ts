@@ -128,6 +128,24 @@ export function normalizeRobotState(input: unknown): RobotState {
     stop_loss: normalizeNumber(
       value.stop_loss ?? value.stopLoss ?? config.stop_loss ?? config.stopLoss,
     ),
+    ai_analysis_enabled: normalizeBoolean(
+      value.ai_analysis_enabled ??
+        value.aiAnalysisEnabled ??
+        config.ai_analysis_enabled ??
+        config.aiAnalysisEnabled,
+    ),
+    ai_confirmation_required: normalizeBoolean(
+      value.ai_confirmation_required ??
+        value.aiConfirmationRequired ??
+        config.ai_confirmation_required ??
+        config.aiConfirmationRequired,
+    ),
+    ai_min_confidence: normalizeNumber(
+      value.ai_min_confidence ??
+        value.aiMinConfidence ??
+        config.ai_min_confidence ??
+        config.aiMinConfidence,
+    ),
     seconds_until_entry: Math.max(
       0,
       normalizeNumber(
@@ -275,6 +293,59 @@ function normalizeSignal(input: unknown): RobotSignal | null {
     payout: normalizePercentage(value.payout),
     reason: normalizeReason(value.reason ?? value.reasons ?? value.motive ?? value.explanation),
     created_at: normalizeOptionalText(value.created_at ?? value.createdAt ?? value.timestamp),
+    ai_approved: normalizeNullableBoolean(
+      value.ai_approved ??
+        value.aiApproved ??
+        value.openai_approved ??
+        value.openaiApproved ??
+        value.ai_confirmation_passed ??
+        value.aiConfirmationPassed,
+    ),
+    ai_confidence: normalizePercentage(
+      value.ai_confidence ??
+        value.aiConfidence ??
+        value.openai_confidence ??
+        value.openaiConfidence,
+    ),
+    ai_risk: normalizeReason(
+      value.ai_risk ?? value.aiRisk ?? value.openai_risk ?? value.openaiRisk,
+    ),
+    ai_candle_reading: normalizeReason(
+      value.ai_candle_reading ??
+        value.aiCandleReading ??
+        value.ai_reading ??
+        value.aiReading ??
+        value.openai_candle_reading ??
+        value.openaiCandleReading,
+    ),
+    ai_entry_reason: normalizeReason(
+      value.ai_entry_reason ??
+        value.aiEntryReason ??
+        value.ai_reason ??
+        value.aiReason ??
+        value.openai_entry_reason ??
+        value.openaiEntryReason,
+    ),
+    ai_voice_text: normalizeOptionalText(
+      value.ai_voice_text ??
+        value.aiVoiceText ??
+        value.openai_voice_text ??
+        value.openaiVoiceText,
+    ),
+    ai_block_reason: normalizeReason(
+      value.ai_block_reason ??
+        value.aiBlockReason ??
+        value.openai_block_reason ??
+        value.openaiBlockReason,
+    ),
+    ai_error: normalizeReason(
+      value.ai_error ??
+        value.aiError ??
+        value.ai_failure_reason ??
+        value.aiFailureReason ??
+        value.openai_error ??
+        value.openaiError,
+    ),
   };
 }
 
@@ -338,8 +409,27 @@ function normalizeNumber(input: unknown): number | null {
 
 function normalizeBoolean(input: unknown) {
   if (input === true || input === 1) return true;
+  if (input === false || input === 0) return false;
   if (typeof input !== "string") return false;
   return input.trim().toLowerCase() === "true" || input.trim() === "1";
+}
+
+function normalizeNullableBoolean(input: unknown): boolean | null {
+  if (input == null) return null;
+  if (input === true || input === 1) return true;
+  if (input === false || input === 0) return false;
+  if (typeof input !== "string") return null;
+  const normalized = input.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "approved") return true;
+  if (
+    normalized === "false" ||
+    normalized === "0" ||
+    normalized === "rejected" ||
+    normalized === "blocked"
+  ) {
+    return false;
+  }
+  return null;
 }
 
 function normalizeConnected(input: unknown): boolean | null {

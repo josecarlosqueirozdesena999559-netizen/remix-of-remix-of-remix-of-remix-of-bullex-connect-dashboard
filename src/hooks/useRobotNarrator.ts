@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
+import { getRobotAiReview } from "@/lib/robotAi";
 import { formatFriendlyRobotText } from "@/lib/robotPresentation";
 
 type NarrationEvent = {
@@ -108,6 +109,7 @@ function getNarrationEvents(
   const signalCreatedAt = signal?.created_at ?? "-";
   const result = getTradeResult(trade);
   const stopLimit = getStopLimit(robotState);
+  const aiReview = getRobotAiReview(signal);
   const operationOpen =
     robotState.operation_in_progress ||
     robotState.result_waiting ||
@@ -147,10 +149,17 @@ function getNarrationEvents(
   }
 
   if (signal && status === "WAITING_NEXT_CANDLE_ENTRY") {
-    events.push({
-      key: createStatusSignalCycleEventKey(status, signal, robotState.cycle_id),
-      text: "Entrada preparada. Vamos entrar no inicio da proxima vela.",
-    });
+    if (aiReview?.voiceText) {
+      events.push({
+        key: createAiVoiceEventKey(robotState, signal, aiReview.voiceText),
+        text: aiReview.voiceText,
+      });
+    } else {
+      events.push({
+        key: createStatusSignalCycleEventKey(status, signal, robotState.cycle_id),
+        text: "Entrada preparada. Vamos entrar no inicio da proxima vela.",
+      });
+    }
   }
 
   if (status === "ANALYZING" && !operationOpen) {
@@ -291,6 +300,10 @@ function createStatusSignalCycleEventKey(
 
 function createSignalEventKey(signal: RobotSignal) {
   return ["SIGNAL_FOUND", signal.symbol, signal.direction, signal.created_at ?? "-"].join("|");
+}
+
+function createAiVoiceEventKey(robotState: RobotState, signal: RobotSignal, aiVoiceText: string) {
+  return `${robotState.cycle_id ?? "-"}${signal.symbol}${aiVoiceText}`;
 }
 
 function createResultKey(result: "WIN" | "LOSS", trade: RobotTrade | null) {

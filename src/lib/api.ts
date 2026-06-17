@@ -136,6 +136,9 @@ export type RobotConfigPayload = {
   martingale_enabled?: boolean;
   martingale_steps?: number;
   martingale_multiplier?: number;
+  ai_analysis_enabled?: boolean;
+  ai_confirmation_required?: boolean;
+  ai_min_confidence?: number;
 };
 
 export function robotConfig(payload: RobotConfigPayload) {

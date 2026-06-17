@@ -9,6 +9,7 @@ import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
+import { getRobotAiReview } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 
 export const Route = createFileRoute("/_authenticated/robot")({
@@ -26,6 +27,8 @@ function RobotPage() {
   const [robotActionError, setRobotActionError] = useState<string | null>(null);
   const [modeActionPending, setModeActionPending] = useState(false);
   const [modeActionError, setModeActionError] = useState<string | null>(null);
+  const [settingsActionPending, setSettingsActionPending] = useState(false);
+  const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [showRealConfirm, setShowRealConfirm] = useState(false);
   const [realConfirmed, setRealConfirmed] = useState(false);
 
@@ -37,7 +40,7 @@ function RobotPage() {
     robotState: robotState.data,
   });
   const displayRobotState = useRobotDisplayState(effectiveRobotState);
-  const { settings, setSettings } = useRobotSettings(user?.id);
+  const { settings, setSettings, saveSettings } = useRobotSettings(user?.id);
   const now = useCurrentTime();
   const analysisWindowSeconds = useSmoothCountdown(
     displayRobotState?.seconds_until_analysis_window,
@@ -83,6 +86,12 @@ function RobotPage() {
     expirationSeconds: smoothExpirationSeconds,
   });
   const syncing = account.isLoading || robotState.isLoading;
+  const aiReview = getRobotAiReview(
+    robotPresentation.signal ??
+      displayRobotState?.pending_signal ??
+      displayRobotState?.last_signal ??
+      displayRobotState?.best_candidate,
+  );
   const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
   const connected = account.data?.connected === true || cachedGrace;
   const activeMode = account.data?.mode ?? null;
@@ -170,6 +179,9 @@ function RobotPage() {
             martingale_enabled: settings.martingaleEnabled,
             martingale_steps: 1,
             martingale_multiplier: settings.martingaleMultiplier,
+            ai_analysis_enabled: settings.aiAnalysisEnabled,
+            ai_confirmation_required: settings.aiConfirmationRequired,
+            ai_min_confidence: settings.aiMinConfidence,
           }),
         );
         unwrapApiResult(await robotStart());
@@ -180,6 +192,24 @@ function RobotPage() {
       setRobotActionError(error instanceof Error ? error.message : "Falha ao atualizar o robô.");
     } finally {
       setRobotActionPending(false);
+    }
+  }
+
+  async function handleSaveAiSettings() {
+    if (!user?.id || !hasBackend || settingsActionPending) return;
+    setSettingsActionError(null);
+    setSettingsActionPending(true);
+    try {
+      await saveSettings(settings, {
+        enabled: displayRobotState?.enabled ?? false,
+        cycleMinutes: displayRobotState?.cycle_minutes ?? FIXED_CYCLE_MINUTES,
+      });
+    } catch (error) {
+      setSettingsActionError(
+        error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao da IA.",
+      );
+    } finally {
+      setSettingsActionPending(false);
     }
   }
 
@@ -395,6 +425,105 @@ function RobotPage() {
         </div>
       </section>
 
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Analise com IA</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Usa a OpenAI para revisar a leitura dos candles sem travar a tela.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
+            <span>Usar IA para analisar candles</span>
+            <input
+              type="checkbox"
+              checked={settings.aiAnalysisEnabled}
+              onChange={(event) =>
+                setSettings({ ...settings, aiAnalysisEnabled: event.target.checked })
+              }
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
+            <span>Exigir aprovacao da IA</span>
+            <input
+              type="checkbox"
+              checked={settings.aiConfirmationRequired}
+              onChange={(event) =>
+                setSettings({ ...settings, aiConfirmationRequired: event.target.checked })
+              }
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+
+          <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
+            <span className="mb-2 block text-sm font-medium">Confianca minima da IA</span>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              value={settings.aiMinConfidence}
+              onChange={(event) =>
+                setSettings({
+                  ...settings,
+                  aiMinConfidence: clampPercentage(event.target.value, settings.aiMinConfidence),
+                })
+              }
+              className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSaveAiSettings}
+            disabled={!hasBackend || settingsActionPending}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {settingsActionPending ? "Salvando..." : "Salvar configuracao da IA"}
+          </button>
+          {settingsActionError ? (
+            <p className="text-sm text-destructive">{settingsActionError}</p>
+          ) : null}
+        </div>
+      </section>
+
+      {aiReview ? (
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div>
+            <h2 className="font-semibold">Analise OpenAI</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Leitura complementar da IA para o sinal atual.
+            </p>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            <Pill label="IA" value={aiReview.statusLabel} />
+            {aiReview.confidenceLabel ? (
+              <Pill label="Confianca IA" value={aiReview.confidenceLabel} />
+            ) : null}
+            {aiReview.riskLabel ? <Pill label="Risco" value={aiReview.riskLabel} /> : null}
+          </div>
+
+          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+            {aiReview.candleReadingLabel ? (
+              <p>Leitura dos candles: {aiReview.candleReadingLabel}</p>
+            ) : null}
+            {aiReview.entryReasonLabel ? (
+              <p>Motivo da entrada: {aiReview.entryReasonLabel}</p>
+            ) : null}
+            {aiReview.blockMessage ? <p className="text-destructive">{aiReview.blockMessage}</p> : null}
+            {aiReview.fallbackMessage ? <p>{aiReview.fallbackMessage}</p> : null}
+          </div>
+        </section>
+      ) : null}
+
       {showRealConfirm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
@@ -461,6 +590,12 @@ function formatScore(value: number) {
 
 function formatAmount(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function clampPercentage(value: string, fallback: number) {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.min(100, Math.max(1, Math.round(next)));
 }
 
 function useCurrentTime() {

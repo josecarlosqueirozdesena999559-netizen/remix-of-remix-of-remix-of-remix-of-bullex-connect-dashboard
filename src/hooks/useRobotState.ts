@@ -21,6 +21,14 @@ export type RobotSignal = {
   payout: number | null;
   reason: string | null;
   created_at: string | null;
+  ai_approved: boolean | null;
+  ai_confidence: number | null;
+  ai_risk: string | null;
+  ai_candle_reading: string | null;
+  ai_entry_reason: string | null;
+  ai_voice_text: string | null;
+  ai_block_reason: string | null;
+  ai_error: string | null;
 };
 
 export type RobotTrade = {
@@ -57,6 +65,9 @@ export type RobotState = {
   entry_value: number | null;
   stop_win: number | null;
   stop_loss: number | null;
+  ai_analysis_enabled: boolean;
+  ai_confirmation_required: boolean;
+  ai_min_confidence: number | null;
   seconds_until_entry: number;
   martingale_enabled: boolean;
   martingale_multiplier: number;
@@ -122,6 +133,9 @@ export function useRobotState(userId?: string) {
         stopLoss: nextState.stop_loss,
         martingaleEnabled: nextState.martingale_enabled,
         martingaleMultiplier: nextState.martingale_multiplier,
+        aiAnalysisEnabled: nextState.ai_analysis_enabled,
+        aiConfirmationRequired: nextState.ai_confirmation_required,
+        aiMinConfidence: nextState.ai_min_confidence,
       });
       console.log("[ROBOT STATE UPDATED]", nextState);
       return nextState;
@@ -155,6 +169,9 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     entry_value: null,
     stop_win: null,
     stop_loss: null,
+    ai_analysis_enabled: false,
+    ai_confirmation_required: false,
+    ai_min_confidence: null,
     seconds_until_entry: 0,
     martingale_enabled: false,
     martingale_multiplier: 2,

@@ -9,6 +9,7 @@ import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
+import { getRobotAiReview } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
 
@@ -98,6 +99,9 @@ export function RobotOverlay({
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
+  const aiReview = getRobotAiReview(
+    robotState?.pending_signal ?? robotState?.last_signal ?? robotState?.best_candidate,
+  );
 
   useEffect(() => {
     setSettings(savedSettings);
@@ -319,6 +323,19 @@ export function RobotOverlay({
         {content.footer ? (
           <p className="mt-0.5 text-[11px] font-semibold sm:text-xs">{content.footer}</p>
         ) : null}
+        {aiReview ? (
+          <div className="mt-2 space-y-1 text-[10px] font-semibold leading-snug sm:text-xs">
+            <p>
+              IA: {aiReview.statusLabel}
+              {aiReview.confidenceLabel ? ` | Confianca: ${aiReview.confidenceLabel}` : ""}
+              {aiReview.riskLabel ? ` | Risco: ${aiReview.riskLabel}` : ""}
+            </p>
+            {aiReview.candleReadingLabel ? <p>Candles: {aiReview.candleReadingLabel}</p> : null}
+            {aiReview.entryReasonLabel ? <p>Motivo: {aiReview.entryReasonLabel}</p> : null}
+            {aiReview.blockMessage ? <p className="text-red-300">{aiReview.blockMessage}</p> : null}
+            {aiReview.fallbackMessage ? <p>{aiReview.fallbackMessage}</p> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -489,11 +506,19 @@ function RobotConfigMenu({
   onClose: () => void;
 }) {
   function updateNumber(
-    key: "entryValue" | "stopWin" | "stopLoss" | "martingaleMultiplier",
+    key: "entryValue" | "stopWin" | "stopLoss" | "martingaleMultiplier" | "aiMinConfidence",
     value: string,
   ) {
     const next = Number(value);
-    onChange({ ...settings, [key]: Number.isFinite(next) ? next : 0 });
+    const normalized =
+      key === "aiMinConfidence"
+        ? Number.isFinite(next)
+          ? Math.min(100, Math.max(1, Math.round(next)))
+          : settings.aiMinConfidence
+        : Number.isFinite(next)
+          ? next
+          : 0;
+    onChange({ ...settings, [key]: normalized });
   }
 
   return (
@@ -549,6 +574,34 @@ function RobotConfigMenu({
             onChange={(value) => updateNumber("martingaleMultiplier", value)}
           />
         ) : null}
+
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-xs font-semibold">
+          <span>Usar IA para analisar candles</span>
+          <input
+            type="checkbox"
+            checked={settings.aiAnalysisEnabled}
+            onChange={(event) => onChange({ ...settings, aiAnalysisEnabled: event.target.checked })}
+            className="h-4 w-4 accent-white"
+          />
+        </label>
+
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-xs font-semibold">
+          <span>Exigir aprovacao da IA</span>
+          <input
+            type="checkbox"
+            checked={settings.aiConfirmationRequired}
+            onChange={(event) =>
+              onChange({ ...settings, aiConfirmationRequired: event.target.checked })
+            }
+            className="h-4 w-4 accent-white"
+          />
+        </label>
+
+        <ConfigNumber
+          label="Confianca minima IA"
+          value={settings.aiMinConfidence}
+          onChange={(value) => updateNumber("aiMinConfidence", value)}
+        />
       </div>
 
       <button

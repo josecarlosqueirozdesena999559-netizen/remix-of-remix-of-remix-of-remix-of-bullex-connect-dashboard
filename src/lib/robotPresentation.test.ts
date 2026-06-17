@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { getRobotAiReview } from "./robotAi.ts";
 import { getRobotPresentation, resetRobotPresentationState } from "./robotPresentation.ts";
 import type { RobotState } from "../hooks/useRobotState.ts";
 import { getRobotStateRefetchInterval } from "./robotPolling.ts";
@@ -229,7 +230,26 @@ test("SENDING_ORDER e PENDING_RESULT usam os novos textos de operacao", () => {
   assert.equal(pending.footer, "Expira em 00:29");
 });
 
-function createSignal() {
+test("analise da IA mostra bloqueio e fallback local quando necessario", () => {
+  const blocked = getRobotAiReview(
+    createSignal({
+      ai_approved: false,
+      ai_block_reason: "mercado_lateral",
+    }),
+  );
+  const fallback = getRobotAiReview(
+    createSignal({
+      ai_error: "timeout",
+    }),
+  );
+
+  assert.equal(blocked?.statusLabel, "Reprovado");
+  assert.equal(blocked?.blockMessage, "IA bloqueou entrada: mercado lateral");
+  assert.equal(fallback?.statusLabel, "Indisponivel");
+  assert.equal(fallback?.fallbackMessage, "IA indisponivel, usando analise tecnica local.");
+});
+
+function createSignal(overrides: Partial<NonNullable<RobotState["pending_signal"]>> = {}) {
   return {
     symbol: "EURUSD-OTC",
     direction: "CALL" as const,
@@ -241,6 +261,15 @@ function createSignal() {
     payout: 84,
     reason: "Rompimento com confirmacao",
     created_at: "2026-06-14T12:00:00Z",
+    ai_approved: null,
+    ai_confidence: null,
+    ai_risk: null,
+    ai_candle_reading: null,
+    ai_entry_reason: null,
+    ai_voice_text: null,
+    ai_block_reason: null,
+    ai_error: null,
+    ...overrides,
   };
 }
 
@@ -282,6 +311,9 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     entry_value: null,
     stop_win: null,
     stop_loss: null,
+    ai_analysis_enabled: false,
+    ai_confirmation_required: false,
+    ai_min_confidence: null,
     seconds_until_entry: 0,
     martingale_enabled: false,
     martingale_multiplier: 2,

@@ -38,6 +38,9 @@ export function useRobotSettings(userId?: string) {
       martingale_enabled: nextSettings.martingaleEnabled,
       martingale_steps: 1,
       martingale_multiplier: nextSettings.martingaleMultiplier,
+      ai_analysis_enabled: nextSettings.aiAnalysisEnabled,
+      ai_confirmation_required: nextSettings.aiConfirmationRequired,
+      ai_min_confidence: nextSettings.aiMinConfidence,
     });
     if (!response.ok) {
       throw new ApiError(response.error, response.code);
