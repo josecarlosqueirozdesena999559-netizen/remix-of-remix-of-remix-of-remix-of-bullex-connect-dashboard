@@ -448,35 +448,39 @@ function RobotPage() {
             />
           </label>
 
-          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
-            <span>Exigir aprovacao da IA</span>
-            <input
-              type="checkbox"
-              checked={settings.aiConfirmationRequired}
-              onChange={(event) =>
-                setSettings({ ...settings, aiConfirmationRequired: event.target.checked })
-              }
-              className="h-4 w-4 accent-primary"
-            />
-          </label>
+          {settings.aiAnalysisEnabled ? (
+            <>
+              <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
+                <span>Exigir aprovacao da IA</span>
+                <input
+                  type="checkbox"
+                  checked={settings.aiConfirmationRequired}
+                  onChange={(event) =>
+                    setSettings({ ...settings, aiConfirmationRequired: event.target.checked })
+                  }
+                  className="h-4 w-4 accent-primary"
+                />
+              </label>
 
-          <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
-            <span className="mb-2 block text-sm font-medium">Confianca minima da IA</span>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              step="1"
-              value={settings.aiMinConfidence}
-              onChange={(event) =>
-                setSettings({
-                  ...settings,
-                  aiMinConfidence: clampPercentage(event.target.value, settings.aiMinConfidence),
-                })
-              }
-              className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
-            />
-          </label>
+              <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
+                <span className="mb-2 block text-sm font-medium">Confianca minima da IA</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={settings.aiMinConfidence}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      aiMinConfidence: clampPercentage(event.target.value, settings.aiMinConfidence),
+                    })
+                  }
+                  className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
+                />
+              </label>
+            </>
+          ) : null}
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
