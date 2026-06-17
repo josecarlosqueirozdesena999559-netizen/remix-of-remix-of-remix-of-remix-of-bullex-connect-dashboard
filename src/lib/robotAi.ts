@@ -1,4 +1,4 @@
-import type { RobotSignal } from "../hooks/useRobotState.ts";
+import type { RobotSignal, RobotState } from "../hooks/useRobotState.ts";
 import { formatFriendlyRobotText } from "./robotPresentation.ts";
 
 export type RobotAiReview = {
@@ -37,6 +37,18 @@ export function getRobotAiReview(signal: RobotSignal | null | undefined): RobotA
     fallbackMessage,
     voiceText: signal.ai_voice_text?.trim() ? signal.ai_voice_text.trim() : null,
   };
+}
+
+export function getVisibleRobotAiSignal(
+  robotState: RobotState | undefined,
+  signal: RobotSignal | null | undefined,
+): RobotSignal | null {
+  if (!robotState || !signal) return null;
+
+  return robotState.status === "WAITING_ENTRY_WINDOW" ||
+    robotState.status === "WAITING_NEXT_CANDLE_ENTRY"
+    ? signal
+    : null;
 }
 
 function getAiStatusLabel(approved: boolean | null, fallbackMessage: string | null) {

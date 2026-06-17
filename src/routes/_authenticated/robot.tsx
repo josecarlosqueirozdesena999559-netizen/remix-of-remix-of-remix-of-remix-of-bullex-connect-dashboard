@@ -9,7 +9,7 @@ import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
-import { getRobotAiReview } from "@/lib/robotAi";
+import { getRobotAiReview, getVisibleRobotAiSignal } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 
 export const Route = createFileRoute("/_authenticated/robot")({
@@ -87,10 +87,10 @@ function RobotPage() {
   });
   const syncing = account.isLoading || robotState.isLoading;
   const aiReview = getRobotAiReview(
-    robotPresentation.signal ??
-      displayRobotState?.pending_signal ??
-      displayRobotState?.last_signal ??
-      displayRobotState?.best_candidate,
+    getVisibleRobotAiSignal(
+      displayRobotState,
+      robotPresentation.signal ?? displayRobotState?.pending_signal,
+    ),
   );
   const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
   const connected = account.data?.connected === true || cachedGrace;

@@ -9,7 +9,7 @@ import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
-import { getRobotAiReview } from "@/lib/robotAi";
+import { getRobotAiReview, getVisibleRobotAiSignal } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
 
@@ -93,14 +93,15 @@ export function RobotOverlay({
     ),
     robotState?.fetched_at,
   );
-  const content = getOverlayContent(robotState, now, {
+  const presentation = getRobotPresentation(robotState, now, {
     analysisWindowSeconds,
     nextCycleSeconds,
     entryWindowSeconds: smoothEntryWindowSeconds,
     expirationSeconds: smoothExpirationSeconds,
   });
+  const content = getOverlayContent(robotState, presentation);
   const aiReview = getRobotAiReview(
-    robotState?.pending_signal ?? robotState?.last_signal ?? robotState?.best_candidate,
+    getVisibleRobotAiSignal(robotState, presentation.signal ?? robotState?.pending_signal),
   );
 
   useEffect(() => {
@@ -390,20 +391,8 @@ function getExpirationResetKey(robotState: RobotState | undefined) {
 
 function getOverlayContent(
   robotState: RobotState | undefined,
-  now: number,
-  countdowns: {
-    analysisWindowSeconds: number | null;
-    nextCycleSeconds: number | null;
-    entryWindowSeconds: number | null;
-    expirationSeconds: number | null;
-  },
+  presentation: ReturnType<typeof getRobotPresentation>,
 ): OverlayContent {
-  const presentation = getRobotPresentation(robotState, now, {
-    analysisWindowSeconds: countdowns.analysisWindowSeconds,
-    nextCycleSeconds: countdowns.nextCycleSeconds,
-    entryWindowSeconds: countdowns.entryWindowSeconds,
-    expirationSeconds: countdowns.expirationSeconds,
-  });
   const trade = presentation.trade;
   const signal = presentation.signal;
   const isPositiveResult = presentation.result === "WIN" || presentation.result === "GALE_WIN";
@@ -451,7 +440,7 @@ function getOverlayContent(
         ) : null}
       </>
     );
-  } else if (signal) {
+  } else if (signal && shouldShowSignalDetails(robotState?.status)) {
     const usedStrategies =
       signal.used_strategies.length > 0
         ? signal.used_strategies
@@ -481,6 +470,10 @@ function getOverlayContent(
     details,
     footer: presentation.footer,
   };
+}
+
+function shouldShowSignalDetails(status: RobotState["status"] | undefined) {
+  return status === "WAITING_ENTRY_WINDOW" || status === "WAITING_NEXT_CANDLE_ENTRY";
 }
 
 function TradeIdentity({ active, direction }: { active: string; direction: RobotDirection }) {
