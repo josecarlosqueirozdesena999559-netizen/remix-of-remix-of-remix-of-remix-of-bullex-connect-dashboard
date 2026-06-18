@@ -87,8 +87,8 @@ export function useRobotStats(days: RobotHistoryDays) {
 }
 
 function normalizeHistory(input: unknown): RobotHistoryItem[] {
-  const payload = asRecord(input);
-  const items = Array.isArray(input) ? input : Array.isArray(payload.items) ? payload.items : [];
+  const payload = unwrapHistoryPayload(input);
+  const items = extractHistoryItems(payload, input);
 
   return items.map(normalizeHistoryItem).filter(Boolean) as RobotHistoryItem[];
 }
@@ -97,10 +97,18 @@ function normalizeHistoryItem(input: unknown): RobotHistoryItem | null {
   const value = asRecord(input);
   const active = text(value.active ?? value.symbol);
   const direction = text(value.direction ?? value.signal).toUpperCase();
-  const result = text(value.result).toUpperCase();
+  const result = normalizeHistoryResult(
+    value.result ??
+      value.cycle_result ??
+      value.cycleResult ??
+      value.outcome ??
+      value.trade_result ??
+      value.tradeResult ??
+      value.status,
+  );
 
   if (!active || (direction !== "CALL" && direction !== "PUT")) return null;
-  if (result !== "WIN" && result !== "LOSS") return null;
+  if (!result) return null;
 
   return {
     id: text(value.id) || `${active}:${text(value.finished_at ?? value.finishedAt)}`,
@@ -108,16 +116,18 @@ function normalizeHistoryItem(input: unknown): RobotHistoryItem | null {
     accountMode: normalizeAccountMode(value.account_mode ?? value.accountMode),
     active,
     direction,
-    amount: number(value.amount) ?? 0,
+    amount: number(value.amount ?? value.entry_value ?? value.entryValue ?? value.value) ?? 0,
     confidence: percentage(value.confidence),
     payout: percentage(value.payout),
     orderId: optionalText(value.order_id ?? value.orderId),
     result,
     badge: normalizeBadge(value),
-    profit: number(value.profit) ?? 0,
-    openedAt: optionalText(value.opened_at ?? value.openedAt),
-    finishedAt: optionalText(value.finished_at ?? value.finishedAt),
-    timeframe: optionalText(value.timeframe),
+    profit: number(value.profit ?? value.pnl ?? value.result_amount ?? value.resultAmount) ?? 0,
+    openedAt: optionalText(value.opened_at ?? value.openedAt ?? value.sent_at ?? value.sentAt),
+    finishedAt: optionalText(
+      value.finished_at ?? value.finishedAt ?? value.closed_at ?? value.closedAt,
+    ),
+    timeframe: optionalText(value.timeframe ?? value.expiration ?? value.expiration_type),
   };
 }
 
@@ -138,14 +148,18 @@ function normalizeBadge(value: Record<string, unknown>): RobotHistoryItem["badge
 }
 
 function normalizeStats(input: unknown): RobotStats {
-  const value = asRecord(input);
+  const value = unwrapStatsPayload(input);
   return {
-    wins: nonNegative(value.wins),
-    losses: nonNegative(value.losses),
-    totalTrades: nonNegative(value.total_trades ?? value.totalTrades),
-    winRate: percentage(value.win_rate ?? value.winRate) ?? 0,
-    profit: number(value.profit) ?? 0,
-    profitFactor: finiteOrNull(value.profit_factor ?? value.profitFactor),
+    wins: nonNegative(value.wins ?? value.won ?? value.win_count ?? value.winCount),
+    losses: nonNegative(value.losses ?? value.loss_count ?? value.lossCount),
+    totalTrades: nonNegative(
+      value.total_trades ?? value.totalTrades ?? value.total ?? value.trades ?? value.operations,
+    ),
+    winRate: percentage(value.win_rate ?? value.winRate ?? value.assertiveness ?? value.hit_rate) ?? 0,
+    profit: number(value.profit ?? value.pnl ?? value.total_profit ?? value.totalProfit) ?? 0,
+    profitFactor: finiteOrNull(
+      value.profit_factor ?? value.profitFactor ?? value.factor ?? value.payoff,
+    ),
     currentWinStreak: nonNegative(value.current_win_streak ?? value.currentWinStreak),
     currentLossStreak: nonNegative(value.current_loss_streak ?? value.currentLossStreak),
     bestWinStreak: nonNegative(value.best_win_streak ?? value.bestWinStreak),
@@ -155,6 +169,70 @@ function normalizeStats(input: unknown): RobotStats {
 
 export function getEmptyRobotStats() {
   return EMPTY_STATS;
+}
+
+function unwrapHistoryPayload(input: unknown): Record<string, unknown> {
+  let value = asRecord(input);
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (
+      Array.isArray(value.items) ||
+      Array.isArray(value.history) ||
+      Array.isArray(value.trades) ||
+      Array.isArray(value.operations) ||
+      Array.isArray(value.records)
+    ) {
+      return value;
+    }
+
+    const nested = value.data ?? value.result ?? value.payload;
+    const nextValue = asRecord(nested);
+    if (Object.keys(nextValue).length === 0) break;
+    value = nextValue;
+  }
+
+  return value;
+}
+
+function extractHistoryItems(payload: Record<string, unknown>, originalInput: unknown) {
+  if (Array.isArray(originalInput)) return originalInput;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.history)) return payload.history;
+  if (Array.isArray(payload.trades)) return payload.trades;
+  if (Array.isArray(payload.operations)) return payload.operations;
+  if (Array.isArray(payload.records)) return payload.records;
+  if (Array.isArray(payload.results)) return payload.results;
+  return [];
+}
+
+function unwrapStatsPayload(input: unknown): Record<string, unknown> {
+  let value = asRecord(input);
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (
+      "wins" in value ||
+      "losses" in value ||
+      "total_trades" in value ||
+      "totalTrades" in value ||
+      "profit" in value
+    ) {
+      return value;
+    }
+
+    const nested = value.stats ?? value.data ?? value.result ?? value.summary ?? value.overview;
+    const nextValue = asRecord(nested);
+    if (Object.keys(nextValue).length === 0) break;
+    value = nextValue;
+  }
+
+  return value;
+}
+
+function normalizeHistoryResult(input: unknown): RobotHistoryItem["result"] | null {
+  const value = text(input).toUpperCase();
+  if (value === "WIN" || value === "GALE_WIN" || value === "WON") return "WIN";
+  if (value === "LOSS" || value === "GALE_LOSS" || value === "LOST") return "LOSS";
+  return null;
 }
 
 function normalizeAccountMode(input: unknown): "DEMO" | "REAL" | null {
