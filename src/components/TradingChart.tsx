@@ -6,6 +6,7 @@ import {
   LineStyle,
   type IChartApi,
   type ISeriesApi,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { MarketCandle } from "@/hooks/useMarketData";
@@ -14,16 +15,17 @@ const CHART_HEIGHT = 680;
 const MOBILE_CHART_HEIGHT = 560;
 const VISIBLE_CANDLE_COUNT = 32;
 const CHART_RIGHT_OFFSET = 4;
+const CHART_TIME_ZONE = "America/Fortaleza";
 const CHART_THEME = {
   background: "#06101f",
-  text: "#a5b4c7",
-  grid: "#16314f",
-  crosshair: "#6ea8dc",
-  candleUp: "#38bdf8",
-  candleDown: "#fb7185",
-  candleUpWick: "#7dd3fc",
-  candleDownWick: "#fda4af",
-  priceLine: "#60a5fa",
+  text: "#ffffff",
+  grid: "rgba(255, 255, 255, 0.08)",
+  crosshair: "#ffffff",
+  candleUp: "#00C853",
+  candleDown: "#FF1744",
+  candleUpWick: "#00C853",
+  candleDownWick: "#FF1744",
+  priceLine: "#ffffff",
   border: "#1d4f91",
   overlayBg: "rgba(3, 12, 26, 0.92)",
 } as const;
@@ -55,6 +57,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevSymbolRef = useRef("");
   const prevLengthRef = useRef(0);
+  const latestTimeRef = useRef<number | null>(null);
   const [hoveredCandle, setHoveredCandle] = useState<MarketCandle | null>(null);
 
   useEffect(() => {
@@ -67,6 +70,10 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       layout: {
         background: { color: CHART_THEME.background },
         textColor: CHART_THEME.text,
+      },
+      localization: {
+        locale: "pt-BR",
+        timeFormatter: (time) => formatDateTimeLabel(time),
       },
       grid: {
         vertLines: { color: CHART_THEME.grid, style: LineStyle.Solid },
@@ -103,22 +110,11 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         rightOffset: CHART_RIGHT_OFFSET,
         barSpacing: 12,
         minBarSpacing: 5,
+        tickMarkFormatter: (time) => formatAxisTimeLabel(time),
       },
     });
 
-    const candleOptions = {
-      upColor: CHART_THEME.candleUp,
-      downColor: CHART_THEME.candleDown,
-      borderVisible: false,
-      wickUpColor: CHART_THEME.candleUpWick,
-      wickDownColor: CHART_THEME.candleDownWick,
-      priceLineColor: CHART_THEME.priceLine,
-      lastValueVisible: true,
-      wickVisible: true,
-      priceFormat: buildPriceFormat(symbol, overlay?.currentPrice ?? null),
-    };
-
-    const series = createCandlestickSeries(chart, candleOptions);
+    const series = createSeriesForSymbol(chart, symbol, overlay?.currentPrice ?? null);
 
     chart.subscribeCrosshairMove((param) => {
       if (!param.point || !param.time) {
@@ -126,7 +122,13 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         return;
       }
 
-      const hovered = param.seriesData.get(series) as MarketCandle | undefined;
+      const activeSeries = seriesRef.current;
+      if (!activeSeries) {
+        setHoveredCandle(null);
+        return;
+      }
+
+      const hovered = param.seriesData.get(activeSeries) as MarketCandle | undefined;
       setHoveredCandle(hovered ?? null);
     });
 
@@ -159,26 +161,44 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
     const series = seriesRef.current;
     if (!chart || !series) return;
 
-    series.applyOptions({
-      priceFormat: buildPriceFormat(symbol, overlay?.currentPrice ?? null),
-    });
-
     const symbolChanged = prevSymbolRef.current !== symbol;
-    const latestCandle = candles[candles.length - 1];
+    const latestCandle = candles[candles.length - 1] ?? null;
 
     if (symbolChanged) {
-      console.log("[CHART_SYMBOL_CHANGED]", {
+      console.log("[SYMBOL_CHANGED]", {
         from: prevSymbolRef.current || null,
         to: symbol,
       });
-      series.setData(candles);
-      focusLatestCandles(chart, candles.length);
+      setHoveredCandle(null);
+      const nextSeries = recreateSeries(chart, series, symbol, overlay?.currentPrice ?? null);
+      seriesRef.current = nextSeries;
+      resetChartForSymbolChange(chart, nextSeries, candles);
       prevSymbolRef.current = symbol;
       prevLengthRef.current = candles.length;
+      latestTimeRef.current = latestCandle ? Number(latestCandle.time) : null;
       return;
     }
 
-    if (candles.length === 0) return;
+    series.applyOptions({
+      priceFormat: buildPriceFormat(symbol, overlay?.currentPrice ?? null),
+      upColor: CHART_THEME.candleUp,
+      downColor: CHART_THEME.candleDown,
+      borderUpColor: CHART_THEME.candleUp,
+      borderDownColor: CHART_THEME.candleDown,
+      wickUpColor: CHART_THEME.candleUpWick,
+      wickDownColor: CHART_THEME.candleDownWick,
+    });
+
+    if (candles.length === 0) {
+      series.setData([]);
+      chart.timeScale().fitContent();
+      resetPriceScale(chart);
+      console.log("[CHART_RESET]", { symbol, candles: 0 });
+      console.log("[PRICE_SCALE_RESET]", { symbol, reason: "empty_data" });
+      prevLengthRef.current = 0;
+      latestTimeRef.current = null;
+      return;
+    }
 
     if (
       prevLengthRef.current === 0 ||
@@ -186,9 +206,18 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       candles.length - prevLengthRef.current > 1
     ) {
       series.setData(candles);
-      focusLatestCandles(chart, candles.length);
+      resetPriceScale(chart);
+      console.log("[PRICE_SCALE_RESET]", { symbol, reason: "setData" });
+      latestTimeRef.current = latestCandle ? Number(latestCandle.time) : null;
     } else if (latestCandle) {
+      const nextTime = Number(latestCandle.time);
+      const previousTime = latestTimeRef.current;
       series.update(latestCandle);
+      latestTimeRef.current = nextTime;
+
+      if (previousTime == null || nextTime !== previousTime) {
+        console.log("[TIMESCALE_FIXED]", { symbol, latest_time: latestCandle.time });
+      }
     }
 
     prevLengthRef.current = candles.length;
@@ -205,7 +234,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
           background:
             "radial-gradient(circle at top, rgba(29,78,216,0.16), transparent 35%), linear-gradient(180deg, #07111f 0%, #030712 100%)",
           borderColor: CHART_THEME.border,
-          boxShadow: "inset 0 1px 0 rgba(125,211,252,0.08), 0 16px 44px rgba(2, 6, 23, 0.45)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 44px rgba(2, 6, 23, 0.45)",
         }}
       />
 
@@ -213,21 +242,21 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         className="pointer-events-none absolute left-8 top-8 z-20 max-w-[min(92%,420px)] rounded-xl border px-4 py-3 text-xs shadow-lg backdrop-blur"
         style={{
           background: CHART_THEME.overlayBg,
-          borderColor: "rgba(96, 165, 250, 0.28)",
+          borderColor: "rgba(255, 255, 255, 0.16)",
         }}
       >
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
           <OverlayRow label="Ativo atual" value={symbol} />
           <OverlayRow
-            label="Preço atual"
+            label="PreÃ§o atual"
             value={overlay?.currentPrice != null ? formatNumber(overlay.currentPrice) : "-"}
           />
           <OverlayRow label="Timeframe" value={timeframe} />
           <OverlayRow label="Status" value={overlay?.realtimeStatus ?? "-"} />
           <OverlayRow label="Melhor ativo" value={overlay?.bestSymbol ?? "-"} />
-          <OverlayRow label="Direção" value={overlay?.direction ?? "-"} />
-          <OverlayRow label="Score/confiança" value={formatScoreConfidence(overlay)} />
-          <OverlayRow label="Estratégia" value={overlay?.strategy ?? "-"} />
+          <OverlayRow label="DireÃ§Ã£o" value={overlay?.direction ?? "-"} />
+          <OverlayRow label="Score/confianÃ§a" value={formatScoreConfidence(overlay)} />
+          <OverlayRow label="EstratÃ©gia" value={overlay?.strategy ?? "-"} />
           <OverlayRow label="Entrada em" value={overlay?.entryCountdown ?? "-"} />
           <OverlayRow label="WIN/LOSS" value={overlay?.result ?? "-"} />
         </div>
@@ -238,7 +267,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
           className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur"
           style={{
             background: CHART_THEME.overlayBg,
-            borderColor: "rgba(96, 165, 250, 0.28)",
+            borderColor: "rgba(255, 255, 255, 0.16)",
           }}
         >
           <div className="font-semibold text-foreground">{formatTime(displayedCandle.time)}</div>
@@ -267,6 +296,8 @@ function createCandlestickSeries(
     upColor: string;
     downColor: string;
     borderVisible: boolean;
+    borderUpColor: string;
+    borderDownColor: string;
     wickUpColor: string;
     wickDownColor: string;
     priceLineColor: string;
@@ -294,9 +325,36 @@ function createCandlestickSeries(
   throw new Error("Lightweight Charts candlestick API not available");
 }
 
+function createSeriesForSymbol(chart: IChartApi, symbol: string, lastPrice: number | null) {
+  return createCandlestickSeries(chart, {
+    upColor: CHART_THEME.candleUp,
+    downColor: CHART_THEME.candleDown,
+    borderVisible: true,
+    borderUpColor: CHART_THEME.candleUp,
+    borderDownColor: CHART_THEME.candleDown,
+    wickUpColor: CHART_THEME.candleUpWick,
+    wickDownColor: CHART_THEME.candleDownWick,
+    priceLineColor: CHART_THEME.priceLine,
+    lastValueVisible: true,
+    wickVisible: true,
+    priceFormat: buildPriceFormat(symbol, lastPrice),
+  });
+}
+
+function recreateSeries(
+  chart: IChartApi,
+  currentSeries: CandlestickSeriesApi,
+  symbol: string,
+  lastPrice: number | null,
+) {
+  chart.removeSeries(currentSeries);
+  return createSeriesForSymbol(chart, symbol, lastPrice);
+}
+
 function focusLatestCandles(chart: IChartApi, candleCount: number) {
   if (candleCount <= 0) {
     chart.timeScale().fitContent();
+    console.log("[TIMESCALE_FIXED]", { visible_candles: 0 });
     return;
   }
 
@@ -305,6 +363,28 @@ function focusLatestCandles(chart: IChartApi, candleCount: number) {
     from: Math.max(0, candleCount - VISIBLE_CANDLE_COUNT),
     to: lastIndex + CHART_RIGHT_OFFSET,
   });
+  console.log("[TIMESCALE_FIXED]", { visible_candles: candleCount });
+}
+
+function resetPriceScale(chart: IChartApi) {
+  chart.priceScale("right").applyOptions({
+    autoScale: true,
+  });
+}
+
+function resetChartForSymbolChange(
+  chart: IChartApi,
+  series: CandlestickSeriesApi,
+  candles: MarketCandle[],
+) {
+  console.log("[CHART_RESET]", { candles: candles.length });
+  series.setData([]);
+  chart.timeScale().resetTimeScale();
+  resetPriceScale(chart);
+  console.log("[PRICE_SCALE_RESET]", { reason: "symbol_change" });
+  series.setData(candles);
+  chart.timeScale().fitContent();
+  focusLatestCandles(chart, candles.length);
 }
 
 function buildPriceFormat(symbol: string, lastPrice: number | null) {
@@ -338,7 +418,47 @@ function formatTime(value: UTCTimestamp) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    timeZone: CHART_TIME_ZONE,
   }).format(date);
+}
+
+function formatAxisTimeLabel(time: Time) {
+  const date = toDate(time);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: CHART_TIME_ZONE,
+  }).format(date);
+}
+
+function formatDateTimeLabel(time: Time) {
+  const date = toDate(time);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: CHART_TIME_ZONE,
+  }).format(date);
+}
+
+function toDate(time: Time) {
+  if (typeof time === "number") {
+    return new Date(time * 1000);
+  }
+
+  if ("timestamp" in time && typeof time.timestamp === "number") {
+    return new Date(time.timestamp * 1000);
+  }
+
+  if ("year" in time && "month" in time && "day" in time) {
+    return new Date(Date.UTC(time.year, time.month - 1, time.day));
+  }
+
+  return null;
 }
 
 function formatNumber(value: number) {

@@ -32,6 +32,7 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
 
   useEffect(() => {
     if (!symbol) {
+      candlesCacheRef.current.clear();
       setCandles([]);
       setLastPrice(null);
       setSelectedPayout(null);
@@ -55,12 +56,16 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
     let payoutController: AbortController | null = null;
 
     const cachedCandles = candlesCacheRef.current.get(symbol) ?? [];
+    setCandles(cachedCandles);
     if (cachedCandles.length > 0) {
       setCandles(cachedCandles);
       const latestCached = cachedCandles[cachedCandles.length - 1] ?? null;
       setLastPrice(latestCached?.close ?? null);
       setLastCandleTimestamp(latestCached?.time ?? null);
       hasInitialCandles = true;
+    } else {
+      setLastPrice(null);
+      setLastCandleTimestamp(null);
     }
 
     setSelectedPayout(null);
@@ -252,11 +257,23 @@ function normalizeCandlesPayload(active: string, input: unknown): MarketCandle[]
   }
 
   const byTime = new Map<number, MarketCandle>();
+  const seenTimes = new Set<number>();
 
   for (const item of raw) {
-    const candle = normalizeCandle(item);
+    const candle = normalizeCandle(item, active);
     if (!candle) continue;
 
+    const candleTime = Number(candle.time);
+    if (seenTimes.has(candleTime)) {
+      console.warn("[INVALID_CANDLE_DROPPED]", {
+        active,
+        reason: "duplicate_timestamp",
+        time: candle.time,
+      });
+      continue;
+    }
+
+    seenTimes.add(candleTime);
     byTime.set(Number(candle.time), candle);
     console.log("[CHART_CANDLE_NORMALIZED]", {
       active,
@@ -271,7 +288,7 @@ function normalizeCandlesPayload(active: string, input: unknown): MarketCandle[]
   return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
 }
 
-function normalizeCandle(raw: unknown): MarketCandle | null {
+function normalizeCandle(raw: unknown, active: string): MarketCandle | null {
   if (!raw || typeof raw !== "object") return null;
 
   const wrapper = raw as Record<string, unknown>;
@@ -285,14 +302,33 @@ function normalizeCandle(raw: unknown): MarketCandle | null {
   const low = normalizeNumber(candle.low ?? candle.min);
   const close = normalizeNumber(candle.close);
 
-  if (open == null || high == null || low == null || close == null) return null;
+  if (open == null || high == null || low == null || close == null) {
+    console.warn("[INVALID_CANDLE_DROPPED]", { active, reason: "nan_price", raw });
+    return null;
+  }
+
+  if (open <= 0 || high <= 0 || low <= 0 || close <= 0) {
+    console.warn("[INVALID_CANDLE_DROPPED]", { active, reason: "zero_or_negative_price", raw });
+    return null;
+  }
+
+  if (high < low) {
+    console.warn("[INVALID_CANDLE_DROPPED]", { active, reason: "high_below_low", raw });
+    return null;
+  }
 
   const timeValue = candle.time ?? candle.from ?? candle.at ?? candle.timestamp;
   const parsedTime = normalizeNumber(timeValue);
-  const timeInSeconds =
-    parsedTime == null
-      ? Math.floor(Date.now() / 1000)
-      : Math.floor(parsedTime > 10_000_000_000 ? parsedTime / 1000 : parsedTime);
+  if (parsedTime == null) {
+    console.warn("[INVALID_CANDLE_DROPPED]", { active, reason: "invalid_timestamp", raw });
+    return null;
+  }
+
+  const timeInSeconds = Math.floor(parsedTime > 10_000_000_000 ? parsedTime / 1000 : parsedTime);
+  if (!Number.isFinite(timeInSeconds) || timeInSeconds <= 0) {
+    console.warn("[INVALID_CANDLE_DROPPED]", { active, reason: "non_finite_timestamp", raw });
+    return null;
+  }
 
   return {
     time: timeInSeconds as UTCTimestamp,

@@ -30,6 +30,7 @@ type Asset = {
 const EMPTY_ASSETS: Asset[] = [];
 const DEFAULT_SYMBOL = "EURUSD-OTC";
 const DEFAULT_TIMEFRAME = "M1";
+const CHART_TIME_ZONE = "America/Fortaleza";
 
 function MarketPage() {
   const { user } = useAuth();
@@ -516,6 +517,7 @@ function formatTime(value: UTCTimestamp) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    timeZone: CHART_TIME_ZONE,
   }).format(date);
 }
 
@@ -524,6 +526,7 @@ function formatDateTime(value: Date) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    timeZone: CHART_TIME_ZONE,
   }).format(value);
 }
 
