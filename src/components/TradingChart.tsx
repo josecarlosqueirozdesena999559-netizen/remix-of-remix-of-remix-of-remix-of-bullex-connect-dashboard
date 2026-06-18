@@ -14,6 +14,19 @@ const CHART_HEIGHT = 680;
 const MOBILE_CHART_HEIGHT = 560;
 const VISIBLE_CANDLE_COUNT = 32;
 const CHART_RIGHT_OFFSET = 4;
+const CHART_THEME = {
+  background: "#06101f",
+  text: "#a5b4c7",
+  grid: "#16314f",
+  crosshair: "#6ea8dc",
+  candleUp: "#38bdf8",
+  candleDown: "#fb7185",
+  candleUpWick: "#7dd3fc",
+  candleDownWick: "#fda4af",
+  priceLine: "#60a5fa",
+  border: "#1d4f91",
+  overlayBg: "rgba(3, 12, 26, 0.92)",
+} as const;
 
 type TradingChartOverlay = {
   currentPrice: number | null;
@@ -52,23 +65,23 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       width: Math.max(1, Math.floor(container.getBoundingClientRect().width)),
       height: CHART_HEIGHT,
       layout: {
-        background: { color: "#111827" },
-        textColor: "#9CA3AF",
+        background: { color: CHART_THEME.background },
+        textColor: CHART_THEME.text,
       },
       grid: {
-        vertLines: { color: "#1F2937", style: LineStyle.Solid },
-        horzLines: { color: "#1F2937", style: LineStyle.Solid },
+        vertLines: { color: CHART_THEME.grid, style: LineStyle.Solid },
+        horzLines: { color: CHART_THEME.grid, style: LineStyle.Solid },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: "#6B7280",
+          color: CHART_THEME.crosshair,
           style: LineStyle.Dashed,
           width: 1,
           labelVisible: true,
         },
         horzLine: {
-          color: "#6B7280",
+          color: CHART_THEME.crosshair,
           style: LineStyle.Dashed,
           width: 1,
           labelVisible: true,
@@ -94,12 +107,12 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
     });
 
     const candleOptions = {
-      upColor: "#22C55E",
-      downColor: "#EF4444",
+      upColor: CHART_THEME.candleUp,
+      downColor: CHART_THEME.candleDown,
       borderVisible: false,
-      wickUpColor: "#22C55E",
-      wickDownColor: "#EF4444",
-      priceLineColor: "#22C55E",
+      wickUpColor: CHART_THEME.candleUpWick,
+      wickDownColor: CHART_THEME.candleDownWick,
+      priceLineColor: CHART_THEME.priceLine,
       lastValueVisible: true,
       wickVisible: true,
       priceFormat: buildPriceFormat(symbol, overlay?.currentPrice ?? null),
@@ -187,10 +200,22 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
     <div className="relative min-h-[592px] p-4 md:min-h-[712px]">
       <div
         ref={containerRef}
-        className="h-[560px] w-full overflow-hidden rounded-xl border border-border/60 bg-card md:h-[680px]"
+        className="h-[560px] w-full overflow-hidden rounded-xl border md:h-[680px]"
+        style={{
+          background:
+            "radial-gradient(circle at top, rgba(29,78,216,0.16), transparent 35%), linear-gradient(180deg, #07111f 0%, #030712 100%)",
+          borderColor: CHART_THEME.border,
+          boxShadow: "inset 0 1px 0 rgba(125,211,252,0.08), 0 16px 44px rgba(2, 6, 23, 0.45)",
+        }}
       />
 
-      <div className="pointer-events-none absolute left-8 top-8 z-20 max-w-[min(92%,420px)] rounded-xl border border-border/80 bg-background/95 px-4 py-3 text-xs shadow-lg backdrop-blur">
+      <div
+        className="pointer-events-none absolute left-8 top-8 z-20 max-w-[min(92%,420px)] rounded-xl border px-4 py-3 text-xs shadow-lg backdrop-blur"
+        style={{
+          background: CHART_THEME.overlayBg,
+          borderColor: "rgba(96, 165, 250, 0.28)",
+        }}
+      >
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
           <OverlayRow label="Ativo atual" value={symbol} />
           <OverlayRow
@@ -209,7 +234,13 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       </div>
 
       {displayedCandle && (
-        <div className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border border-border/80 bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur">
+        <div
+          className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur"
+          style={{
+            background: CHART_THEME.overlayBg,
+            borderColor: "rgba(96, 165, 250, 0.28)",
+          }}
+        >
           <div className="font-semibold text-foreground">{formatTime(displayedCandle.time)}</div>
           <div className="mt-1 text-muted-foreground">Open {formatNumber(displayedCandle.open)}</div>
           <div className="text-muted-foreground">High {formatNumber(displayedCandle.high)}</div>
