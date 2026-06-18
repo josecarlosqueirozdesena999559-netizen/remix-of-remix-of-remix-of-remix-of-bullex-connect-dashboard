@@ -18,6 +18,8 @@ export type RobotHistoryItem = {
   orderId: string | null;
   result: "WIN" | "LOSS";
   badge: "NORMAL" | "GALE 1" | "GALE WIN" | "GALE LOSS";
+  isGale: boolean;
+  galeStep: number | null;
   profit: number;
   openedAt: string | null;
   finishedAt: string | null;
@@ -65,7 +67,7 @@ export function useRobotHistory(days: RobotHistoryDays) {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 1,
-    staleTime: 15000,
+    staleTime: 0,
   });
 }
 
@@ -124,6 +126,10 @@ function normalizeHistoryItem(input: unknown): RobotHistoryItem | null {
     orderId: optionalText(value.order_id ?? value.orderId),
     result,
     badge: normalizeBadge(value),
+    isGale: normalizeIsGale(value),
+    galeStep: number(
+      value.gale_step ?? value.galeStep ?? value.martingale_step ?? value.martingaleStep,
+    ),
     profit: number(value.profit ?? value.pnl ?? value.result_amount ?? value.resultAmount) ?? 0,
     openedAt: optionalText(value.opened_at ?? value.openedAt ?? value.sent_at ?? value.sentAt),
     finishedAt: optionalText(
@@ -147,6 +153,14 @@ function normalizeBadge(value: Record<string, unknown>): RobotHistoryItem["badge
     value.gale_step ?? value.galeStep ?? value.martingale_step ?? value.martingaleStep,
   );
   return galeStep != null && galeStep >= 1 ? "GALE 1" : "NORMAL";
+}
+
+function normalizeIsGale(value: Record<string, unknown>) {
+  const isGale = boolean(value.is_gale ?? value.isGale ?? value.gale ?? value.martingale);
+  if (isGale != null) return isGale;
+  return (
+    number(value.gale_step ?? value.galeStep ?? value.martingale_step ?? value.martingaleStep) != null
+  );
 }
 
 function normalizeStats(input: unknown): RobotStats {
@@ -269,6 +283,20 @@ function number(input: unknown): number | null {
 function optionalText(input: unknown) {
   const value = text(input);
   return value || null;
+}
+
+function boolean(input: unknown) {
+  if (input === true || input === 1) return true;
+  if (input === false || input === 0) return false;
+  if (typeof input !== "string") return null;
+  const normalized = input.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "sim") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "nao") {
+    return false;
+  }
+  return null;
 }
 
 function text(input: unknown) {

@@ -395,8 +395,8 @@ function getOverlayContent(
 ): OverlayContent {
   const trade = presentation.trade;
   const signal = presentation.signal;
-  const isPositiveResult = presentation.result === "WIN" || presentation.result === "GALE_WIN";
-  const isNegativeResult = presentation.result === "LOSS" || presentation.result === "GALE_LOSS";
+  const isPositiveResult = presentation.result === "WIN";
+  const isNegativeResult = presentation.result === "LOSS";
   const tone =
     presentation.kind === "result"
       ? isPositiveResult
@@ -465,11 +465,19 @@ function getOverlayContent(
   }
 
   return {
-    title: presentation.title,
+    title: formatOverlayTitle(robotState, presentation.title),
     tone,
     details,
     footer: presentation.footer,
   };
+}
+
+function formatOverlayTitle(robotState: RobotState | undefined, title: string) {
+  if (robotState?.last_trade?.is_gale && robotState.last_trade.result === "LOSS") {
+    return "LOSS no Gale";
+  }
+
+  return title;
 }
 
 function shouldShowSignalDetails(status: RobotState["status"] | undefined) {

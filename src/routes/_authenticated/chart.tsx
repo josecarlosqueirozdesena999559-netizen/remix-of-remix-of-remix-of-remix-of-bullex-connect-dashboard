@@ -114,7 +114,7 @@ function MarketPage() {
     isAssetNotAllowed(payoutError);
 
   const overlaySignal = displayRobotState?.pending_signal ?? displayRobotState?.best_candidate ?? null;
-  const overlayResult = displayRobotState?.last_trade?.result ?? null;
+  const overlayResult = getOverlayResult(displayRobotState);
 
   return (
     <div className="space-y-6">
@@ -553,4 +553,18 @@ function formatEntryCountdown(robotState: RobotState | undefined) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = safeSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function getOverlayResult(robotState: RobotState | undefined) {
+  if (!robotState) return null;
+  if (robotState.cycle_result === "WIN" || robotState.cycle_result === "LOSS") {
+    return robotState.cycle_result;
+  }
+  if (robotState.cycle_result === "GALE_WIN") return "WIN";
+  if (robotState.cycle_result === "GALE_LOSS") return "LOSS";
+  if (robotState.gale_pending || robotState.gale_in_progress) return null;
+  if (robotState.last_trade?.result === "WIN" || robotState.last_trade?.result === "LOSS") {
+    return robotState.last_trade.result;
+  }
+  return null;
 }

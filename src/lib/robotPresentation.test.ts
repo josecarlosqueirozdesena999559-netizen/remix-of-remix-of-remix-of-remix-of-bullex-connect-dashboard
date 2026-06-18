@@ -96,7 +96,7 @@ test("WAITING_GALE_ENTRY mostra Gale preparado sem tratar loss inicial como fina
     now,
   );
 
-  assert.equal(presentation.title, "Gale 1 preparado");
+  assert.equal(presentation.title, "Gale preparado");
   assert.equal(presentation.kind, "gale");
   assert.equal(presentation.gale?.active, "EURUSD");
   assert.equal(presentation.gale?.direction, "CALL");
@@ -124,11 +124,11 @@ test("status de envio e resultado pendente do Gale mostram textos especificos", 
     now,
   );
 
-  assert.equal(sending.title, "Enviando Gale 1...");
+  assert.equal(sending.title, "Gale em andamento");
   assert.equal(pending.title, "Aguardando resultado do Gale 1");
 });
 
-test("cycle_result final de Gale mostra WIN ou LOSS final", () => {
+test("cycle_result final de Gale mostra WIN ou LOSS na tela", () => {
   resetRobotPresentationState();
 
   const galeWin = getRobotPresentation(
@@ -155,8 +155,8 @@ test("cycle_result final de Gale mostra WIN ou LOSS final", () => {
     now,
   );
 
-  assert.equal(galeWin.title, "WIN no Gale 1");
-  assert.equal(galeLoss.title, "LOSS final no Gale 1");
+  assert.equal(galeWin.title, "WIN");
+  assert.equal(galeLoss.title, "LOSS");
   resetRobotPresentationState();
 });
 
@@ -167,7 +167,8 @@ test("polling acelera enquanto aguarda resultado", () => {
   );
   assert.equal(getRobotStateRefetchInterval(createRobotState({ result_waiting: true })), 1000);
   assert.equal(getRobotStateRefetchInterval(createRobotState({ status: "PENDING_RESULT" })), 1000);
-  assert.equal(getRobotStateRefetchInterval(createRobotState()), 2000);
+  assert.equal(getRobotStateRefetchInterval(createRobotState()), 1000);
+  assert.equal(getRobotStateRefetchInterval(createRobotState({ enabled: false })), 2000);
 });
 
 test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima vela", () => {
@@ -287,6 +288,8 @@ function createTrade(overrides: Partial<NonNullable<RobotState["last_trade"]>> =
     finished_at: null,
     profit: null,
     gale_step: null,
+    is_gale: false,
+    account_mode: "DEMO" as const,
     ...overrides,
   };
 }
@@ -320,6 +323,8 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     martingale_steps: 1,
     cycle_result: null,
     gale_step: null,
+    gale_pending: false,
+    gale_in_progress: false,
     gale_active: null,
     gale_direction: null,
     gale_amount: null,

@@ -1,6 +1,6 @@
 import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
 
-type RobotResult = "WIN" | "LOSS" | "GALE_WIN" | "GALE_LOSS" | null;
+type RobotResult = "WIN" | "LOSS" | null;
 const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
 let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
@@ -139,19 +139,19 @@ export function getRobotPresentation(
     return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
   }
 
-  if (status === "WAITING_GALE_ENTRY") {
+  if (status === "WAITING_GALE_ENTRY" || robotState.gale_pending) {
     const gale = getGale(robotState);
     return {
-      ...createPresentation("gale", "Gale 1 preparado", null, "Entrada no início da próxima vela"),
+      ...createPresentation("gale", "Gale preparado", null, "Entrada no início da próxima vela"),
       gale,
       direction: gale?.direction ?? null,
     };
   }
 
-  if (status === "SENDING_GALE_ORDER") {
+  if (status === "SENDING_GALE_ORDER" || robotState.gale_in_progress) {
     const gale = getGale(robotState);
     return {
-      ...createPresentation("operation", "Enviando Gale 1..."),
+      ...createPresentation("operation", "Gale em andamento"),
       gale,
       direction: gale?.direction ?? null,
     };
@@ -489,10 +489,10 @@ function getGale(robotState: RobotState): RobotGale | null {
 }
 
 function getCycleResult(robotState: RobotState): Exclude<RobotResult, null> | null {
-  if (robotState.cycle_result === "GALE_WIN") return "GALE_WIN";
-  if (robotState.cycle_result === "GALE_LOSS") return "GALE_LOSS";
   if (robotState.cycle_result === "WIN") return "WIN";
   if (robotState.cycle_result === "LOSS") return "LOSS";
+  if (robotState.cycle_result === "GALE_WIN") return "WIN";
+  if (robotState.cycle_result === "GALE_LOSS") return "LOSS";
   return null;
 }
 
@@ -506,7 +506,5 @@ function isResultStatus(status: string) {
 }
 
 function formatResultTitle(result: Exclude<RobotResult, null>) {
-  if (result === "GALE_WIN") return "WIN no Gale 1";
-  if (result === "GALE_LOSS") return "LOSS final no Gale 1";
   return result;
 }

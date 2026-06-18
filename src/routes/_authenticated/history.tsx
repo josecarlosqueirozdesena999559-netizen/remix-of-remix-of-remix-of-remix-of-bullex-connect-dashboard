@@ -125,8 +125,9 @@ function HistoryPage() {
                 <TableHead>Direção</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Resultado</TableHead>
-                <TableHead>Lucro</TableHead>
+                <TableHead>Lucro/Prejuizo</TableHead>
                 <TableHead>Gale</TableHead>
+                <TableHead>Gale Step</TableHead>
                 <TableHead>Conta</TableHead>
               </TableRow>
             </TableHeader>
@@ -211,9 +212,10 @@ function HistoryRow({ item }: { item: RobotHistoryItem }) {
       </TableCell>
       <TableCell>
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${galeClass}`}>
-          {formatGale(item.badge)}
+          {item.isGale ? "Sim" : "Nao"}
         </span>
       </TableCell>
+      <TableCell>{item.galeStep ?? "-"}</TableCell>
       <TableCell>
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${accountClass}`}>
           {accountLabel}
@@ -238,14 +240,6 @@ function formatMoney(value: number) {
     style: "currency",
     currency: "USD",
   }).format(value);
-}
-
-function formatGale(value: RobotHistoryItem["badge"]) {
-  if (value === "NORMAL") return "Não";
-  if (value === "GALE 1") return "Sim";
-  if (value === "GALE WIN") return "Sim";
-  if (value === "GALE LOSS") return "Sim";
-  return value;
 }
 
 function formatDecimal(value: number) {

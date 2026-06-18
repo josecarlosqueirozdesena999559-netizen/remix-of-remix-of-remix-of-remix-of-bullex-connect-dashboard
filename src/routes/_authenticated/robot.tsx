@@ -33,6 +33,7 @@ function RobotPage() {
   const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [showRealConfirm, setShowRealConfirm] = useState(false);
   const [realConfirmed, setRealConfirmed] = useState(false);
+  const [lastHistoryRefreshKey, setLastHistoryRefreshKey] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const account = useBullExAccount();
@@ -125,9 +126,20 @@ function RobotPage() {
 
     if (!resultStatus && !stopLimitReached && !finalCycleResult && !tradeResult) return;
 
+    const refreshKey = [
+      displayRobotState.cycle_id ?? "-",
+      displayRobotState.cycle_result ?? "-",
+      displayRobotState.last_trade?.order_id ?? "-",
+      displayRobotState.last_trade?.finished_at ?? "-",
+      displayRobotState.last_trade?.result ?? "-",
+    ].join("|");
+    if (lastHistoryRefreshKey === refreshKey) return;
+    setLastHistoryRefreshKey(refreshKey);
+
     void queryClient.invalidateQueries({ queryKey: ROBOT_HISTORY_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: ROBOT_STATS_QUERY_KEY });
   }, [
+    lastHistoryRefreshKey,
     displayRobotState?.cycle_id,
     displayRobotState?.cycle_result,
     displayRobotState?.last_trade?.finished_at,

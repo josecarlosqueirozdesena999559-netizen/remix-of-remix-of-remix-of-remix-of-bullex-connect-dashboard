@@ -44,6 +44,8 @@ export type RobotTrade = {
   finished_at: string | null;
   profit: number | null;
   gale_step: number | null;
+  is_gale: boolean;
+  account_mode: "DEMO" | "REAL" | null;
 };
 
 export type RobotState = {
@@ -74,6 +76,8 @@ export type RobotState = {
   martingale_steps: number;
   cycle_result: string | null;
   gale_step: number | null;
+  gale_pending: boolean;
+  gale_in_progress: boolean;
   gale_active: string | null;
   gale_direction: RobotDirection | null;
   gale_amount: number | null;
@@ -145,7 +149,7 @@ export function useRobotState(userId?: string) {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 1,
-    staleTime: 1000,
+    staleTime: 0,
   });
 }
 
@@ -178,6 +182,8 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     martingale_steps: 1,
     cycle_result: null,
     gale_step: null,
+    gale_pending: false,
+    gale_in_progress: false,
     gale_active: null,
     gale_direction: null,
     gale_amount: null,

@@ -97,6 +97,18 @@ export function normalizeRobotState(input: unknown): RobotState {
       value.active_fallback_in_progress ??
       value.activeFallbackInProgress,
   );
+  const galePending =
+    normalizeBoolean(value.gale_pending ?? value.galePending) || status === "WAITING_GALE_ENTRY";
+  const galeInProgress =
+    normalizeBoolean(
+      value.gale_in_progress ??
+        value.galeInProgress ??
+        value.gale_active_flag ??
+        value.galeActiveFlag ??
+        (typeof value.gale_active === "boolean" ? value.gale_active : null),
+    ) ||
+    status === "SENDING_GALE_ORDER" ||
+    status === "PENDING_GALE_RESULT";
 
   return {
     enabled: normalizeBoolean(value.enabled),
@@ -182,8 +194,10 @@ export function normalizeRobotState(input: unknown): RobotState {
     gale_step: normalizeNumber(
       value.gale_step ?? value.galeStep ?? tradeValue.gale_step ?? tradeValue.galeStep,
     ),
+    gale_pending: galePending,
+    gale_in_progress: galeInProgress,
     gale_active: normalizeOptionalText(
-      value.gale_active ??
+      (typeof value.gale_active === "string" ? value.gale_active : null) ??
         value.galeActive ??
         value.gale_asset ??
         value.galeAsset ??
@@ -386,6 +400,14 @@ function normalizeTrade(input: unknown): RobotTrade | null {
     finished_at: normalizeOptionalText(value.finished_at ?? value.finishedAt),
     profit: normalizeNumber(value.profit ?? value.pnl ?? value.result_amount ?? value.resultAmount),
     gale_step: normalizeNumber(value.gale_step ?? value.galeStep),
+    is_gale: normalizeBoolean(
+      value.is_gale ??
+        value.isGale ??
+        value.gale ??
+        value.martingale ??
+        ((normalizeNumber(value.gale_step ?? value.galeStep) ?? 0) > 0 ? 1 : 0),
+    ),
+    account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode ?? value.mode),
   };
 }
 
