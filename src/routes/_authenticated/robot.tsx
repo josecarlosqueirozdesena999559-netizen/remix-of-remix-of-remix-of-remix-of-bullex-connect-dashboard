@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
@@ -8,6 +9,7 @@ import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
 import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
+import { ROBOT_HISTORY_QUERY_KEY, ROBOT_STATS_QUERY_KEY } from "@/hooks/useRobotHistory";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotAiReview, getVisibleRobotAiSignal } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
@@ -31,6 +33,7 @@ function RobotPage() {
   const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [showRealConfirm, setShowRealConfirm] = useState(false);
   const [realConfirmed, setRealConfirmed] = useState(false);
+  const queryClient = useQueryClient();
 
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
@@ -105,6 +108,36 @@ function RobotPage() {
     await robotState.refetch();
   }
 
+  useEffect(() => {
+    if (!displayRobotState) return;
+    const resultStatus =
+      displayRobotState.status === "RESULT_RECEIVED" ||
+      displayRobotState.status === "GALE_RESULT_RECEIVED";
+    const stopLimitReached = getStopLimit(displayRobotState) != null;
+    const finalCycleResult =
+      displayRobotState.cycle_result === "WIN" ||
+      displayRobotState.cycle_result === "LOSS" ||
+      displayRobotState.cycle_result === "GALE_WIN" ||
+      displayRobotState.cycle_result === "GALE_LOSS";
+    const tradeResult =
+      displayRobotState.last_trade?.result === "WIN" ||
+      displayRobotState.last_trade?.result === "LOSS";
+
+    if (!resultStatus && !stopLimitReached && !finalCycleResult && !tradeResult) return;
+
+    void queryClient.invalidateQueries({ queryKey: ROBOT_HISTORY_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: ROBOT_STATS_QUERY_KEY });
+  }, [
+    displayRobotState?.cycle_id,
+    displayRobotState?.cycle_result,
+    displayRobotState?.last_trade?.finished_at,
+    displayRobotState?.last_trade?.order_id,
+    displayRobotState?.last_trade?.result,
+    displayRobotState?.status,
+    displayRobotState?.stop_reason,
+    queryClient,
+  ]);
+
   async function handleDemoMode() {
     if (!hasBackend || syncing || !connected || modeActionPending || activeMode === "PRACTICE") {
       return;
@@ -164,6 +197,11 @@ function RobotPage() {
       if (robotEnabled) {
         unwrapApiResult(await robotConfig({ enabled: false }));
       } else {
+        if (displayRobotState && getStopLimit(displayRobotState)) {
+          unwrapApiResult(await robotConfig({ enabled: false }));
+          await robotState.refetch();
+        }
+
         unwrapApiResult(
           await robotConfig({
             enabled: true,
@@ -652,4 +690,20 @@ function getExpirationResetKey(robotState: RobotState | undefined) {
 function unwrapApiResult<T>(result: ApiResult<T>) {
   if (!result.ok) throw new ApiError(result.error, result.code);
   return result.data;
+}
+
+function getStopLimit(robotState: RobotState): "STOP_WIN" | "STOP_LOSS" | null {
+  const text = `${robotState.status} ${robotState.stop_reason ?? ""}`
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (text.includes("STOP_WIN") || text.includes("WIN_REACHED") || text.includes("TAKE_PROFIT")) {
+    return "STOP_WIN";
+  }
+
+  if (text.includes("STOP_LOSS") || text.includes("LOSS_REACHED") || text.includes("MAX_LOSS")) {
+    return "STOP_LOSS";
+  }
+
+  return null;
 }

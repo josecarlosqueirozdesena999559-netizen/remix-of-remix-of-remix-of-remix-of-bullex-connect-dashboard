@@ -293,7 +293,7 @@ export function RobotOverlay({
         <video
           src="/robo-wink.webm"
           aria-label="Robô analisando o mercado"
-          className="pointer-events-none h-auto w-[110px] object-contain [filter:sepia(1)_saturate(7)_hue-rotate(190deg)_brightness(0.72)_contrast(1.45)_drop-shadow(0_0_10px_rgba(0,0,42,0.95))_drop-shadow(0_0_5px_rgba(255,255,255,0.28))] sm:w-[170px]"
+          className="pointer-events-none h-auto w-[110px] object-contain [filter:saturate(1.15)_brightness(0.96)_contrast(1.12)_drop-shadow(0_0_10px_rgba(22,101,52,0.35))_drop-shadow(0_0_4px_rgba(255,255,255,0.18))] sm:w-[170px]"
           autoPlay
           loop
           muted

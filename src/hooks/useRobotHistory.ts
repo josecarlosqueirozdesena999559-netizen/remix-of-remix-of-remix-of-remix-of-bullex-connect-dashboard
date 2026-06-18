@@ -3,6 +3,8 @@ import { ApiError, apiRequest } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
 export type RobotHistoryDays = 1 | 7 | 30;
+export const ROBOT_HISTORY_QUERY_KEY = ["robot-history"] as const;
+export const ROBOT_STATS_QUERY_KEY = ["robot-stats"] as const;
 
 export type RobotHistoryItem = {
   id: string;
@@ -52,7 +54,7 @@ export function useRobotHistory(days: RobotHistoryDays) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["robot-history", user?.id, days],
+    queryKey: [...ROBOT_HISTORY_QUERY_KEY, user?.id, days],
     queryFn: async () => {
       const response = await apiRequest<unknown>(`/robot/history?days=${days}`);
       if (!response.ok) throw new ApiError(response.error, response.code);
@@ -71,7 +73,7 @@ export function useRobotStats(days: RobotHistoryDays) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["robot-stats", user?.id, days],
+    queryKey: [...ROBOT_STATS_QUERY_KEY, user?.id, days],
     queryFn: async () => {
       const response = await apiRequest<unknown>(`/robot/stats?days=${days}`);
       if (!response.ok) throw new ApiError(response.error, response.code);
@@ -144,7 +146,7 @@ function normalizeBadge(value: Record<string, unknown>): RobotHistoryItem["badge
   const galeStep = number(
     value.gale_step ?? value.galeStep ?? value.martingale_step ?? value.martingaleStep,
   );
-  return galeStep === 1 ? "GALE 1" : "NORMAL";
+  return galeStep != null && galeStep >= 1 ? "GALE 1" : "NORMAL";
 }
 
 function normalizeStats(input: unknown): RobotStats {
@@ -237,7 +239,9 @@ function normalizeHistoryResult(input: unknown): RobotHistoryItem["result"] | nu
 
 function normalizeAccountMode(input: unknown): "DEMO" | "REAL" | null {
   const mode = text(input).toUpperCase();
-  return mode === "DEMO" || mode === "REAL" ? mode : null;
+  if (mode === "REAL") return "REAL";
+  if (mode === "DEMO" || mode === "PRACTICE") return "DEMO";
+  return null;
 }
 
 function percentage(input: unknown) {

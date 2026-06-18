@@ -114,7 +114,7 @@ function HistoryPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="flex min-h-48 items-center justify-center px-4 text-center text-sm text-muted-foreground">
-            Nenhuma operação finalizada neste período.
+            Nenhuma operação registrada ainda.
           </div>
         ) : (
           <Table>
@@ -124,11 +124,10 @@ function HistoryPage() {
                 <TableHead>Ativo</TableHead>
                 <TableHead>Direção</TableHead>
                 <TableHead>Valor</TableHead>
-                <TableHead>Payout</TableHead>
-                <TableHead>Selo</TableHead>
-                <TableHead>Confiança</TableHead>
                 <TableHead>Resultado</TableHead>
-                <TableHead className="text-right">Lucro</TableHead>
+                <TableHead>Lucro</TableHead>
+                <TableHead>Gale</TableHead>
+                <TableHead>Conta</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -177,7 +176,8 @@ function StatCard({
 function HistoryRow({ item }: { item: RobotHistoryItem }) {
   const isWin = item.result === "WIN";
   const resultClass = isWin ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400";
-  const badgeClass =
+  const directionClass = item.direction === "CALL" ? "text-emerald-400" : "text-red-400";
+  const galeClass =
     item.badge === "NORMAL"
       ? "bg-muted text-muted-foreground"
       : item.badge === "GALE WIN"
@@ -185,7 +185,13 @@ function HistoryRow({ item }: { item: RobotHistoryItem }) {
         : item.badge === "GALE LOSS"
           ? "bg-red-500/15 text-red-400"
           : "bg-amber-500/15 text-amber-300";
-  const directionClass = item.direction === "CALL" ? "text-emerald-400" : "text-red-400";
+  const accountLabel = item.accountMode ?? "-";
+  const accountClass =
+    item.accountMode === "REAL"
+      ? "bg-primary/15 text-primary"
+      : item.accountMode === "DEMO"
+        ? "bg-sky-500/15 text-sky-300"
+        : "bg-muted text-muted-foreground";
 
   return (
     <TableRow>
@@ -195,22 +201,23 @@ function HistoryRow({ item }: { item: RobotHistoryItem }) {
       <TableCell className="font-medium">{item.active}</TableCell>
       <TableCell className={`font-semibold ${directionClass}`}>{item.direction}</TableCell>
       <TableCell>{formatMoney(item.amount)}</TableCell>
-      <TableCell>{formatPercentage(item.payout)}</TableCell>
-      <TableCell>
-        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${badgeClass}`}>
-          {item.badge}
-        </span>
-      </TableCell>
-      <TableCell>{formatPercentage(item.confidence)}</TableCell>
       <TableCell>
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${resultClass}`}>
           {item.result}
         </span>
       </TableCell>
-      <TableCell
-        className={`text-right font-semibold ${isWin ? "text-emerald-400" : "text-red-400"}`}
-      >
+      <TableCell className={`font-semibold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
         {formatMoney(item.profit)}
+      </TableCell>
+      <TableCell>
+        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${galeClass}`}>
+          {formatGale(item.badge)}
+        </span>
+      </TableCell>
+      <TableCell>
+        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${accountClass}`}>
+          {accountLabel}
+        </span>
       </TableCell>
     </TableRow>
   );
@@ -233,8 +240,12 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
-function formatPercentage(value: number | null) {
-  return value == null ? "-" : `${formatDecimal(value)}%`;
+function formatGale(value: RobotHistoryItem["badge"]) {
+  if (value === "NORMAL") return "Não";
+  if (value === "GALE 1") return "Sim";
+  if (value === "GALE WIN") return "Sim";
+  if (value === "GALE LOSS") return "Sim";
+  return value;
 }
 
 function formatDecimal(value: number) {
