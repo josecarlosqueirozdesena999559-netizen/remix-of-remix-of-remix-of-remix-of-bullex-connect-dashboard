@@ -248,15 +248,15 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
           <OverlayRow label="Ativo atual" value={symbol} />
           <OverlayRow
-            label="PreÃ§o atual"
+            label="Preço atual"
             value={overlay?.currentPrice != null ? formatNumber(overlay.currentPrice) : "-"}
           />
           <OverlayRow label="Timeframe" value={timeframe} />
           <OverlayRow label="Status" value={overlay?.realtimeStatus ?? "-"} />
           <OverlayRow label="Melhor ativo" value={overlay?.bestSymbol ?? "-"} />
-          <OverlayRow label="DireÃ§Ã£o" value={overlay?.direction ?? "-"} />
-          <OverlayRow label="Score/confianÃ§a" value={formatScoreConfidence(overlay)} />
-          <OverlayRow label="EstratÃ©gia" value={overlay?.strategy ?? "-"} />
+          <OverlayRow label="Direção" value={overlay?.direction ?? "-"} />
+          <OverlayRow label="Score/confiança" value={formatScoreConfidence(overlay)} />
+          <OverlayRow label="Estratégia" value={overlay?.strategy ?? "-"} />
           <OverlayRow label="Entrada em" value={overlay?.entryCountdown ?? "-"} />
           <OverlayRow label="WIN/LOSS" value={overlay?.result ?? "-"} />
         </div>

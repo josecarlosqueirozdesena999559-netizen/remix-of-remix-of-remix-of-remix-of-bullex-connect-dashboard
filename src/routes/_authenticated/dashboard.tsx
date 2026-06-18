@@ -103,7 +103,7 @@ function Dashboard() {
           tone={acc?.mode === "REAL" ? "negative" : "positive"}
         />
         <LiveCard
-          label="RobÃ´"
+          label="Robô"
           value={robotStatus}
           Icon={Bot}
           tone={robotConnected ? "positive" : syncing ? undefined : "negative"}
