@@ -156,6 +156,10 @@ export function robotStop() {
   return apiRequest<unknown>("/robot/stop", { method: "POST" });
 }
 
+export function robotResetCycle() {
+  return apiRequest<unknown>("/robot/reset-cycle", { method: "POST" });
+}
+
 export function robotState(userId: string) {
   return apiRequest<unknown>("/robot/state", {}, userId);
 }

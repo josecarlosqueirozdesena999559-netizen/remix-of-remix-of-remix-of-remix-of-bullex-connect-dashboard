@@ -6,10 +6,10 @@ import {
   type ReactNode,
 } from "react";
 import { Settings, Volume2, VolumeX, X } from "lucide-react";
+import { toast } from "sonner";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
-import { getRobotAiReview, getVisibleRobotAiSignal } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
 
@@ -100,9 +100,6 @@ export function RobotOverlay({
     expirationSeconds: smoothExpirationSeconds,
   });
   const content = getOverlayContent(robotState, presentation);
-  const aiReview = getRobotAiReview(
-    getVisibleRobotAiSignal(robotState, presentation.signal ?? robotState?.pending_signal),
-  );
 
   useEffect(() => {
     setSettings(savedSettings);
@@ -276,14 +273,18 @@ export function RobotOverlay({
           settings={settings}
           onChange={setSettings}
           onClose={() => setConfigOpen(false)}
-          onSave={() => {
-            void Promise.resolve(onSettingsChange?.(settings))
-              .then(() => {
-                setConfigOpen(false);
-              })
-              .catch((error) => {
-                console.error("[ROBOT CONFIG SAVE ERROR]", error);
-              });
+          onSave={async () => {
+            try {
+              await Promise.resolve(onSettingsChange?.(settings));
+              toast.success("Configurações salvas");
+              setConfigOpen(false);
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Não foi possível salvar as configurações.";
+              toast.error(message);
+              console.error("[ROBOT CONFIG SAVE ERROR]", error);
+              throw error;
+            }
           }}
         />
       ) : null}
@@ -323,19 +324,6 @@ export function RobotOverlay({
         ) : null}
         {content.footer ? (
           <p className="mt-0.5 text-[11px] font-semibold sm:text-xs">{content.footer}</p>
-        ) : null}
-        {aiReview ? (
-          <div className="mt-2 space-y-1 text-[10px] font-semibold leading-snug sm:text-xs">
-            <p>
-              IA: {aiReview.statusLabel}
-              {aiReview.confidenceLabel ? ` | Confianca: ${aiReview.confidenceLabel}` : ""}
-              {aiReview.riskLabel ? ` | Risco: ${aiReview.riskLabel}` : ""}
-            </p>
-            {aiReview.candleReadingLabel ? <p>Candles: {aiReview.candleReadingLabel}</p> : null}
-            {aiReview.entryReasonLabel ? <p>Motivo: {aiReview.entryReasonLabel}</p> : null}
-            {aiReview.blockMessage ? <p className="text-red-300">{aiReview.blockMessage}</p> : null}
-            {aiReview.fallbackMessage ? <p>{aiReview.fallbackMessage}</p> : null}
-          </div>
         ) : null}
       </div>
     </div>
@@ -503,19 +491,21 @@ function RobotConfigMenu({
 }: {
   settings: RobotSettings;
   onChange: (settings: RobotSettings) => void;
-  onSave: () => void;
+  onSave: () => Promise<void>;
   onClose: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
+
   function updateNumber(
-    key: "entryValue" | "stopWin" | "stopLoss" | "martingaleMultiplier" | "aiMinConfidence",
+    key: "entryValue" | "stopWin" | "stopLoss" | "martingaleSteps" | "martingaleMultiplier",
     value: string,
   ) {
     const next = Number(value);
     const normalized =
-      key === "aiMinConfidence"
+      key === "martingaleSteps"
         ? Number.isFinite(next)
-          ? Math.min(100, Math.max(1, Math.round(next)))
-          : settings.aiMinConfidence
+          ? Math.max(1, Math.round(next))
+          : settings.martingaleSteps
         : Number.isFinite(next)
           ? next
           : 0;
@@ -552,14 +542,14 @@ function RobotConfigMenu({
           onChange={(value) => updateNumber("stopLoss", value)}
         />
         <ConfigNumber
-          label="Entrada"
+          label="Valor por entrada"
           value={settings.entryValue}
           step="0.5"
           onChange={(value) => updateNumber("entryValue", value)}
         />
 
         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-xs font-semibold">
-          <span>Usar Martingale / Gale 1</span>
+          <span>Gale ativado</span>
           <input
             type="checkbox"
             checked={settings.martingaleEnabled}
@@ -567,50 +557,36 @@ function RobotConfigMenu({
             className="h-4 w-4 accent-white"
           />
         </label>
-        {settings.martingaleEnabled ? (
-          <ConfigNumber
-            label="Multiplicador Gale"
-            value={settings.martingaleMultiplier}
-            step="0.1"
-            onChange={(value) => updateNumber("martingaleMultiplier", value)}
-          />
-        ) : null}
-
-        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-xs font-semibold">
-          <span>Usar IA para analisar candles</span>
-          <input
-            type="checkbox"
-            checked={settings.aiAnalysisEnabled}
-            onChange={(event) => onChange({ ...settings, aiAnalysisEnabled: event.target.checked })}
-            className="h-4 w-4 accent-white"
-          />
-        </label>
-
-        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-xs font-semibold">
-          <span>Exigir aprovacao da IA</span>
-          <input
-            type="checkbox"
-            checked={settings.aiConfirmationRequired}
-            onChange={(event) =>
-              onChange({ ...settings, aiConfirmationRequired: event.target.checked })
-            }
-            className="h-4 w-4 accent-white"
-          />
-        </label>
 
         <ConfigNumber
-          label="Confianca minima IA"
-          value={settings.aiMinConfidence}
-          onChange={(value) => updateNumber("aiMinConfidence", value)}
+          label="Quantidade de Gales"
+          value={settings.martingaleSteps}
+          step="1"
+          onChange={(value) => updateNumber("martingaleSteps", value)}
+        />
+        <ConfigNumber
+          label="Multiplicador do Gale"
+          value={settings.martingaleMultiplier}
+          step="0.1"
+          onChange={(value) => updateNumber("martingaleMultiplier", value)}
         />
       </div>
 
       <button
         type="button"
-        onClick={onSave}
-        className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
+        onClick={async () => {
+          if (saving) return;
+          setSaving(true);
+          try {
+            await onSave();
+          } finally {
+            setSaving(false);
+          }
+        }}
+        disabled={saving}
+        className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Salvar
+        {saving ? "Salvando..." : "Salvar configurações"}
       </button>
     </div>
   );

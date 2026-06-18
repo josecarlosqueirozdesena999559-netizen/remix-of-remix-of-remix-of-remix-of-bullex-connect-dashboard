@@ -3,6 +3,7 @@ export type RobotSettings = {
   stopWin: number;
   stopLoss: number;
   martingaleEnabled: boolean;
+  martingaleSteps: number;
   martingaleMultiplier: number;
   aiAnalysisEnabled: boolean;
   aiConfirmationRequired: boolean;
@@ -15,6 +16,7 @@ export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   stopWin: 50,
   stopLoss: 30,
   martingaleEnabled: false,
+  martingaleSteps: 1,
   martingaleMultiplier: 2,
   aiAnalysisEnabled: false,
   aiConfirmationRequired: false,
@@ -30,6 +32,7 @@ let pendingConfig: {
   stopWin: number;
   stopLoss: number;
   martingaleEnabled: boolean;
+  martingaleSteps: number;
   martingaleMultiplier: number;
   aiAnalysisEnabled: boolean;
   aiConfirmationRequired: boolean;
@@ -58,6 +61,7 @@ export function markRobotConfigPending(userId: string, settings: RobotSettings) 
     stopWin: currentSettings.stopWin,
     stopLoss: currentSettings.stopLoss,
     martingaleEnabled: currentSettings.martingaleEnabled,
+    martingaleSteps: currentSettings.martingaleSteps,
     martingaleMultiplier: currentSettings.martingaleMultiplier,
     aiAnalysisEnabled: currentSettings.aiAnalysisEnabled,
     aiConfirmationRequired: currentSettings.aiConfirmationRequired,
@@ -74,6 +78,7 @@ export function syncRobotSettings(
     stopWin: number | null;
     stopLoss: number | null;
     martingaleEnabled?: boolean | null;
+    martingaleSteps?: number | null;
     martingaleMultiplier?: number | null;
     aiAnalysisEnabled?: boolean | null;
     aiConfirmationRequired?: boolean | null;
@@ -86,6 +91,7 @@ export function syncRobotSettings(
 
   if (pendingConfig?.userId === userId && backendHasConfig) {
     const backendMartingaleEnabled = settings.martingaleEnabled ?? pendingConfig.martingaleEnabled;
+    const backendMartingaleSteps = settings.martingaleSteps ?? pendingConfig.martingaleSteps;
     const backendMartingaleMultiplier =
       settings.martingaleMultiplier ?? pendingConfig.martingaleMultiplier;
     const backendAiAnalysisEnabled =
@@ -98,6 +104,7 @@ export function syncRobotSettings(
       settings.stopWin === pendingConfig.stopWin &&
       settings.stopLoss === pendingConfig.stopLoss &&
       backendMartingaleEnabled === pendingConfig.martingaleEnabled &&
+      backendMartingaleSteps === pendingConfig.martingaleSteps &&
       backendMartingaleMultiplier === pendingConfig.martingaleMultiplier &&
       backendAiAnalysisEnabled === pendingConfig.aiAnalysisEnabled &&
       backendAiConfirmationRequired === pendingConfig.aiConfirmationRequired &&
@@ -118,6 +125,7 @@ export function syncRobotSettings(
     stopWin: settings.stopWin ?? previous.stopWin,
     stopLoss: settings.stopLoss ?? previous.stopLoss,
     martingaleEnabled: settings.martingaleEnabled ?? previous.martingaleEnabled,
+    martingaleSteps: settings.martingaleSteps ?? previous.martingaleSteps,
     martingaleMultiplier: settings.martingaleMultiplier ?? previous.martingaleMultiplier,
     aiAnalysisEnabled: settings.aiAnalysisEnabled ?? previous.aiAnalysisEnabled,
     aiConfirmationRequired:
@@ -131,6 +139,7 @@ export function syncRobotSettings(
     currentSettings.stopWin === next.stopWin &&
     currentSettings.stopLoss === next.stopLoss &&
     currentSettings.martingaleEnabled === next.martingaleEnabled &&
+    currentSettings.martingaleSteps === next.martingaleSteps &&
     currentSettings.martingaleMultiplier === next.martingaleMultiplier &&
     currentSettings.aiAnalysisEnabled === next.aiAnalysisEnabled &&
     currentSettings.aiConfirmationRequired === next.aiConfirmationRequired &&
@@ -166,6 +175,10 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
     martingaleEnabled:
       settings?.martingaleEnabled === true ||
       (settings as { g1?: boolean } | null | undefined)?.g1 === true,
+    martingaleSteps: positiveInteger(
+      settings?.martingaleSteps,
+      DEFAULT_ROBOT_SETTINGS.martingaleSteps,
+    ),
     martingaleMultiplier: positiveNumber(
       settings?.martingaleMultiplier,
       DEFAULT_ROBOT_SETTINGS.martingaleMultiplier,
@@ -192,6 +205,10 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
 function positiveNumber(value: unknown, fallback: number) {
   const next = typeof value === "number" ? value : Number(value);
   return Number.isFinite(next) && next > 0 ? next : fallback;
+}
+
+function positiveInteger(value: unknown, fallback: number) {
+  return Math.max(1, Math.floor(positiveNumber(value, fallback)));
 }
 
 function emitChange() {

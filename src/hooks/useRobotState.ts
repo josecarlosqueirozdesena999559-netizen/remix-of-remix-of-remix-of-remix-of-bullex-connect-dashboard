@@ -137,6 +137,7 @@ export function useRobotState(userId?: string) {
         stopWin: nextState.stop_win,
         stopLoss: nextState.stop_loss,
         martingaleEnabled: nextState.martingale_enabled,
+        martingaleSteps: nextState.martingale_steps,
         martingaleMultiplier: nextState.martingale_multiplier,
         aiAnalysisEnabled: nextState.ai_analysis_enabled,
         aiConfirmationRequired: nextState.ai_confirmation_required,

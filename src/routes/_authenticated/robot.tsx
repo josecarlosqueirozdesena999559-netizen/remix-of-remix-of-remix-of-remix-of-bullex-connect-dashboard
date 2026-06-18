@@ -2,11 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
+import { toast } from "sonner";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
 import {
   ApiError,
   apiConfig,
   robotConfig,
+  robotResetCycle,
   robotStart,
   robotStop,
   type ApiResult,
@@ -19,7 +21,6 @@ import { useRobotState, type RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { ROBOT_HISTORY_QUERY_KEY, ROBOT_STATS_QUERY_KEY } from "@/hooks/useRobotHistory";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
-import { getRobotAiReview, getVisibleRobotAiSignal } from "@/lib/robotAi";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 
 export const Route = createFileRoute("/_authenticated/robot")({
@@ -39,6 +40,8 @@ function RobotPage() {
   const [modeActionError, setModeActionError] = useState<string | null>(null);
   const [settingsActionPending, setSettingsActionPending] = useState(false);
   const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
+  const [resetCyclePending, setResetCyclePending] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const [showRealConfirm, setShowRealConfirm] = useState(false);
   const [realConfirmed, setRealConfirmed] = useState(false);
   const [lastHistoryRefreshKey, setLastHistoryRefreshKey] = useState<string | null>(null);
@@ -98,12 +101,6 @@ function RobotPage() {
     expirationSeconds: smoothExpirationSeconds,
   });
   const syncing = account.isLoading || robotState.isLoading;
-  const aiReview = getRobotAiReview(
-    getVisibleRobotAiSignal(
-      displayRobotState,
-      robotPresentation.signal ?? displayRobotState?.pending_signal,
-    ),
-  );
   const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
   const connected = account.data?.connected === true || cachedGrace;
   const activeMode = account.data?.mode ?? null;
@@ -113,6 +110,7 @@ function RobotPage() {
     (displayRobotState?.enabled === false && displayRobotState?.worker_running === false);
   const robotEnabled = Boolean(displayRobotState) && !robotStopped;
   const hasBackend = !!apiConfig.BASE_URL;
+  const showResetCycle = shouldShowResetCycle(displayRobotState);
 
   async function refreshAccountAndRobot() {
     await account.refetch();
@@ -237,11 +235,11 @@ function RobotPage() {
             stop_win: settings.stopWin,
             stop_loss: settings.stopLoss,
             martingale_enabled: settings.martingaleEnabled,
-            martingale_steps: 1,
+            martingale_steps: settings.martingaleSteps,
             martingale_multiplier: settings.martingaleMultiplier,
-            ai_analysis_enabled: settings.aiAnalysisEnabled,
-            ai_confirmation_required: settings.aiConfirmationRequired,
-            ai_min_confidence: settings.aiMinConfidence,
+            ai_analysis_enabled: false,
+            ai_confirmation_required: false,
+            ai_min_confidence: null,
           }),
         );
         unwrapApiResult(await robotStart());
@@ -267,12 +265,35 @@ function RobotPage() {
         enabled: displayRobotState?.enabled ?? false,
         cycleMinutes: displayRobotState?.cycle_minutes ?? FIXED_CYCLE_MINUTES,
       });
+      await robotState.refetch();
+      toast.success("Configurações salvas");
+      setConfigOpen(false);
     } catch (error) {
-      setSettingsActionError(
-        error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao da IA.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Não foi possível salvar as configurações.";
+      setSettingsActionError(message);
+      toast.error(message);
     } finally {
       setSettingsActionPending(false);
+    }
+  }
+
+  async function handleResetCycle() {
+    if (!hasBackend || resetCyclePending || !showResetCycle) return;
+    setRobotActionError(null);
+    setResetCyclePending(true);
+    try {
+      unwrapApiResult(await robotResetCycle());
+      await robotState.refetch();
+      await queryClient.invalidateQueries({ queryKey: ROBOT_HISTORY_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: ROBOT_STATS_QUERY_KEY });
+      toast.success("Ciclo reiniciado");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Não foi possível reiniciar o ciclo.";
+      setRobotActionError(message);
+      toast.error(message);
+    } finally {
+      setResetCyclePending(false);
     }
   }
 
@@ -459,10 +480,36 @@ function RobotPage() {
             )}
             {robotEnabled ? "Parar robô" : "Iniciar robô"}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsActionError(null);
+              setConfigOpen((current) => !current);
+            }}
+            className="rounded-xl border border-border bg-background/40 px-5 py-3 font-semibold transition hover:bg-accent"
+          >
+            {configOpen ? "Fechar configurações" : "Abrir configurações"}
+          </button>
         </div>
 
         {robotActionError ? (
           <p className="mt-3 text-sm text-destructive">{robotActionError}</p>
+        ) : null}
+
+        {showResetCycle ? (
+          <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-4">
+            <p className="text-sm font-medium text-warning-foreground">
+              Stop atingido. Reinicie o ciclo para continuar.
+            </p>
+            <button
+              type="button"
+              onClick={handleResetCycle}
+              disabled={resetCyclePending}
+              className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resetCyclePending ? "Reiniciando..." : "Reiniciar ciclo"}
+            </button>
+          </div>
         ) : null}
       </section>
 
@@ -488,105 +535,93 @@ function RobotPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Analise com IA</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Usa a OpenAI para revisar a leitura dos candles sem travar a tela.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
-            <span>Usar IA para analisar candles</span>
-            <input
-              type="checkbox"
-              checked={settings.aiAnalysisEnabled}
-              onChange={(event) =>
-                setSettings({ ...settings, aiAnalysisEnabled: event.target.checked })
-              }
-              className="h-4 w-4 accent-primary"
-            />
-          </label>
-
-          {settings.aiAnalysisEnabled ? (
-            <>
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
-                <span>Exigir aprovacao da IA</span>
-                <input
-                  type="checkbox"
-                  checked={settings.aiConfirmationRequired}
-                  onChange={(event) =>
-                    setSettings({ ...settings, aiConfirmationRequired: event.target.checked })
-                  }
-                  className="h-4 w-4 accent-primary"
-                />
-              </label>
-
-              <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
-                <span className="mb-2 block text-sm font-medium">Confianca minima da IA</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={settings.aiMinConfidence}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      aiMinConfidence: clampPercentage(event.target.value, settings.aiMinConfidence),
-                    })
-                  }
-                  className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
-                />
-              </label>
-            </>
-          ) : null}
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSaveAiSettings}
-            disabled={!hasBackend || settingsActionPending}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {settingsActionPending ? "Salvando..." : "Salvar configuracao da IA"}
-          </button>
-          {settingsActionError ? (
-            <p className="text-sm text-destructive">{settingsActionError}</p>
-          ) : null}
-        </div>
-      </section>
-
-      {aiReview ? (
+      {configOpen ? (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <div>
-            <h2 className="font-semibold">Analise OpenAI</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Leitura complementar da IA para o sinal atual.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Configurações do robô</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ajuste stops, entrada e parâmetros de gale.
+              </p>
+            </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <Pill label="IA" value={aiReview.statusLabel} />
-            {aiReview.confidenceLabel ? (
-              <Pill label="Confianca IA" value={aiReview.confidenceLabel} />
-            ) : null}
-            {aiReview.riskLabel ? <Pill label="Risco" value={aiReview.riskLabel} /> : null}
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <ConfigField
+              label="Stop Win"
+              value={settings.stopWin}
+              onChange={(value) =>
+                setSettings({ ...settings, stopWin: normalizeConfigNumber(value, settings.stopWin) })
+              }
+            />
+            <ConfigField
+              label="Stop Loss"
+              value={settings.stopLoss}
+              onChange={(value) =>
+                setSettings({
+                  ...settings,
+                  stopLoss: normalizeConfigNumber(value, settings.stopLoss),
+                })
+              }
+            />
+            <ConfigField
+              label="Valor por entrada"
+              value={settings.entryValue}
+              step="0.5"
+              onChange={(value) =>
+                setSettings({
+                  ...settings,
+                  entryValue: normalizeConfigNumber(value, settings.entryValue),
+                })
+              }
+            />
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-medium">
+              <span>Gale ativado</span>
+              <input
+                type="checkbox"
+                checked={settings.martingaleEnabled}
+                onChange={(event) =>
+                  setSettings({ ...settings, martingaleEnabled: event.target.checked })
+                }
+                className="h-4 w-4 accent-primary"
+              />
+            </label>
+            <ConfigField
+              label="Quantidade de Gales"
+              value={settings.martingaleSteps}
+              step="1"
+              onChange={(value) =>
+                setSettings({
+                  ...settings,
+                  martingaleSteps: normalizeConfigInteger(value, settings.martingaleSteps),
+                })
+              }
+            />
+            <ConfigField
+              label="Multiplicador do Gale"
+              value={settings.martingaleMultiplier}
+              step="0.1"
+              onChange={(value) =>
+                setSettings({
+                  ...settings,
+                  martingaleMultiplier: normalizeConfigNumber(value, settings.martingaleMultiplier),
+                })
+              }
+            />
           </div>
 
-          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-            {aiReview.candleReadingLabel ? (
-              <p>Leitura dos candles: {aiReview.candleReadingLabel}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSaveAiSettings}
+              disabled={!hasBackend || settingsActionPending}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {settingsActionPending ? "Salvando..." : "Salvar configurações"}
+            </button>
+            {settingsActionError ? (
+              <p className="text-sm text-destructive">{settingsActionError}</p>
             ) : null}
-            {aiReview.entryReasonLabel ? (
-              <p>Motivo da entrada: {aiReview.entryReasonLabel}</p>
-            ) : null}
-            {aiReview.blockMessage ? <p className="text-destructive">{aiReview.blockMessage}</p> : null}
-            {aiReview.fallbackMessage ? <p>{aiReview.fallbackMessage}</p> : null}
           </div>
         </section>
       ) : null}
@@ -659,10 +694,49 @@ function formatAmount(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function clampPercentage(value: string, fallback: number) {
+function ConfigField({
+  label,
+  value,
+  onChange,
+  step = "1",
+}: {
+  label: string;
+  value: number;
+  onChange: (value: string) => void;
+  step?: string;
+}) {
+  return (
+    <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
+      <span className="mb-2 block text-sm font-medium">{label}</span>
+      <input
+        type="number"
+        min="0"
+        step={step}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
+      />
+    </label>
+  );
+}
+
+function normalizeConfigNumber(value: string, fallback: number) {
   const next = Number(value);
   if (!Number.isFinite(next)) return fallback;
-  return Math.min(100, Math.max(1, Math.round(next)));
+  return Math.max(0, next);
+}
+
+function normalizeConfigInteger(value: string, fallback: number) {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.max(1, Math.round(next));
+}
+
+function shouldShowResetCycle(robotState: RobotState | undefined) {
+  if (!robotState) return false;
+  return [robotState.last_rejection_reason, robotState.rejection_reason].some((reason) =>
+    reason === "STOP_WIN_HIT" || reason === "STOP_LOSS_HIT",
+  );
 }
 
 function useCurrentTime() {
