@@ -3,7 +3,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
-import { ApiError, apiConfig, robotConfig, robotStart, type ApiResult, bullexApi } from "@/lib/api";
+import {
+  ApiError,
+  apiConfig,
+  robotConfig,
+  robotStart,
+  robotStop,
+  type ApiResult,
+  bullexApi,
+} from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
 import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
@@ -100,8 +108,10 @@ function RobotPage() {
   const connected = account.data?.connected === true || cachedGrace;
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
-  const robotEnabled =
-    displayRobotState?.enabled === true && displayRobotState.status !== "STOPPED";
+  const robotStopped =
+    displayRobotState?.status === "STOPPED" ||
+    (displayRobotState?.enabled === false && displayRobotState?.worker_running === false);
+  const robotEnabled = Boolean(displayRobotState) && !robotStopped;
   const hasBackend = !!apiConfig.BASE_URL;
 
   async function refreshAccountAndRobot() {
@@ -207,7 +217,7 @@ function RobotPage() {
     setRobotActionPending(true);
     try {
       if (robotEnabled) {
-        unwrapApiResult(await robotConfig({ enabled: false }));
+        unwrapApiResult(await robotStop());
       } else {
         if (displayRobotState && getStopLimit(displayRobotState)) {
           unwrapApiResult(await robotConfig({ enabled: false }));
@@ -237,7 +247,10 @@ function RobotPage() {
         unwrapApiResult(await robotStart());
       }
 
-      await robotState.refetch();
+      const nextRobotState = await robotState.refetch();
+      if (!nextRobotState.data) {
+        throw new Error("Nao foi possivel atualizar o estado do robo.");
+      }
     } catch (error) {
       setRobotActionError(error instanceof Error ? error.message : "Falha ao atualizar o robô.");
     } finally {

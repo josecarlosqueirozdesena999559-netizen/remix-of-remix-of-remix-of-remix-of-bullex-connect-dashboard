@@ -112,6 +112,9 @@ export function normalizeRobotState(input: unknown): RobotState {
 
   return {
     enabled: normalizeBoolean(value.enabled),
+    worker_running: normalizeBoolean(
+      value.worker_running ?? value.workerRunning ?? value.running ?? value.is_running,
+    ),
     connected: !disconnected,
     status,
     cycle_id: normalizeOptionalText(value.cycle_id ?? value.cycleId),

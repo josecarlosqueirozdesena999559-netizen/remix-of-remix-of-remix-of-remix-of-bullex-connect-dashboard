@@ -50,6 +50,7 @@ export type RobotTrade = {
 
 export type RobotState = {
   enabled: boolean;
+  worker_running: boolean;
   connected: boolean;
   status: string;
   cycle_id: string | null;
@@ -156,6 +157,7 @@ export function useRobotState(userId?: string) {
 export function createStoppedRobotState(disconnected = false): RobotState {
   return {
     enabled: false,
+    worker_running: false,
     connected: !disconnected,
     status: "STOPPED",
     cycle_id: null,

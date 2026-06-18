@@ -200,6 +200,19 @@ test("WAITING_NEXT_CANDLE_ENTRY nao mostra 00:00 enquanto aguarda a vela", () =>
   assert.equal(presentation.footer, "Aguardando abertura da vela...");
 });
 
+test("enabled false sem worker parado ainda nao mostra robo parado", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      enabled: false,
+      worker_running: true,
+      status: "WAITING_NEXT_CYCLE",
+    }),
+    now,
+  );
+
+  assert.notEqual(presentation.title, "Robo parado");
+});
+
 test("WAITING_NEXT_CYCLE nao mostra entrada liberada antes de SENDING_ORDER", () => {
   const presentation = getRobotPresentation(
     createRobotState({
@@ -297,6 +310,7 @@ function createTrade(overrides: Partial<NonNullable<RobotState["last_trade"]>> =
 function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
   return {
     enabled: true,
+    worker_running: true,
     connected: true,
     status: "WAITING_NEXT_CYCLE",
     cycle_id: null,

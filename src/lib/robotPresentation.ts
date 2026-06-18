@@ -92,7 +92,7 @@ export function getRobotPresentation(
     };
   }
 
-  if (!robotState.enabled || status === "STOPPED") {
+  if (status === "STOPPED" || isRobotFullyStopped(robotState)) {
     return createPresentation("stopped", "Robo parado");
   }
 
@@ -340,6 +340,10 @@ function isDisconnected(robotState: RobotState) {
     robotState.disconnected ||
     robotState.status === "ACCOUNT_DISCONNECTED"
   );
+}
+
+function isRobotFullyStopped(robotState: RobotState) {
+  return robotState.enabled === false && robotState.worker_running === false;
 }
 
 function getOrderRejectionReason(robotState: RobotState) {
