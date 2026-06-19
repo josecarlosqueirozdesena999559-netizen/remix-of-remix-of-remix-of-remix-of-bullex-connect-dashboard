@@ -24,13 +24,22 @@ export function useRobotSettings(userId?: string) {
 
   async function saveSettings(
     nextSettings: RobotSettings,
-    robotConfigState: { enabled: boolean; cycleMinutes: number },
+    robotConfigState: {
+      enabled: boolean;
+      cycleMinutes: number;
+      accountMode: "DEMO" | "REAL";
+      allowReal: boolean;
+      confirmReal: boolean;
+    },
   ) {
     if (!userId) throw new ApiError("Não autenticado", "NO_AUTH");
 
     markRobotConfigPending(userId, nextSettings);
     const response = await robotConfig({
       enabled: robotConfigState.enabled,
+      account_mode: robotConfigState.accountMode,
+      allow_real: robotConfigState.allowReal,
+      confirm_real: robotConfigState.confirmReal,
       entry_value: nextSettings.entryValue,
       cycle_minutes: robotConfigState.cycleMinutes,
       stop_win: nextSettings.stopWin,

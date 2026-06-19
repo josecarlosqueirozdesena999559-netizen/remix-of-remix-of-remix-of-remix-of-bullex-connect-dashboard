@@ -121,6 +121,40 @@ function RobotPage() {
     ? `Compra REAL bloqueada: ${realBuyError}`
     : robotPresentation.detail;
 
+  function buildRobotConfigPayload(
+    overrides: Partial<Parameters<typeof robotConfig>[0]> = {},
+  ): Parameters<typeof robotConfig>[0] {
+    const currentAccountMode =
+      displayRobotState?.account_mode ??
+      (activeMode === "REAL" ? "REAL" : activeMode === "PRACTICE" ? "DEMO" : "DEMO");
+    const currentAllowReal =
+      displayRobotState?.allow_real ??
+      (currentAccountMode === "REAL" || activeMode === "REAL");
+    const currentConfirmReal =
+      displayRobotState?.confirm_real ??
+      (currentAccountMode === "REAL" || activeMode === "REAL");
+
+    return {
+      enabled: displayRobotState?.enabled ?? false,
+      account_mode: currentAccountMode,
+      allow_real: currentAllowReal,
+      confirm_real: currentConfirmReal,
+      entry_value: settings.entryValue,
+      cycle_minutes: displayRobotState?.cycle_minutes ?? FIXED_CYCLE_MINUTES,
+      min_confidence: FIXED_MIN_CONFIDENCE,
+      min_payout: FIXED_MIN_PAYOUT,
+      stop_win: settings.stopWin,
+      stop_loss: settings.stopLoss,
+      martingale_enabled: settings.martingaleEnabled,
+      martingale_steps: settings.martingaleSteps,
+      martingale_multiplier: settings.martingaleMultiplier,
+      ai_analysis_enabled: false,
+      ai_confirmation_required: false,
+      ai_min_confidence: null,
+      ...overrides,
+    };
+  }
+
   async function refreshAccountAndRobot() {
     await account.refetch();
     await robotState.refetch();
@@ -230,6 +264,15 @@ function RobotPage() {
     setModeActionPending(true);
     try {
       unwrapApiResult(await bullexApi.changeMode({ mode: "PRACTICE" }));
+      unwrapApiResult(
+        await robotConfig(
+          buildRobotConfigPayload({
+            account_mode: "DEMO",
+            allow_real: false,
+            confirm_real: false,
+          }),
+        ),
+      );
       await refreshAccountAndRobot();
     } catch (error) {
       setModeActionError(
@@ -253,6 +296,15 @@ function RobotPage() {
     setModeActionPending(true);
     try {
       unwrapApiResult(await bullexApi.changeMode({ mode: "REAL", confirm_real: true }));
+      unwrapApiResult(
+        await robotConfig(
+          buildRobotConfigPayload({
+            account_mode: "REAL",
+            allow_real: true,
+            confirm_real: true,
+          }),
+        ),
+      );
       setShowRealConfirm(false);
       setRealConfirmed(false);
       await refreshAccountAndRobot();
@@ -285,24 +337,17 @@ function RobotPage() {
         }
 
         unwrapApiResult(
-          await robotConfig({
+          await robotConfig(
+            buildRobotConfigPayload({
             enabled: true,
             account_mode: realSelected ? "REAL" : "DEMO",
             allow_real: realSelected,
             confirm_real: realSelected,
-            entry_value: settings.entryValue,
             cycle_minutes: FIXED_CYCLE_MINUTES,
             min_confidence: FIXED_MIN_CONFIDENCE,
             min_payout: FIXED_MIN_PAYOUT,
-            stop_win: settings.stopWin,
-            stop_loss: settings.stopLoss,
-            martingale_enabled: settings.martingaleEnabled,
-            martingale_steps: settings.martingaleSteps,
-            martingale_multiplier: settings.martingaleMultiplier,
-            ai_analysis_enabled: false,
-            ai_confirmation_required: false,
-            ai_min_confidence: null,
-          }),
+            }),
+          ),
         );
         unwrapApiResult(await robotStart());
       }
@@ -326,6 +371,11 @@ function RobotPage() {
       await saveSettings(settings, {
         enabled: displayRobotState?.enabled ?? false,
         cycleMinutes: displayRobotState?.cycle_minutes ?? FIXED_CYCLE_MINUTES,
+        accountMode:
+          displayRobotState?.account_mode ??
+          (activeMode === "REAL" ? "REAL" : activeMode === "PRACTICE" ? "DEMO" : "DEMO"),
+        allowReal: displayRobotState?.allow_real ?? activeMode === "REAL",
+        confirmReal: displayRobotState?.confirm_real ?? activeMode === "REAL",
       });
       await robotState.refetch();
       toast.success("Configurações salvas");
