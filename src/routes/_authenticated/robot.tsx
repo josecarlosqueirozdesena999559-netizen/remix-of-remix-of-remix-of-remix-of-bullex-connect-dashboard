@@ -410,7 +410,7 @@ function RobotPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl min-w-0 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
@@ -574,7 +574,7 @@ function RobotPage() {
           </div>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <button
             type="button"
             onClick={handleRobotToggle}
@@ -585,7 +585,7 @@ function RobotPage() {
               syncing ||
               (!robotEnabled && !connected)
             }
-            className={`flex min-w-40 items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-40 sm:w-auto ${
               robotEnabled
                 ? "bg-destructive text-destructive-foreground"
                 : "bg-success text-success-foreground"
@@ -604,7 +604,7 @@ function RobotPage() {
               setSettingsActionError(null);
               setConfigOpen((current) => !current);
             }}
-            className="rounded-xl border border-border bg-background/40 px-5 py-3 font-semibold transition hover:bg-accent"
+            className="w-full rounded-xl border border-border bg-background/40 px-5 py-3 font-semibold transition hover:bg-accent sm:w-auto"
           >
             {configOpen ? "Fechar configurações" : "Abrir configurações"}
           </button>

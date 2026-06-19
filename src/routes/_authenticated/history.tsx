@@ -46,7 +46,7 @@ function HistoryPage() {
   const isRefreshing = history.isFetching || statsQuery.isFetching;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Histórico</h1>
@@ -81,7 +81,7 @@ function HistoryPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Win Rate" value={`${formatDecimal(stats.winRate)}%`} Icon={Activity} />
         <StatCard label="Wins" value={String(stats.wins)} Icon={ShieldCheck} tone="positive" />
         <StatCard label="Losses" value={String(stats.losses)} Icon={ShieldX} tone="negative" />
@@ -117,7 +117,8 @@ function HistoryPage() {
             Nenhuma operação registrada ainda.
           </div>
         ) : (
-          <Table>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[860px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
@@ -136,7 +137,8 @@ function HistoryPage() {
                 <HistoryRow key={item.id} item={item} />
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         )}
       </section>
     </div>

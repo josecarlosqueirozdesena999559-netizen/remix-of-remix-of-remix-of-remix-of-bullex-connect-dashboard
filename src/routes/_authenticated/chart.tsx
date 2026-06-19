@@ -118,9 +118,9 @@ function MarketPage() {
   const overlayResult = getOverlayResult(displayRobotState);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Mercado binário - 21 pares monitorados</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Mercado binário - 21 pares monitorados</h1>
         <p className="text-sm text-muted-foreground">
           Gráfico próprio usando apenas os candles retornados pela BullEx.
         </p>
@@ -148,7 +148,7 @@ function MarketPage() {
           </div>
         )}
 
-      <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
+      <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
             <label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
@@ -246,7 +246,7 @@ function MarketPage() {
         <ClientOnly
           fallback={
             <div className="p-4">
-              <div className="flex h-[560px] w-full items-center justify-center rounded-xl border border-border/60 bg-card text-sm text-muted-foreground md:h-[680px]">
+              <div className="flex h-[360px] w-full items-center justify-center rounded-xl border border-border/60 bg-card px-4 text-center text-sm text-muted-foreground sm:h-[460px] md:h-[680px]">
                 Carregando gráfico...
               </div>
             </div>
@@ -255,7 +255,7 @@ function MarketPage() {
           <Suspense
             fallback={
               <div className="p-4">
-                <div className="flex h-[560px] w-full items-center justify-center rounded-xl border border-border/60 bg-card text-sm text-muted-foreground md:h-[680px]">
+                <div className="flex h-[360px] w-full items-center justify-center rounded-xl border border-border/60 bg-card px-4 text-center text-sm text-muted-foreground sm:h-[460px] md:h-[680px]">
                   Carregando gráfico...
                 </div>
               </div>
@@ -298,36 +298,36 @@ function MarketPage() {
           <h2 className="font-semibold">Últimos 10 candles</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[540px] w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
-                <th className="px-5 py-3">Hora</th>
-                <th className="px-5 py-3">Open</th>
-                <th className="px-5 py-3">High</th>
-                <th className="px-5 py-3">Low</th>
-                <th className="px-5 py-3">Close</th>
+                <th className="px-3 py-3 sm:px-5">Hora</th>
+                <th className="px-3 py-3 sm:px-5">Open</th>
+                <th className="px-3 py-3 sm:px-5">High</th>
+                <th className="px-3 py-3 sm:px-5">Low</th>
+                <th className="px-3 py-3 sm:px-5">Close</th>
               </tr>
             </thead>
             <tbody>
               {candles.slice(-10).map((candle, index) => (
                 <tr key={`${candle.time}-${index}`} className="border-b border-border/50">
-                  <td className="px-5 py-3">{formatTime(candle.time)}</td>
-                  <td className="px-5 py-3 font-mono">{formatNumber(candle.open)}</td>
-                  <td className="px-5 py-3 font-mono">{formatNumber(candle.high)}</td>
-                  <td className="px-5 py-3 font-mono">{formatNumber(candle.low)}</td>
-                  <td className="px-5 py-3 font-mono">{formatNumber(candle.close)}</td>
+                  <td className="px-3 py-3 sm:px-5">{formatTime(candle.time)}</td>
+                  <td className="px-3 py-3 font-mono sm:px-5">{formatNumber(candle.open)}</td>
+                  <td className="px-3 py-3 font-mono sm:px-5">{formatNumber(candle.high)}</td>
+                  <td className="px-3 py-3 font-mono sm:px-5">{formatNumber(candle.low)}</td>
+                  <td className="px-3 py-3 font-mono sm:px-5">{formatNumber(candle.close)}</td>
                 </tr>
               ))}
               {chartSymbol && !isCandlesLoading && candles.length === 0 && !candlesError && (
                 <tr>
-                  <td className="px-5 py-6 text-muted-foreground" colSpan={5}>
+                  <td className="px-3 py-6 text-muted-foreground sm:px-5" colSpan={5}>
                     Nenhum candle normalizado retornado
                   </td>
                 </tr>
               )}
               {!chartSymbol && (
                 <tr>
-                  <td className="px-5 py-6 text-muted-foreground" colSpan={5}>
+                  <td className="px-3 py-6 text-muted-foreground sm:px-5" colSpan={5}>
                     Selecione um ativo para buscar candles.
                   </td>
                 </tr>

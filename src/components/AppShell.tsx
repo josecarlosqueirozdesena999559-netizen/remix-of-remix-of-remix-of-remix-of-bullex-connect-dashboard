@@ -45,9 +45,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row w-full bg-background text-foreground">
-      <aside className="md:w-64 md:min-h-screen bg-background flex md:flex-col">
-        <div className="p-6 flex items-center gap-3">
+    <div className="flex min-h-screen w-full flex-col bg-background text-foreground md:flex-row">
+      <aside className="mobile-safe-top border-b border-border/80 bg-background/95 backdrop-blur md:min-h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r md:backdrop-blur-0">
+        <div className="flex items-center gap-3 px-4 py-4 sm:px-6 md:p-6">
           <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
             <Bot className="h-5 w-5" />
           </div>
@@ -56,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="text-xs text-muted-foreground leading-tight">AutoBot</div>
           </div>
         </div>
-        <nav className="flex md:flex-col gap-1 p-3 flex-1 overflow-x-auto">
+        <nav className="scrollbar-none flex gap-2 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:gap-1 md:px-3 md:pb-0">
           {visibleNav.map(({ to, label, Icon }) => {
             const active = pathname === to || pathname.startsWith(to + "/");
             return (
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={to}
                 to={to}
                 preload="intent"
-                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors md:shrink ${
                   active
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -76,11 +76,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="hidden md:block p-3">
-          <div className="text-xs text-muted-foreground truncate mb-2">{user?.email}</div>
+        <div className="border-t border-border/70 p-3 md:mt-auto">
+          <div className="mb-2 truncate text-xs text-muted-foreground">{user?.email}</div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 text-sm py-2 px-3 rounded-md border border-border bg-card hover:bg-accent transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent"
           >
             <LogOut className="w-4 h-4" /> Sair
           </button>
@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main
-        className={`flex-1 p-4 md:p-8 w-full mx-auto ${
+        className={`min-w-0 flex-1 px-4 py-5 sm:px-5 md:px-8 md:py-8 ${
           pathname === "/chart" ? "max-w-[1680px]" : "max-w-7xl"
         }`}
       >
