@@ -28,7 +28,8 @@ export class ApiError extends Error {
 
 export function getApiErrorMessage(codeOrMessage?: string, fallback = "Erro inesperado") {
   if (!codeOrMessage) return fallback;
-  return ERROR_MESSAGES[codeOrMessage] ?? codeOrMessage;
+  if (ERROR_MESSAGES[codeOrMessage]) return ERROR_MESSAGES[codeOrMessage];
+  return fallback !== "Erro inesperado" ? fallback : codeOrMessage;
 }
 
 export function isKnownApiError(codeOrMessage?: string) {
@@ -141,6 +142,14 @@ export type RobotConfigPayload = {
   ai_min_confidence?: number;
 };
 
+export type BullexBuyRealPayload = {
+  asset_id: string;
+  direction: "CALL" | "PUT";
+  amount: number;
+  duration: number;
+  confirm_real: true;
+};
+
 export function robotConfig(payload: RobotConfigPayload) {
   return apiRequest<unknown>("/robot/config", {
     method: "POST",
@@ -166,6 +175,13 @@ export function robotState(userId: string) {
 
 export function robotSyncConnection() {
   return apiRequest<{ ok: boolean }>("/robot/sync-connection", { method: "POST" });
+}
+
+export function buyReal(payload: BullexBuyRealPayload) {
+  return apiRequest<unknown>("/bullex/buy-real", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export const bullexApi = {

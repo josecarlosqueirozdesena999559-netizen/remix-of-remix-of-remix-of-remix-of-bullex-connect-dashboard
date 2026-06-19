@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
 import { toast } from "sonner";
 import { useBullExAccount } from "@/hooks/useBullExAccount";
@@ -13,6 +13,8 @@ import {
   robotStop,
   type ApiResult,
   bullexApi,
+  buyReal,
+  type BullexBuyRealPayload,
 } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
@@ -45,10 +47,13 @@ function RobotPage() {
   const [showRealConfirm, setShowRealConfirm] = useState(false);
   const [realConfirmed, setRealConfirmed] = useState(false);
   const [lastHistoryRefreshKey, setLastHistoryRefreshKey] = useState<string | null>(null);
+  const [realBuyError, setRealBuyError] = useState<string | null>(null);
+  const realBuyAttemptRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
   const account = useBullExAccount();
   const robotState = useRobotState(user?.id);
+  const refetchRobotState = robotState.refetch;
   const effectiveRobotState = useRobotConnectionSync({
     userId: user?.id,
     accountConnected: account.data?.connected === true,
@@ -111,6 +116,10 @@ function RobotPage() {
   const robotEnabled = Boolean(displayRobotState) && !robotStopped;
   const hasBackend = !!apiConfig.BASE_URL;
   const showResetCycle = shouldShowResetCycle(displayRobotState);
+  const robotStatusTitle = realBuyError ? "Compra REAL bloqueada" : robotPresentation.title;
+  const robotStatusDetail = realBuyError
+    ? `Compra REAL bloqueada: ${realBuyError}`
+    : robotPresentation.detail;
 
   async function refreshAccountAndRobot() {
     await account.refetch();
@@ -156,6 +165,59 @@ function RobotPage() {
     displayRobotState?.status,
     displayRobotState?.stop_reason,
     queryClient,
+  ]);
+
+  useEffect(() => {
+    if (!displayRobotState || !hasBackend || activeMode !== "REAL") {
+      realBuyAttemptRef.current = null;
+      setRealBuyError(null);
+      return;
+    }
+
+    if (
+      displayRobotState.status === "PENDING_RESULT" ||
+      displayRobotState.status === "PENDING_GALE_RESULT" ||
+      displayRobotState.last_trade?.result === "PENDING_RESULT"
+    ) {
+      setRealBuyError(null);
+      return;
+    }
+
+    const realOrder = getRealBuyPayload(displayRobotState, settings.entryValue);
+    if (!realOrder) return;
+
+    const orderKey = createRealBuyKey(displayRobotState, realOrder);
+    if (realBuyAttemptRef.current === orderKey) return;
+    realBuyAttemptRef.current = orderKey;
+    setRealBuyError(null);
+
+    console.log("[FRONT REAL MODE]", {
+      accountMode: activeMode,
+      robotStatus: displayRobotState.status,
+      cycleId: displayRobotState.cycle_id,
+    });
+    console.log("[FRONT REAL BUY PAYLOAD]", realOrder);
+
+    void (async () => {
+      const result = await buyReal(realOrder);
+      if (!result.ok) {
+        const reason = result.error || result.code || "Motivo nao informado";
+        console.error("[FRONT REAL BUY ERROR]", result);
+        setRealBuyError(reason);
+        await refetchRobotState();
+        return;
+      }
+
+      console.log("[FRONT REAL BUY SUCCESS]", result.data);
+      setRealBuyError(null);
+      await refetchRobotState();
+    })();
+  }, [
+    activeMode,
+    displayRobotState,
+    hasBackend,
+    refetchRobotState,
+    settings.entryValue,
   ]);
 
   async function handleDemoMode() {
@@ -383,9 +445,15 @@ function RobotPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Status do robô
             </p>
-            <h2 className="mt-1 text-2xl font-semibold">{robotPresentation.title}</h2>
-            {robotPresentation.detail ? (
-              <p className="mt-1 text-sm text-muted-foreground">{robotPresentation.detail}</p>
+            <h2 className="mt-1 text-2xl font-semibold">{robotStatusTitle}</h2>
+            {robotStatusDetail ? (
+              <p
+                className={`mt-1 text-sm ${
+                  realBuyError ? "font-medium text-destructive" : "text-muted-foreground"
+                }`}
+              >
+                {robotStatusDetail}
+              </p>
             ) : null}
             {robotPresentation.footer ? (
               <p className="mt-1 text-sm font-medium">{robotPresentation.footer}</p>
@@ -730,6 +798,68 @@ function normalizeConfigInteger(value: string, fallback: number) {
   const next = Number(value);
   if (!Number.isFinite(next)) return fallback;
   return Math.max(1, Math.round(next));
+}
+
+function getRealBuyPayload(
+  robotState: RobotState,
+  fallbackAmount: number,
+): BullexBuyRealPayload | null {
+  if (!shouldSendRealBuy(robotState)) return null;
+
+  const isGale = robotState.status === "SENDING_GALE_ORDER" || robotState.gale_in_progress;
+  const assetId = isGale
+    ? robotState.gale_active ?? robotState.last_trade?.active
+    : robotState.pending_signal?.symbol;
+  const direction = isGale
+    ? robotState.gale_direction ?? robotState.last_trade?.direction
+    : robotState.pending_signal?.direction;
+  const amount = isGale
+    ? robotState.gale_amount ?? robotState.last_trade?.amount ?? fallbackAmount
+    : robotState.entry_value ?? fallbackAmount;
+  const duration = robotState.cycle_minutes || FIXED_CYCLE_MINUTES;
+
+  if (!assetId || (direction !== "CALL" && direction !== "PUT")) return null;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+
+  return {
+    asset_id: assetId,
+    direction,
+    amount,
+    duration,
+    confirm_real: true,
+  };
+}
+
+function shouldSendRealBuy(robotState: RobotState) {
+  if (robotState.account_mode !== "REAL") return false;
+  if (!robotState.allow_real || !robotState.confirm_real) return false;
+  if (robotState.result_waiting) return false;
+  if (
+    robotState.status === "PENDING_RESULT" ||
+    robotState.status === "PENDING_GALE_RESULT" ||
+    robotState.last_trade?.result === "PENDING_RESULT"
+  ) {
+    return false;
+  }
+
+  return (
+    robotState.status === "SENDING_ORDER" ||
+    robotState.status === "SENDING_GALE_ORDER" ||
+    (robotState.entry_window_open && robotState.pending_signal != null)
+  );
+}
+
+function createRealBuyKey(robotState: RobotState, payload: BullexBuyRealPayload) {
+  return [
+    robotState.cycle_id ?? "-",
+    robotState.status,
+    robotState.gale_step ?? 0,
+    payload.asset_id,
+    payload.direction,
+    payload.amount,
+    payload.duration,
+  ].join("|");
 }
 
 function shouldShowResetCycle(robotState: RobotState | undefined) {
