@@ -7,6 +7,39 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; code?: string; status?: number };
 
+export type AdminPlanStatus = "active" | "expired" | "trial" | "canceled";
+
+export type AdminCreateUserPayload = {
+  name: string;
+  email: string;
+  password: string;
+  plan_name?: string;
+  amount?: number;
+  currency?: string;
+  status?: AdminPlanStatus;
+  started_at?: string | null;
+  expires_at?: string | null;
+  next_billing_at?: string | null;
+  grant_access?: boolean;
+  is_admin?: boolean;
+};
+
+export type AdminUpdateUserPayload = {
+  name?: string;
+  email?: string;
+  password?: string;
+  plan_name?: string;
+  amount?: number;
+  currency?: string;
+  status?: AdminPlanStatus;
+  started_at?: string | null;
+  expires_at?: string | null;
+  next_billing_at?: string | null;
+  grant_access?: boolean;
+  reset_monthly_cycle?: boolean;
+  is_admin?: boolean;
+};
+
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_API_KEY: "Erro de configuração da API",
   SESSION_NOT_FOUND: "Conta BullEx desconectada. Clique em Conectar BullEx.",
@@ -180,6 +213,24 @@ export function robotSyncConnection() {
 export function buyReal(payload: BullexBuyRealPayload) {
   return apiRequest<unknown>("/bullex/buy-real", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminOverview() {
+  return apiRequest<unknown>("/admin/overview");
+}
+
+export function adminCreateUser(payload: AdminCreateUserPayload) {
+  return apiRequest<unknown>("/admin/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminUpdateUser(userId: string, payload: AdminUpdateUserPayload) {
+  return apiRequest<unknown>(`/admin/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }

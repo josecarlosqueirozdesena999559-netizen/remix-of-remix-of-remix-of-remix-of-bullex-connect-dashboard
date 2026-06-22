@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { initTrial } from "@/lib/trial";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
@@ -12,7 +11,6 @@ export const Route = createFileRoute("/login")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,22 +27,9 @@ function AuthPage() {
     setLoading(true);
     setError(null);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/dashboard", replace: true });
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInErr) throw signInErr;
-        initTrial(true);
-        navigate({ to: "/welcome-trial", replace: true });
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate({ to: "/dashboard", replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao autenticar");
     } finally {
@@ -68,10 +53,11 @@ function AuthPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6">
-          <h1 className="mb-1 text-xl font-semibold">
-            {mode === "login" ? "Entrar" : "Criar conta"}
-          </h1>
-          <p className="mb-6 text-sm text-muted-foreground">Acesse sua plataforma de operacoes.</p>
+          <h1 className="mb-1 text-xl font-semibold">Entrar</h1>
+          <p className="mb-2 text-sm text-muted-foreground">Acesse sua plataforma de operacoes.</p>
+          <p className="mb-6 text-xs text-muted-foreground">
+            Novos acessos sao criados pelo administrador.
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -109,22 +95,9 @@ function AuthPage() {
               disabled={loading}
               className="w-full rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Cadastrar"}
+              {loading ? "Aguarde..." : "Entrar"}
             </button>
           </form>
-
-          <div className="mt-5 text-center text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                setMode(mode === "login" ? "signup" : "login");
-                setError(null);
-              }}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              {mode === "login" ? "Criar uma conta" : "Ja tenho conta - entrar"}
-            </button>
-          </div>
         </div>
       </div>
     </div>

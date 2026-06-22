@@ -29,13 +29,18 @@ const nav = [
 ] as const;
 
 const adminNav = { to: "/admin", label: "Admin", Icon: ShieldCheck } as const;
+const adminOnlyNav = [
+  { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  adminNav,
+  { to: "/settings", label: "Configurações", Icon: Settings },
+] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const visibleNav = isAdminUser(user) ? [...nav.slice(0, -1), adminNav, nav.at(-1)!] : nav;
+  const visibleNav = isAdminUser(user) ? adminOnlyNav : nav;
 
   async function handleLogout() {
     await supabase.auth.signOut();
