@@ -5,9 +5,8 @@ import { Loader2, LockKeyhole, Mail, Plug, Power, X } from "lucide-react";
 import {
   BULLEX_ACCOUNT_QUERY_KEY,
   type BullExAccountState,
-  useBullExAccount,
 } from "@/hooks/useBullExAccount";
-import { useRobotState } from "@/hooks/useRobotState";
+import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { apiConfig } from "@/lib/api";
 import { createOptimisticConnectedBullExAccount } from "@/lib/bullexAccountPolling";
 import { useAuth } from "@/lib/useAuth";
@@ -25,8 +24,7 @@ export const Route = createFileRoute("/_authenticated/bullex")({
 
 function BullExPage() {
   const { user } = useAuth();
-  const account = useBullExAccount();
-  const robotState = useRobotState(user?.id);
+  const { account, robotState } = useLiveTradingData();
   const disconnect = useDisconnectBullex();
   const reconnect = useReconnectBullex();
   const [loginOpen, setLoginOpen] = useState(false);

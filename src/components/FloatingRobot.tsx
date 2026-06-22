@@ -1,24 +1,17 @@
 import { useState } from "react";
 import { Bot } from "lucide-react";
 import { RobotOverlay } from "@/components/RobotOverlay";
-import { useBullExAccount } from "@/hooks/useBullExAccount";
-import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
+import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotNarrator } from "@/hooks/useRobotNarrator";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
-import { useRobotState, type RobotState } from "@/hooks/useRobotState";
+import type { RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 
 export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(true);
-  const robotState = useRobotState(userId);
-  const account = useBullExAccount();
-  const effectiveRobotState = useRobotConnectionSync({
-    userId,
-    accountConnected: account.data?.connected === true,
-    robotState: robotState.data,
-  });
-  const displayRobotState = useRobotDisplayState(effectiveRobotState);
+  const { account, robotState } = useLiveTradingData();
+  const displayRobotState = useRobotDisplayState(robotState.data);
   const { settings, saveSettings } = useRobotSettings(userId);
   const nextCycleSeconds = useSmoothCountdown(
     displayRobotState?.display_countdown_seconds ?? displayRobotState?.seconds_until_next_cycle,

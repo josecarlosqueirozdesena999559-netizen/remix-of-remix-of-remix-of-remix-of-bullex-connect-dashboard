@@ -3,10 +3,10 @@ import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { BarChart3, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { UTCTimestamp } from "lightweight-charts";
-import { useBullExAccount } from "@/hooks/useBullExAccount";
+import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useMarketData } from "@/hooks/useMarketData";
-import { useRobotState, type RobotState } from "@/hooks/useRobotState";
+import type { RobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
@@ -35,8 +35,7 @@ const CHART_TIME_ZONE = "America/Fortaleza";
 function MarketPage() {
   const { user } = useAuth();
   const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
-  const account = useBullExAccount();
-  const robotState = useRobotState(user?.id);
+  const { account, robotState } = useLiveTradingData();
   const displayRobotState = useRobotDisplayState(robotState.data);
   const now = useCurrentTime();
   const chartSelection = resolveChartSelection(displayRobotState, selectedSymbol, now);

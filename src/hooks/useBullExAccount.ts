@@ -1,9 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, type BullexAccount, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
-import { useRobotState } from "@/hooks/useRobotState";
 import {
-  createOptimisticConnectedBullExAccount,
   getBullExAccountBackoffRemaining,
   getBullExAccountRefetchInterval,
   registerBullExAccountFetchFailure,
@@ -24,28 +22,31 @@ export type BullExAccountState = {
   status: BullexAccount["status"] | "disconnected";
 };
 
-export function useBullExAccount() {
-  const { user } = useAuth();
+export function useBullExAccountQuery({
+  userId,
+  enabled = true,
+  isDocumentVisible = true,
+}: {
+  userId?: string;
+  enabled?: boolean;
+  isDocumentVisible?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
-  const robotState = useRobotState(user?.id);
-  const userId = user?.id;
-  const robotStateReady = Boolean(userId) && (robotState.data !== undefined || robotState.error != null);
 
   return useQuery({
     queryKey: [...BULLEX_ACCOUNT_QUERY_KEY, userId],
     queryFn: async () => {
-      const activeUserId = user?.id;
       const now = Date.now();
-      const backoffRemainingMs = getBullExAccountBackoffRemaining(activeUserId, now);
+      const backoffRemainingMs = getBullExAccountBackoffRemaining(userId, now);
       if (backoffRemainingMs > 0) {
         console.log("[ACCOUNT_POLL_SKIPPED_BACKOFF]", {
-          user_id: activeUserId ?? null,
+          user_id: userId ?? null,
           wait_ms: backoffRemainingMs,
         });
 
         const cachedState = queryClient.getQueryData<BullExAccountState>([
           ...BULLEX_ACCOUNT_QUERY_KEY,
-          activeUserId,
+          userId,
         ]);
         return cachedState ?? getDisconnectedState();
       }
@@ -55,15 +56,16 @@ export function useBullExAccount() {
 
       const response = await bullexApi.account();
       if (!response.ok) {
-        const backoffMs = registerBullExAccountFetchFailure(activeUserId, now);
+        const backoffMs = registerBullExAccountFetchFailure(userId, now);
         console.warn("[ACCOUNT_FETCH_FAILED]", {
-          user_id: activeUserId ?? null,
+          user_id: userId ?? null,
           code: response.code ?? null,
           status: response.status ?? null,
           wait_ms: backoffMs,
         });
 
         if (shouldTreatAccountStatusAsDisconnected(response.status, response.code)) {
+          registerBullExAccountFetchSuccess(userId);
           const disconnected = getDisconnectedState();
           console.log("[BULLEX ACCOUNT UPDATED]", disconnected);
           return disconnected;
@@ -74,18 +76,20 @@ export function useBullExAccount() {
         throw error;
       }
 
-      registerBullExAccountFetchSuccess(activeUserId);
+      registerBullExAccountFetchSuccess(userId);
       const nextState = normalizeBullExAccount(response.data);
       console.log("[ACCOUNT_FETCH_SUCCESS]", {
-        user_id: activeUserId ?? null,
+        user_id: userId ?? null,
         connected: nextState.connected,
         status: nextState.status,
       });
       console.log("[BULLEX ACCOUNT UPDATED]", nextState);
       return nextState;
     },
-    enabled: robotStateReady,
+    enabled: enabled && Boolean(userId),
     refetchInterval: () => {
+      if (!isDocumentVisible) return false;
+
       const remainingBackoffMs = getBullExAccountBackoffRemaining(userId);
       if (remainingBackoffMs > 0) {
         console.log("[ACCOUNT_POLL_BACKOFF_ACTIVE]", {
@@ -96,11 +100,16 @@ export function useBullExAccount() {
 
       return getBullExAccountRefetchInterval(userId);
     },
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     retry: false,
     staleTime: 15000,
   });
+}
+
+export function useBullExAccount() {
+  const { user } = useAuth();
+  return useBullExAccountQuery({ userId: user?.id });
 }
 
 export function normalizeBullExAccount(data: BullexAccount | null | undefined): BullExAccountState {

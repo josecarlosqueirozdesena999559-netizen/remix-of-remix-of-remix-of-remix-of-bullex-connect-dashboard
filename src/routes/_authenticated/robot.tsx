@@ -3,7 +3,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Power } from "lucide-react";
 import { toast } from "sonner";
-import { useBullExAccount } from "@/hooks/useBullExAccount";
 import {
   ApiError,
   apiConfig,
@@ -17,9 +16,9 @@ import {
   type BullexBuyRealPayload,
 } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
-import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
+import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
-import { useRobotState, type RobotState } from "@/hooks/useRobotState";
+import type { RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { ROBOT_HISTORY_QUERY_KEY, ROBOT_STATS_QUERY_KEY } from "@/hooks/useRobotHistory";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
@@ -51,15 +50,9 @@ function RobotPage() {
   const realBuyAttemptRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
-  const account = useBullExAccount();
-  const robotState = useRobotState(user?.id);
+  const { account, robotState } = useLiveTradingData();
   const refetchRobotState = robotState.refetch;
-  const effectiveRobotState = useRobotConnectionSync({
-    userId: user?.id,
-    accountConnected: account.data?.connected === true,
-    robotState: robotState.data,
-  });
-  const displayRobotState = useRobotDisplayState(effectiveRobotState);
+  const displayRobotState = useRobotDisplayState(robotState.data);
   const { settings, setSettings, saveSettings } = useRobotSettings(user?.id);
   const now = useCurrentTime();
   const analysisWindowSeconds = useSmoothCountdown(

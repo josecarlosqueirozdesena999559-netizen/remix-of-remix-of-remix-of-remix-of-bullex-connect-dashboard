@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
 import { FloatingRobot } from "@/components/FloatingRobot";
+import { LiveTradingDataProvider } from "@/hooks/useLiveTradingData";
 import { isAdminUser } from "@/lib/adminAccess";
 import { resetBullExAccountState } from "@/hooks/useBullExAccount";
 
@@ -50,8 +51,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background text-foreground md:flex-row">
-      <aside className="mobile-safe-top border-b border-border/80 bg-background/95 backdrop-blur md:min-h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r md:backdrop-blur-0">
+    <LiveTradingDataProvider userId={user?.id}>
+      <div className="flex min-h-screen w-full flex-col bg-background text-foreground md:flex-row">
+        <aside className="mobile-safe-top border-b border-border/80 bg-background/95 backdrop-blur md:min-h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r md:backdrop-blur-0">
         <div className="flex items-center gap-3 px-4 py-4 sm:px-6 md:p-6">
           <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
             <Bot className="h-5 w-5" />
@@ -90,17 +92,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>
-      </aside>
+        </aside>
 
-      <main
-        className={`min-w-0 flex-1 px-4 py-5 sm:px-5 md:px-8 md:py-8 ${
-          pathname === "/chart" ? "max-w-[1680px]" : "max-w-7xl"
-        }`}
-      >
-        {pathname !== "/welcome-trial" && <TrialBanner />}
-        {children}
-      </main>
-      <FloatingRobot userId={user?.id} />
-    </div>
+        <main
+          className={`min-w-0 flex-1 px-4 py-5 sm:px-5 md:px-8 md:py-8 ${
+            pathname === "/chart" ? "max-w-[1680px]" : "max-w-7xl"
+          }`}
+        >
+          {pathname !== "/welcome-trial" && <TrialBanner />}
+          {children}
+        </main>
+        <FloatingRobot userId={user?.id} />
+      </div>
+    </LiveTradingDataProvider>
   );
 }

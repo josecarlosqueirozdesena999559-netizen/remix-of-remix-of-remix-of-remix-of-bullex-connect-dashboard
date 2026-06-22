@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, robotState } from "@/lib/api";
 import { normalizeRobotState } from "@/lib/normalizeRobotState";
-import { getRobotStateRefetchInterval } from "@/lib/robotPolling";
+import {
+  getRobotStateRefetchInterval,
+  registerRobotStateFetchFailure,
+  registerRobotStateFetchSuccess,
+} from "@/lib/robotPolling";
 import { syncRobotSettings } from "@/lib/robotSettings";
 
 export { normalizeRobotState } from "@/lib/normalizeRobotState";
@@ -110,27 +114,38 @@ export type RobotState = {
   fetched_at: number;
 };
 
-export function useRobotState(userId?: string) {
+export function useRobotStateQuery(userId?: string, isDocumentVisible = true) {
   return useQuery({
     queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
     queryFn: async () => {
-      if (!userId) throw new ApiError("Não autenticado", "NO_AUTH");
+      if (!userId) throw new ApiError("NÃ£o autenticado", "NO_AUTH");
+
+      const now = Date.now();
       console.log("[ROBOT STATE REFETCH]");
       console.log(`[ROBOT STATE FETCH user_id=${userId}]`);
       const response = await robotState(userId);
 
       if (!response.ok) {
         if (response.code === "SESSION_NOT_FOUND" || response.code === "SESSION_DISCONNECTED") {
+          registerRobotStateFetchSuccess(userId);
           const disconnectedState = createStoppedRobotState(true);
           console.log("[ROBOT STATE UPDATED]", disconnectedState);
           return disconnectedState;
         }
 
+        const backoffMs = registerRobotStateFetchFailure(userId, now);
         const error = new ApiError(response.error, response.code);
+        console.warn("[ROBOT STATE BACKOFF]", {
+          user_id: userId,
+          code: response.code ?? null,
+          status: response.status ?? null,
+          wait_ms: backoffMs,
+        });
         console.error("[ROBOT STATE ERROR]", error);
         throw error;
       }
 
+      registerRobotStateFetchSuccess(userId);
       const nextState = normalizeRobotState(response.data);
       syncRobotSettings(userId, {
         entryValue: nextState.entry_value,
@@ -147,12 +162,19 @@ export function useRobotState(userId?: string) {
       return nextState;
     },
     enabled: Boolean(userId),
-    refetchInterval: (query) => getRobotStateRefetchInterval(query.state.data),
+    refetchInterval: (query) => {
+      if (!isDocumentVisible) return false;
+      return getRobotStateRefetchInterval(query.state.data, userId);
+    },
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 1,
     staleTime: 0,
   });
+}
+
+export function useRobotState(userId?: string) {
+  return useRobotStateQuery(userId);
 }
 
 export function createStoppedRobotState(disconnected = false): RobotState {

@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Bot, Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useBullExAccount } from "@/hooks/useBullExAccount";
-import { useRobotConnectionSync } from "@/hooks/useRobotConnectionSync";
-import { useRobotState } from "@/hooks/useRobotState";
+import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { ApiError, apiConfig } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 
@@ -14,18 +12,12 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function Dashboard() {
   const { user } = useAuth();
-  const account = useBullExAccount();
-  const robotState = useRobotState(user?.id);
+  const { account, robotState } = useLiveTradingData();
   const acc = account.data;
   const syncing = account.isLoading || robotState.isLoading;
   const cachedGrace = robotState.data?.connection_status_source === "cached_grace";
   const connected = acc?.connected === true || cachedGrace;
-  const effectiveRobotState = useRobotConnectionSync({
-    userId: user?.id,
-    accountConnected: connected,
-    robotState: robotState.data,
-  });
-  const robotConnected = connected && (cachedGrace || effectiveRobotState?.connected !== false);
+  const robotConnected = connected && (cachedGrace || robotState.data?.connected !== false);
   const accountStatus = getConnectionStatusLabel({ syncing, connected, cachedGrace });
   const robotStatus = getConnectionStatusLabel({
     syncing,

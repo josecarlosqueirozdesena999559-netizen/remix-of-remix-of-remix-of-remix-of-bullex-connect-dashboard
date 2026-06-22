@@ -1,7 +1,7 @@
 const NORMAL_ACCOUNT_POLL_MS = 15000;
-const CONNECT_ACCOUNT_POLL_MS = 3000;
+const CONNECT_ACCOUNT_POLL_MS = 10000;
 const CONNECT_ACCOUNT_POLL_WINDOW_MS = 20000;
-const ACCOUNT_ERROR_BACKOFF_MS = [5000, 15000, 30000, 60000] as const;
+const ACCOUNT_ERROR_BACKOFF_MS = [5000, 10000, 20000, 30000] as const;
 
 type AccountPollState = {
   consecutiveFailures: number;

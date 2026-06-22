@@ -24,7 +24,7 @@ test("refresh normal nao passa de uma request a cada 15 segundos", () => {
   );
 });
 
-test("connect usa polling de 3 segundos por ate 20 segundos", () => {
+test("connect respeita polling minimo de 10 segundos por ate 20 segundos", () => {
   resetBullExAccountPolling(USER_ID);
   markBullExAccountConnectBurst(USER_ID, BASE_NOW);
 
@@ -51,14 +51,14 @@ test("404 aplica backoff e nao mantem retry agressivo", () => {
   assert.equal(getBullExAccountRefetchInterval(USER_ID, BASE_NOW + 5001), 15000);
 });
 
-test("falhas repetidas sobem o backoff ate 60 segundos", () => {
+test("falhas repetidas sobem o backoff ate 30 segundos", () => {
   resetBullExAccountPolling(USER_ID);
 
   assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW), 5000);
-  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 5000), 15000);
-  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 20000), 30000);
-  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 50000), 60000);
-  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 110000), 60000);
+  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 5000), 10000);
+  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 15000), 20000);
+  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 35000), 30000);
+  assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW + 65000), 30000);
 });
 
 test("404 e codigos de sessao sao tratados como disconnected", () => {
