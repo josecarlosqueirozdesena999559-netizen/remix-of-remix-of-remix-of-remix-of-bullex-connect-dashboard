@@ -54,10 +54,7 @@ function AuthPage() {
 
         <div className="rounded-2xl border border-border bg-card p-6">
           <h1 className="mb-1 text-xl font-semibold">Entrar</h1>
-          <p className="mb-2 text-sm text-muted-foreground">Acesse sua plataforma de operacoes.</p>
-          <p className="mb-6 text-xs text-muted-foreground">
-            Novos acessos sao criados pelo administrador.
-          </p>
+          <div className="mb-6" />
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
