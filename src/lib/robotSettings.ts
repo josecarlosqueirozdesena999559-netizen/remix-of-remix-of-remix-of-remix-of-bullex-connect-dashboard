@@ -11,8 +11,12 @@ export type RobotSettings = {
   narratorEnabled: boolean;
 };
 
+export const ENTRY_VALUE_MIN = 2;
+export const ENTRY_VALUE_MAX = 1000;
+export const ENTRY_VALUE_STEP = 1;
+
 export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
-  entryValue: 2,
+  entryValue: ENTRY_VALUE_MIN,
   stopWin: 50,
   stopLoss: 30,
   martingaleEnabled: false,
@@ -169,7 +173,12 @@ export function subscribeRobotSettings(listener: () => void) {
 
 export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null): RobotSettings {
   return {
-    entryValue: positiveNumber(settings?.entryValue, DEFAULT_ROBOT_SETTINGS.entryValue),
+    entryValue: rangedNumber(
+      settings?.entryValue,
+      DEFAULT_ROBOT_SETTINGS.entryValue,
+      ENTRY_VALUE_MIN,
+      ENTRY_VALUE_MAX,
+    ),
     stopWin: positiveNumber(settings?.stopWin, DEFAULT_ROBOT_SETTINGS.stopWin),
     stopLoss: positiveNumber(settings?.stopLoss, DEFAULT_ROBOT_SETTINGS.stopLoss),
     martingaleEnabled:
@@ -205,6 +214,12 @@ export function normalizeRobotSettings(settings?: Partial<RobotSettings> | null)
 function positiveNumber(value: unknown, fallback: number) {
   const next = typeof value === "number" ? value : Number(value);
   return Number.isFinite(next) && next > 0 ? next : fallback;
+}
+
+function rangedNumber(value: unknown, fallback: number, min: number, max: number) {
+  const next = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.min(max, Math.max(min, next));
 }
 
 function positiveInteger(value: unknown, fallback: number) {

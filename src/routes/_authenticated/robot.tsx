@@ -23,6 +23,7 @@ import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { ROBOT_HISTORY_QUERY_KEY, ROBOT_STATS_QUERY_KEY } from "@/hooks/useRobotHistory";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
+import { ENTRY_VALUE_MAX, ENTRY_VALUE_MIN, ENTRY_VALUE_STEP } from "@/lib/robotSettings";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
@@ -227,7 +228,7 @@ function RobotPage() {
       return;
     }
 
-    const realOrder = getRealBuyPayload(displayRobotState, settings.entryValue);
+    const realOrder = getRealBuyPayload(displayRobotState);
     if (!realOrder) return;
 
     const orderKey = createRealBuyKey(displayRobotState, realOrder);
@@ -261,7 +262,6 @@ function RobotPage() {
     displayRobotState,
     hasBackend,
     refetchRobotState,
-    settings.entryValue,
   ]);
 
   async function handleDemoMode() {
@@ -695,11 +695,14 @@ function RobotPage() {
             <ConfigField
               label="Valor por entrada"
               value={settings.entryValue}
-              step="0.5"
+              min={ENTRY_VALUE_MIN}
+              max={ENTRY_VALUE_MAX}
+              step={ENTRY_VALUE_STEP}
+              helperText={`Valor minimo: ${formatCurrencyBRL(ENTRY_VALUE_MIN)}\nValor maximo: ${formatCurrencyBRL(ENTRY_VALUE_MAX)}`}
               onChange={(value) =>
                 setSettings({
                   ...settings,
-                  entryValue: normalizeConfigNumber(value, settings.entryValue),
+                  entryValue: normalizeEntryValue(value, settings.entryValue),
                 })
               }
             />
@@ -826,24 +829,36 @@ function ConfigField({
   label,
   value,
   onChange,
-  step = "1",
+  step = 1,
+  min = 0,
+  max,
+  helperText,
 }: {
   label: string;
   value: number;
   onChange: (value: string) => void;
-  step?: string;
+  step?: number;
+  min?: number;
+  max?: number;
+  helperText?: string;
 }) {
   return (
     <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
       <span className="mb-2 block text-sm font-medium">{label}</span>
       <input
         type="number"
-        min="0"
+        min={min}
+        max={max}
         step={step}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
       />
+      {helperText ? (
+        <span className="mt-2 block whitespace-pre-line text-xs text-muted-foreground">
+          {helperText}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -854,16 +869,19 @@ function normalizeConfigNumber(value: string, fallback: number) {
   return Math.max(0, next);
 }
 
+function normalizeEntryValue(value: string, fallback: number) {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.min(ENTRY_VALUE_MAX, Math.max(ENTRY_VALUE_MIN, Math.round(next)));
+}
+
 function normalizeConfigInteger(value: string, fallback: number) {
   const next = Number(value);
   if (!Number.isFinite(next)) return fallback;
   return Math.max(1, Math.round(next));
 }
 
-function getRealBuyPayload(
-  robotState: RobotState,
-  fallbackAmount: number,
-): BullexBuyRealPayload | null {
+function getRealBuyPayload(robotState: RobotState): BullexBuyRealPayload | null {
   if (!shouldSendRealBuy(robotState)) return null;
 
   const isGale = robotState.status === "SENDING_GALE_ORDER" || robotState.gale_in_progress;
@@ -874,8 +892,8 @@ function getRealBuyPayload(
     ? robotState.gale_direction ?? robotState.last_trade?.direction
     : robotState.pending_signal?.direction;
   const amount = isGale
-    ? robotState.gale_amount ?? robotState.last_trade?.amount ?? fallbackAmount
-    : robotState.entry_value ?? fallbackAmount;
+    ? robotState.gale_amount ?? robotState.last_trade?.amount ?? robotState.entry_value
+    : robotState.entry_value;
   const duration = robotState.cycle_minutes || FIXED_CYCLE_MINUTES;
 
   if (!assetId || (direction !== "CALL" && direction !== "PUT")) return null;
@@ -920,6 +938,13 @@ function createRealBuyKey(robotState: RobotState, payload: BullexBuyRealPayload)
     payload.amount,
     payload.duration,
   ].join("|");
+}
+
+function formatCurrencyBRL(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
 }
 
 function shouldShowResetCycle(robotState: RobotState | undefined) {

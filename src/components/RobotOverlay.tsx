@@ -11,7 +11,13 @@ import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
-import { DEFAULT_ROBOT_SETTINGS, type RobotSettings } from "@/lib/robotSettings";
+import {
+  DEFAULT_ROBOT_SETTINGS,
+  ENTRY_VALUE_MAX,
+  ENTRY_VALUE_MIN,
+  ENTRY_VALUE_STEP,
+  type RobotSettings,
+} from "@/lib/robotSettings";
 
 type RobotOverlayProps = {
   robotState?: RobotState;
@@ -527,13 +533,17 @@ function RobotConfigMenu({
   ) {
     const next = Number(value);
     const normalized =
-      key === "martingaleSteps"
+      key === "entryValue"
+        ? Number.isFinite(next)
+          ? Math.min(ENTRY_VALUE_MAX, Math.max(ENTRY_VALUE_MIN, Math.round(next)))
+          : settings.entryValue
+        : key === "martingaleSteps"
         ? Number.isFinite(next)
           ? Math.max(1, Math.round(next))
           : settings.martingaleSteps
         : Number.isFinite(next)
           ? next
-          : 0;
+          : settings[key];
     onChange({ ...settings, [key]: normalized });
   }
 
@@ -569,7 +579,10 @@ function RobotConfigMenu({
         <ConfigNumber
           label="Valor por entrada"
           value={settings.entryValue}
-          step="0.5"
+          min={ENTRY_VALUE_MIN}
+          max={ENTRY_VALUE_MAX}
+          step={ENTRY_VALUE_STEP}
+          helperText={`Valor minimo: ${formatCurrencyBRL(ENTRY_VALUE_MIN)}\nValor maximo: ${formatCurrencyBRL(ENTRY_VALUE_MAX)}`}
           onChange={(value) => updateNumber("entryValue", value)}
         />
 
@@ -620,12 +633,18 @@ function RobotConfigMenu({
 function ConfigNumber({
   label,
   value,
-  step = "1",
+  step = 1,
+  min = 0,
+  max,
+  helperText,
   onChange,
 }: {
   label: string;
   value: number;
-  step?: string;
+  step?: number;
+  min?: number;
+  max?: number;
+  helperText?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -633,12 +652,18 @@ function ConfigNumber({
       <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       <input
         type="number"
-        min="0"
+        min={min}
+        max={max}
         step={step}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-lg border border-border bg-input px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-ring/20"
       />
+      {helperText ? (
+        <span className="mt-1 block whitespace-pre-line text-[11px] text-muted-foreground">
+          {helperText}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -709,6 +734,13 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "USD",
+  }).format(value);
+}
+
+function formatCurrencyBRL(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
   }).format(value);
 }
 
