@@ -22,7 +22,7 @@ import { resetBullExAccountState } from "@/hooks/useBullExAccount";
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { to: "/chart", label: "Gráfico", Icon: CandlestickChart },
-  { to: "/bullex", label: "BullEx", Icon: Plug },
+  { to: "/bullex", label: "ElCapo", Icon: Plug },
   { to: "/robot", label: "Robô", Icon: Bot },
   { to: "/history", label: "Histórico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Bot className="h-5 w-5" />
           </div>
           <div>
-            <div className="font-bold leading-tight">BullEx</div>
+            <div className="font-bold leading-tight">ElCapo</div>
             <div className="text-xs text-muted-foreground leading-tight">AutoBot</div>
           </div>
         </div>

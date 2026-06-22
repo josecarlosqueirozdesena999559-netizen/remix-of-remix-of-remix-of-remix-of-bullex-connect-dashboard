@@ -46,7 +46,7 @@ function AuthPage() {
               <Bot className="h-6 w-6" />
             </div>
             <div className="text-left">
-              <div className="text-xl font-bold leading-tight">BullEx AutoBot</div>
+              <div className="text-xl font-bold leading-tight">ElCapo AutoBot</div>
               <div className="text-xs text-muted-foreground">Painel de operacoes</div>
             </div>
           </div>
