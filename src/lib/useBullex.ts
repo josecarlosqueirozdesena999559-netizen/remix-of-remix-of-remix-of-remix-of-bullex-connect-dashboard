@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BULLEX_ACCOUNT_QUERY_KEY, getDisconnectedState } from "@/hooks/useBullExAccount";
-import { ROBOT_STATE_QUERY_KEY } from "@/hooks/useRobotState";
+import { createStoppedRobotState, ROBOT_STATE_QUERY_KEY } from "@/hooks/useRobotState";
+import { resetRobotPresentationState } from "@/lib/robotPresentation";
 import {
   ApiError,
   type ApiResult,
@@ -104,6 +105,13 @@ export function useDisconnectBullex() {
     mutationFn: async () => unwrap(await bullexApi.disconnect()),
     onSuccess: async () => {
       qc.setQueryData([...BULLEX_ACCOUNT_QUERY_KEY, user?.id], getDisconnectedState());
+      qc.setQueryData([...ROBOT_STATE_QUERY_KEY, user?.id], createStoppedRobotState(true));
+      resetRobotPresentationState();
+      await qc.refetchQueries({
+        queryKey: [...ROBOT_STATE_QUERY_KEY, user?.id],
+        exact: true,
+        type: "active",
+      });
       await qc.invalidateQueries({ queryKey: ["bullex"] });
       await qc.invalidateQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY });
     },

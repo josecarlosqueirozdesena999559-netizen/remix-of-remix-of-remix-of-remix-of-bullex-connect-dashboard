@@ -54,7 +54,10 @@ function preferAccountConnection(
     ...robotState,
     connected: true,
     disconnected: false,
-    status: robotState.status === "ACCOUNT_DISCONNECTED" ? "STOPPED" : robotState.status,
+    status:
+      robotState.status === "ACCOUNT_DISCONNECTED" || robotState.status === "DISCONNECTED"
+        ? "STOPPED"
+        : robotState.status,
     real_block_reason:
       robotState.real_block_reason === "Conta BullEx desconectada"
         ? null
@@ -76,6 +79,7 @@ function isRobotDisconnected(robotState: RobotState | undefined) {
   return (
     robotState?.connected === false ||
     robotState?.disconnected === true ||
-    robotState?.status === "ACCOUNT_DISCONNECTED"
+    robotState?.status === "ACCOUNT_DISCONNECTED" ||
+    robotState?.status === "DISCONNECTED"
   );
 }

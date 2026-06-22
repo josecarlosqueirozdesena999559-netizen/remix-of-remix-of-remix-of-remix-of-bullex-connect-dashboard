@@ -338,7 +338,8 @@ function isDisconnected(robotState: RobotState) {
   return (
     robotState.connected === false ||
     robotState.disconnected ||
-    robotState.status === "ACCOUNT_DISCONNECTED"
+    robotState.status === "ACCOUNT_DISCONNECTED" ||
+    robotState.status === "DISCONNECTED"
   );
 }
 

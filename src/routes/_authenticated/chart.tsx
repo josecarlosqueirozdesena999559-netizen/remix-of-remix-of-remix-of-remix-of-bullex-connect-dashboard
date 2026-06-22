@@ -38,7 +38,16 @@ function MarketPage() {
   const { account, robotState } = useLiveTradingData();
   const displayRobotState = useRobotDisplayState(robotState.data);
   const now = useCurrentTime();
-  const chartSelection = resolveChartSelection(displayRobotState, selectedSymbol, now);
+  const accountDisconnected =
+    account.data?.connected === false ||
+    account.data?.status === "disconnected" ||
+    account.data?.status === "DISCONNECTED";
+  const chartSelection = resolveChartSelection(
+    displayRobotState,
+    selectedSymbol,
+    now,
+    accountDisconnected,
+  );
   const chartSymbol = chartSelection.symbol;
 
   const assetsQuery = useQuery({
@@ -113,7 +122,9 @@ function MarketPage() {
     isAssetNotAllowed(candlesError) ||
     isAssetNotAllowed(payoutError);
 
-  const overlaySignal = displayRobotState?.pending_signal ?? displayRobotState?.best_candidate ?? null;
+  const overlaySignal = accountDisconnected
+    ? null
+    : displayRobotState?.pending_signal ?? displayRobotState?.best_candidate ?? null;
   const overlayResult = getOverlayResult(displayRobotState);
 
   return (
@@ -265,14 +276,17 @@ function MarketPage() {
               timeframe={DEFAULT_TIMEFRAME}
               candles={candles}
               overlay={{
+                disconnected: accountDisconnected,
                 currentPrice: lastPrice,
                 realtimeStatus: formatRealtimeStatus(realtimeStatus, realtimeAgeSeconds),
-                bestSymbol: displayRobotState?.best_candidate?.symbol ?? null,
+                bestSymbol: accountDisconnected
+                  ? null
+                  : displayRobotState?.best_candidate?.symbol ?? null,
                 direction: overlaySignal?.direction ?? null,
                 confidence: overlaySignal?.confidence ?? null,
                 score: overlaySignal?.strategy_score ?? null,
                 strategy: overlaySignal?.strategy_name ?? null,
-                entryCountdown: formatEntryCountdown(displayRobotState),
+                entryCountdown: accountDisconnected ? null : formatEntryCountdown(displayRobotState),
                 result: overlayResult,
               }}
             />
@@ -363,7 +377,12 @@ function resolveChartSelection(
   robotState: RobotState | undefined,
   selectedSymbol: string,
   now: number,
+  disconnected = false,
 ) {
+  if (disconnected) {
+    return { symbol: selectedSymbol || DEFAULT_SYMBOL, source: "selected" as const };
+  }
+
   if (robotState?.pending_signal?.symbol) {
     return { symbol: robotState.pending_signal.symbol, source: "pending_signal" as const };
   }

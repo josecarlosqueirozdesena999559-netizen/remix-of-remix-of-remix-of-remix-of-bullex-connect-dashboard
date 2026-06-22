@@ -22,6 +22,8 @@ export function useRobotDisplayState(robotState: RobotState | undefined) {
       robotState.status === "SIGNAL_REJECTED" ||
       robotState.status === "PENDING_RESULT" ||
       robotState.status === "RESULT_RECEIVED" ||
+      robotState.status === "ACCOUNT_DISCONNECTED" ||
+      robotState.status === "DISCONNECTED" ||
       robotState.status === "STOPPED" ||
       robotState.status === "WAITING_NEXT_CYCLE"
     ) {

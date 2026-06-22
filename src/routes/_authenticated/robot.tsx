@@ -100,7 +100,12 @@ function RobotPage() {
   });
   const syncing = account.isLoading || robotState.isLoading;
   const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
-  const connected = account.data?.connected === true || cachedGrace;
+  const accountDisconnected =
+    !cachedGrace &&
+    (account.data?.connected === false ||
+      account.data?.status === "disconnected" ||
+      account.data?.status === "DISCONNECTED");
+  const connected = !accountDisconnected && (account.data?.connected === true || cachedGrace);
   const activeMode = account.data?.mode ?? null;
   const realSelected = activeMode === "REAL";
   const robotStopped =
@@ -109,10 +114,22 @@ function RobotPage() {
   const robotEnabled = Boolean(displayRobotState) && !robotStopped;
   const hasBackend = !!apiConfig.BASE_URL;
   const showResetCycle = shouldShowResetCycle(displayRobotState);
-  const robotStatusTitle = realBuyError ? "Compra REAL bloqueada" : robotPresentation.title;
-  const robotStatusDetail = realBuyError
-    ? `Compra REAL bloqueada: ${realBuyError}`
-    : robotPresentation.detail;
+  const disconnectedPresentation = {
+    title: "Conta BullEx desconectada",
+    detail: "Reconecte sua conta para voltar a operar.",
+    footer: null,
+  };
+  const robotStatusTitle = accountDisconnected
+    ? disconnectedPresentation.title
+    : realBuyError
+      ? "Compra REAL bloqueada"
+      : robotPresentation.title;
+  const robotStatusDetail = accountDisconnected
+    ? disconnectedPresentation.detail
+    : realBuyError
+      ? `Compra REAL bloqueada: ${realBuyError}`
+      : robotPresentation.detail;
+  const robotStatusFooter = accountDisconnected ? null : robotPresentation.footer;
 
   function buildRobotConfigPayload(
     overrides: Partial<Parameters<typeof robotConfig>[0]> = {},
@@ -428,9 +445,9 @@ function RobotPage() {
         </div>
       ) : null}
 
-      {!syncing && !connected ? (
+      {!syncing && accountDisconnected ? (
         <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-sm">
-          <p className="font-medium text-warning-foreground">Conta BullEx desconectada.</p>
+          <p className="font-medium text-warning-foreground">Conta BullEx desconectada</p>
           <p className="mt-1 text-muted-foreground">
             Faça login na página BullEx antes de iniciar o robô.
           </p>
@@ -438,7 +455,7 @@ function RobotPage() {
             to="/bullex"
             className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
           >
-            Abrir BullEx
+            Conectar BullEx
           </Link>
         </div>
       ) : null}
@@ -498,8 +515,8 @@ function RobotPage() {
                 {robotStatusDetail}
               </p>
             ) : null}
-            {robotPresentation.footer ? (
-              <p className="mt-1 text-sm font-medium">{robotPresentation.footer}</p>
+            {robotStatusFooter ? (
+              <p className="mt-1 text-sm font-medium">{robotStatusFooter}</p>
             ) : null}
           </div>
           <span className="rounded-md bg-muted px-3 py-1 text-xs font-medium">
@@ -507,7 +524,7 @@ function RobotPage() {
           </span>
         </div>
 
-        {robotPresentation.trade ? (
+        {!accountDisconnected && robotPresentation.trade ? (
           <div className="mt-5 flex flex-wrap gap-2 text-sm">
             <Pill label="Ativo" value={robotPresentation.trade.active} />
             <Pill label="Direção" value={robotPresentation.trade.direction} />
@@ -520,7 +537,7 @@ function RobotPage() {
           </div>
         ) : null}
 
-        {robotPresentation.gale ? (
+        {!accountDisconnected && robotPresentation.gale ? (
           <div className="mt-5 flex flex-wrap gap-2 text-sm">
             <Pill label="Mesmo ativo" value={robotPresentation.gale.active} />
             <Pill label="Mesma direção" value={robotPresentation.gale.direction} />
@@ -530,7 +547,7 @@ function RobotPage() {
           </div>
         ) : null}
 
-        {robotPresentation.signal ? (
+        {!accountDisconnected && robotPresentation.signal ? (
           <div className="mt-5 space-y-3 text-sm">
             <div className="flex flex-wrap gap-2">
               <Pill label="Ativo" value={robotPresentation.signal.symbol} />

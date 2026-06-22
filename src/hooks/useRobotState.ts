@@ -182,7 +182,7 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     enabled: false,
     worker_running: false,
     connected: !disconnected,
-    status: "STOPPED",
+    status: disconnected ? "ACCOUNT_DISCONNECTED" : "STOPPED",
     cycle_id: null,
     allow_real: false,
     confirm_real: false,

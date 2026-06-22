@@ -31,6 +31,7 @@ const CHART_THEME = {
 } as const;
 
 type TradingChartOverlay = {
+  disconnected?: boolean;
   currentPrice: number | null;
   realtimeStatus: string;
   bestSymbol: string | null;
@@ -253,11 +254,15 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
           />
           <OverlayRow label="Timeframe" value={timeframe} />
           <OverlayRow label="Status" value={overlay?.realtimeStatus ?? "-"} />
-          <OverlayRow label="Melhor ativo" value={overlay?.bestSymbol ?? "-"} />
+          {!overlay?.disconnected ? (
+            <OverlayRow label="Melhor ativo" value={overlay?.bestSymbol ?? "-"} />
+          ) : null}
           <OverlayRow label="Direção" value={overlay?.direction ?? "-"} />
           <OverlayRow label="Score/confiança" value={formatScoreConfidence(overlay)} />
           <OverlayRow label="Estratégia" value={overlay?.strategy ?? "-"} />
-          <OverlayRow label="Entrada em" value={overlay?.entryCountdown ?? "-"} />
+          {!overlay?.disconnected ? (
+            <OverlayRow label="Entrada em" value={overlay?.entryCountdown ?? "-"} />
+          ) : null}
           <OverlayRow label="WIN/LOSS" value={overlay?.result ?? "-"} />
         </div>
       </div>

@@ -227,6 +227,24 @@ test("WAITING_NEXT_CYCLE nao mostra entrada liberada antes de SENDING_ORDER", ()
   assert.equal(presentation.footer, null);
 });
 
+test("status DISCONNECTED nunca mostra analise operacional", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      connected: false,
+      disconnected: true,
+      status: "DISCONNECTED",
+      best_candidate: createSignal(),
+      seconds_until_next_cycle: 42,
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Conta BullEx desconectada");
+  assert.equal(presentation.detail, "Reconecte para o robo operar");
+  assert.equal(presentation.footer, null);
+  assert.equal(presentation.signal, null);
+});
+
 test("SENDING_ORDER e PENDING_RESULT usam os novos textos de operacao", () => {
   const sending = getRobotPresentation(createRobotState({ status: "SENDING_ORDER" }), now);
   const pending = getRobotPresentation(
