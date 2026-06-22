@@ -421,7 +421,7 @@ function formatScore(value: number | null) {
 }
 
 function formatTechnicalSpeech(value: string) {
-  return value
+  return removeSpeechDiacritics(value)
     .replace(/([a-zA-Z])([A-Z])/g, "$1 $2")
     .replace(/[_/\\-]+/g, " ")
     .replace(/\bRSI\b/gi, "R S I")
@@ -432,6 +432,10 @@ function formatTechnicalSpeech(value: string) {
     .replace(/\bOTC\b/gi, "O T C")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function removeSpeechDiacritics(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function formatSpokenDuration(totalSeconds: number) {
