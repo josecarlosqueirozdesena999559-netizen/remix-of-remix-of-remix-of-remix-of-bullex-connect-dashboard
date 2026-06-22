@@ -1,7 +1,29 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: () => {
-    throw redirect({ to: "/dashboard" });
-  },
+  ssr: false,
+  component: HomeRedirect,
 });
+
+function HomeRedirect() {
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    navigate({ to: user ? "/dashboard" : "/login", replace: true });
+  }, [loading, navigate, user]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="text-center">
+        <div className="text-lg font-semibold text-foreground">Carregando</div>
+        <div className="mt-2 text-sm text-muted-foreground">
+          Redirecionando para a pagina correta.
+        </div>
+      </div>
+    </div>
+  );
+}

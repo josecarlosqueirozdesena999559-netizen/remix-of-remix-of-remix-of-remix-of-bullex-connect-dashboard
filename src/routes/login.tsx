@@ -53,8 +53,7 @@ function AuthPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6">
-          <h1 className="mb-1 text-xl font-semibold">Entrar</h1>
-          <div className="mb-6" />
+          <h1 className="mb-6 text-xl font-semibold">Entrar</h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
