@@ -5,7 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Settings, Volume2, VolumeX, X } from "lucide-react";
+import { RotateCcw, Settings, Trophy, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
@@ -23,6 +23,10 @@ type RobotOverlayProps = {
   onSettingsChange?: (settings: RobotSettings) => void | Promise<void>;
   onClose?: () => void;
   showConfig?: boolean;
+  adminModelControls?: {
+    onAddWin: () => void;
+    onResetScore: () => void;
+  } | null;
 };
 
 type Position = {
@@ -49,6 +53,7 @@ export function RobotOverlay({
   onSettingsChange,
   onClose,
   showConfig,
+  adminModelControls,
 }: RobotOverlayProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
@@ -324,6 +329,26 @@ export function RobotOverlay({
         ) : null}
         {content.footer ? (
           <p className="mt-0.5 text-[11px] font-semibold sm:text-xs">{content.footer}</p>
+        ) : null}
+        {adminModelControls ? (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={adminModelControls.onAddWin}
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1.5 text-[10px] font-bold text-emerald-100 transition hover:bg-emerald-500/30 sm:text-xs"
+            >
+              <Trophy className="h-3 w-3" />
+              WIN +1
+            </button>
+            <button
+              type="button"
+              onClick={adminModelControls.onResetScore}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-card/80 px-3 py-1.5 text-[10px] font-bold text-foreground transition hover:bg-accent sm:text-xs"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Resetar placar
+            </button>
+          </div>
         ) : null}
       </div>
     </div>

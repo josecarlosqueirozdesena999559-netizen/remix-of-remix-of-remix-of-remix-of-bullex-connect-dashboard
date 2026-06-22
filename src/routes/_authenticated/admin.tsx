@@ -7,6 +7,8 @@ import {
   CalendarClock,
   CheckCircle2,
   CreditCard,
+  Gift,
+  LineChart,
   Search,
   ShieldCheck,
   UserPlus,
@@ -23,6 +25,7 @@ import {
 } from "@/lib/api";
 import { isAdminUser } from "@/lib/adminAccess";
 import { supabase } from "@/lib/supabase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin - BullEx AutoBot" }] }),
@@ -55,10 +58,14 @@ type AdminOverview = {
     expiredPlans: number;
     activeTrials: number;
     totalRevenue: number;
+    monthlyProfit: number;
+    monthlyBillings: number;
     currency: string;
   };
   users: AdminUser[];
 };
+
+const TRIAL_DAYS = 7;
 
 function AdminPage() {
   const queryClient = useQueryClient();
@@ -114,6 +121,10 @@ function AdminPage() {
   const expiredUsers = filteredUsers.filter((user) => user.status === "expired");
   const trialUsers = filteredUsers.filter((user) => user.status === "trial");
   const selectedUser = filteredUsers.find((user) => user.id === selectedUserId) ?? null;
+  const thisMonthBillingUsers = useMemo(
+    () => getUsersWithBillingInMonth(overview.users, new Date()),
+    [overview.users],
+  );
 
   const createUserMutation = useMutation({
     mutationFn: async (payload: AdminCreateUserPayload) => {
@@ -194,6 +205,25 @@ function AdminPage() {
     });
   }
 
+  function handleGrantTrial() {
+    if (!selectedUser) return;
+
+    const trialEndDate = getDateInputValue(TRIAL_DAYS);
+    updateUserMutation.mutate({
+      userId: selectedUser.id,
+      payload: {
+        plan_name: "Teste gratis",
+        amount: 0,
+        currency: selectedUser.currency || "BRL",
+        status: "trial",
+        expires_at: toIsoDateTime(trialEndDate),
+        next_billing_at: toIsoDateTime(trialEndDate),
+        grant_access: true,
+        reset_monthly_cycle: true,
+      },
+    });
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -249,185 +279,22 @@ function AdminPage() {
           tone="money"
         />
       </div>
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="users" className="border border-border bg-card px-4 py-2 data-[state=active]:border-primary">
+            Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="create" className="border border-border bg-card px-4 py-2 data-[state=active]:border-primary">
+            Criar usuario
+          </TabsTrigger>
+          <TabsTrigger value="finance" className="border border-border bg-card px-4 py-2 data-[state=active]:border-primary">
+            Financeiro
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <div>
-            <h2 className="flex items-center gap-2 font-semibold">
-              <UserPlus className="h-4 w-4 text-primary" />
-              Cadastrar usuario
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              O cadastro publico fica bloqueado. Somente o admin cria acessos.
-            </p>
-          </div>
-
-          <form onSubmit={handleCreateUserSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Nome"
-              value={createForm.name}
-              onChange={(value) => setCreateForm((current) => ({ ...current, name: value }))}
-              placeholder="Nome do usuario"
-            />
-            <Field
-              label="Email"
-              type="email"
-              value={createForm.email}
-              onChange={(value) => setCreateForm((current) => ({ ...current, email: value }))}
-              placeholder="usuario@email.com"
-            />
-            <Field
-              label="Senha provisoria"
-              type="password"
-              value={createForm.password}
-              onChange={(value) => setCreateForm((current) => ({ ...current, password: value }))}
-              placeholder="Minimo de 6 caracteres"
-            />
-            <Field
-              label="Plano"
-              value={createForm.plan}
-              onChange={(value) => setCreateForm((current) => ({ ...current, plan: value }))}
-              placeholder="Mensal"
-            />
-            <Field
-              label="Valor mensal"
-              type="number"
-              value={createForm.amount}
-              onChange={(value) => setCreateForm((current) => ({ ...current, amount: value }))}
-              placeholder="0"
-              min="0"
-              step="0.01"
-            />
-            <Field
-              label="Proxima cobranca"
-              type="date"
-              value={createForm.billingDate}
-              onChange={(value) =>
-                setCreateForm((current) => ({ ...current, billingDate: value }))
-              }
-            />
-            <div className="sm:col-span-2">
-              <button
-                type="submit"
-                disabled={createUserMutation.isPending}
-                className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {createUserMutation.isPending ? "Cadastrando..." : "Cadastrar usuario"}
-              </button>
-            </div>
-          </form>
-
-          {createUserMutation.error ? (
-            <InlineFeedback
-              tone="error"
-              message={getErrorMessage(createUserMutation.error, "Falha ao cadastrar usuario.")}
-            />
-          ) : null}
-          {createUserMutation.isSuccess ? (
-            <InlineFeedback
-              tone="success"
-              message="Usuario criado. Ajuste plano e cobranca se precisar."
-            />
-          ) : null}
-        </section>
-
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <div>
-            <h2 className="flex items-center gap-2 font-semibold">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Liberar acesso e renovar mensalidade
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Selecione um usuario na lista para reativar acesso ou definir a proxima cobranca.
-            </p>
-          </div>
-
-          {selectedUser ? (
-            <form onSubmit={handleUserUpdateSubmit} className="mt-5 space-y-4">
-              <div className="rounded-xl border border-border bg-background/60 p-4">
-                <div className="font-semibold">{selectedUser.name || selectedUser.email}</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {selectedUser.email || selectedUser.id}
-                </div>
-              </div>
-
-              <Field
-                label="Plano"
-                value={editForm.plan}
-                onChange={(value) => setEditForm((current) => ({ ...current, plan: value }))}
-              />
-              <Field
-                label="Valor mensal"
-                type="number"
-                value={editForm.amount}
-                onChange={(value) => setEditForm((current) => ({ ...current, amount: value }))}
-                min="0"
-                step="0.01"
-              />
-              <SelectField
-                label="Status"
-                value={editForm.status}
-                onChange={(value) =>
-                  setEditForm((current) => ({ ...current, status: value as AdminPlanStatus }))
-                }
-                options={STATUS_OPTIONS}
-              />
-              <Field
-                label="Fim do acesso"
-                type="date"
-                value={editForm.expiresAt}
-                onChange={(value) => setEditForm((current) => ({ ...current, expiresAt: value }))}
-              />
-              <Field
-                label="Proxima cobranca"
-                type="date"
-                value={editForm.nextBillingAt}
-                onChange={(value) =>
-                  setEditForm((current) => ({ ...current, nextBillingAt: value }))
-                }
-              />
-
-              <label className="flex items-center gap-3 rounded-xl border border-border px-3 py-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={editForm.grantAccess}
-                  onChange={(event) =>
-                    setEditForm((current) => ({
-                      ...current,
-                      grantAccess: event.target.checked,
-                    }))
-                  }
-                />
-                Liberar uso imediatamente
-              </label>
-
-              <button
-                type="submit"
-                disabled={updateUserMutation.isPending}
-                className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {updateUserMutation.isPending ? "Salvando..." : "Salvar liberacao"}
-              </button>
-            </form>
-          ) : (
-            <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
-              Escolha um usuario na tabela abaixo para abrir os controles de liberacao.
-            </div>
-          )}
-
-          {updateUserMutation.error ? (
-            <InlineFeedback
-              tone="error"
-              message={getErrorMessage(updateUserMutation.error, "Falha ao atualizar usuario.")}
-            />
-          ) : null}
-          {updateUserMutation.isSuccess ? (
-            <InlineFeedback tone="success" message="Acesso e ciclo mensal atualizados." />
-          ) : null}
-        </section>
-      </div>
-
-      <section className="rounded-2xl border border-border bg-card">
+        <TabsContent value="users" className="space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <section className="rounded-2xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
           <div>
             <h2 className="font-semibold">Usuarios</h2>
@@ -531,13 +398,293 @@ function AdminPage() {
             </tbody>
           </table>
         </div>
-      </section>
+            </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <PlanList title="Ativos" users={activeUsers} empty="Nenhum plano ativo" />
-        <PlanList title="Vencidos" users={expiredUsers} empty="Nenhum plano vencido" />
-        <PlanList title="Teste gratis" users={trialUsers} empty="Nenhum teste gratis ativo" />
-      </div>
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div>
+                <h2 className="flex items-center gap-2 font-semibold">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  Liberar acesso e renovar mensalidade
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Selecione um usuario na tabela para editar acesso, cobranca ou liberar teste gratis.
+                </p>
+              </div>
+
+              {selectedUser ? (
+                <form onSubmit={handleUserUpdateSubmit} className="mt-5 space-y-4">
+                  <div className="rounded-xl border border-border bg-background/60 p-4">
+                    <div className="font-semibold">{selectedUser.name || selectedUser.email}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {selectedUser.email || selectedUser.id}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGrantTrial}
+                      disabled={updateUserMutation.isPending}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Gift className="h-4 w-4 text-primary" />
+                      Liberar teste gratis
+                    </button>
+                  </div>
+
+                  <Field
+                    label="Plano"
+                    value={editForm.plan}
+                    onChange={(value) => setEditForm((current) => ({ ...current, plan: value }))}
+                  />
+                  <Field
+                    label="Valor mensal"
+                    type="number"
+                    value={editForm.amount}
+                    onChange={(value) => setEditForm((current) => ({ ...current, amount: value }))}
+                    min="0"
+                    step="0.01"
+                  />
+                  <SelectField
+                    label="Status"
+                    value={editForm.status}
+                    onChange={(value) =>
+                      setEditForm((current) => ({ ...current, status: value as AdminPlanStatus }))
+                    }
+                    options={STATUS_OPTIONS}
+                  />
+                  <Field
+                    label="Fim do acesso"
+                    type="date"
+                    value={editForm.expiresAt}
+                    onChange={(value) => setEditForm((current) => ({ ...current, expiresAt: value }))}
+                  />
+                  <Field
+                    label="Proxima cobranca"
+                    type="date"
+                    value={editForm.nextBillingAt}
+                    onChange={(value) =>
+                      setEditForm((current) => ({ ...current, nextBillingAt: value }))
+                    }
+                  />
+
+                  <label className="flex items-center gap-3 rounded-xl border border-border px-3 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={editForm.grantAccess}
+                      onChange={(event) =>
+                        setEditForm((current) => ({
+                          ...current,
+                          grantAccess: event.target.checked,
+                        }))
+                      }
+                    />
+                    Liberar uso imediatamente
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={updateUserMutation.isPending}
+                    className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {updateUserMutation.isPending ? "Salvando..." : "Salvar liberacao"}
+                  </button>
+                </form>
+              ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+                  Escolha um usuario na tabela para abrir os controles de liberacao.
+                </div>
+              )}
+
+              {updateUserMutation.error ? (
+                <InlineFeedback
+                  tone="error"
+                  message={getErrorMessage(updateUserMutation.error, "Falha ao atualizar usuario.")}
+                />
+              ) : null}
+              {updateUserMutation.isSuccess ? (
+                <InlineFeedback tone="success" message="Acesso e ciclo mensal atualizados." />
+              ) : null}
+            </section>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <PlanList title="Ativos" users={activeUsers} empty="Nenhum plano ativo" />
+            <PlanList title="Vencidos" users={expiredUsers} empty="Nenhum plano vencido" />
+            <PlanList title="Teste gratis" users={trialUsers} empty="Nenhum teste gratis ativo" />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="create">
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <div>
+              <h2 className="flex items-center gap-2 font-semibold">
+                <UserPlus className="h-4 w-4 text-primary" />
+                Cadastrar usuario
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                O cadastro publico fica bloqueado. Somente o admin cria acessos.
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateUserSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Nome"
+                value={createForm.name}
+                onChange={(value) => setCreateForm((current) => ({ ...current, name: value }))}
+                placeholder="Nome do usuario"
+              />
+              <Field
+                label="Email"
+                type="email"
+                value={createForm.email}
+                onChange={(value) => setCreateForm((current) => ({ ...current, email: value }))}
+                placeholder="usuario@email.com"
+              />
+              <Field
+                label="Senha provisoria"
+                type="password"
+                value={createForm.password}
+                onChange={(value) => setCreateForm((current) => ({ ...current, password: value }))}
+                placeholder="Minimo de 6 caracteres"
+              />
+              <Field
+                label="Plano"
+                value={createForm.plan}
+                onChange={(value) => setCreateForm((current) => ({ ...current, plan: value }))}
+                placeholder="Mensal"
+              />
+              <Field
+                label="Valor mensal"
+                type="number"
+                value={createForm.amount}
+                onChange={(value) => setCreateForm((current) => ({ ...current, amount: value }))}
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+              <Field
+                label="Proxima cobranca"
+                type="date"
+                value={createForm.billingDate}
+                onChange={(value) =>
+                  setCreateForm((current) => ({ ...current, billingDate: value }))
+                }
+              />
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  disabled={createUserMutation.isPending}
+                  className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {createUserMutation.isPending ? "Cadastrando..." : "Cadastrar usuario"}
+                </button>
+              </div>
+            </form>
+
+            {createUserMutation.error ? (
+              <InlineFeedback
+                tone="error"
+                message={getErrorMessage(createUserMutation.error, "Falha ao cadastrar usuario.")}
+              />
+            ) : null}
+            {createUserMutation.isSuccess ? (
+              <InlineFeedback
+                tone="success"
+                message="Usuario criado. Ajuste plano e cobranca se precisar."
+              />
+            ) : null}
+          </section>
+        </TabsContent>
+
+        <TabsContent value="finance" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <AdminStat
+              label="Lucro mensal previsto"
+              value={formatMoney(overview.stats.monthlyProfit, overview.stats.currency)}
+              Icon={LineChart}
+              tone="money"
+            />
+            <AdminStat
+              label="Cobrancas neste mes"
+              value={formatNumber(overview.stats.monthlyBillings)}
+              Icon={CalendarClock}
+            />
+            <AdminStat
+              label="Testes gratis ativos"
+              value={formatNumber(overview.stats.activeTrials)}
+              Icon={Gift}
+            />
+          </div>
+
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Painel de lucro mensal</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Estimativa baseada nos usuarios ativos e nas cobrancas previstas para o mes atual.
+                </p>
+              </div>
+              <span className="rounded-md bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+                {formatMonthLabel(new Date())}
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-xl border border-border bg-background/50 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Resumo do mes
+                </div>
+                <div className="mt-3 space-y-3">
+                  <FinanceRow
+                    label="Lucro mensal previsto"
+                    value={formatMoney(overview.stats.monthlyProfit, overview.stats.currency)}
+                  />
+                  <FinanceRow
+                    label="Usuarios ativos pagantes"
+                    value={formatNumber(activeUsers.length)}
+                  />
+                  <FinanceRow
+                    label="Cobrancas previstas"
+                    value={formatNumber(thisMonthBillingUsers.length)}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-background/50 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Proximas cobrancas do mes
+                </div>
+                <div className="mt-3 space-y-3">
+                  {thisMonthBillingUsers.slice(0, 8).map((user) => (
+                    <div
+                      key={`billing-${user.id}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">
+                          {user.name || user.email || user.id}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {formatDate(user.nextBillingAt)}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {formatMoney(user.amount, user.currency)}
+                      </div>
+                    </div>
+                  ))}
+                  {thisMonthBillingUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma cobranca prevista para este mes.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -599,6 +746,15 @@ function PlanList({ title, users, empty }: { title: string; users: AdminUser[]; 
         {users.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : null}
       </div>
     </section>
+  );
+}
+
+function FinanceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-3">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold">{value}</span>
+    </div>
   );
 }
 
@@ -701,6 +857,11 @@ function normalizeAdminOverview(input: unknown): AdminOverview {
   const users = rawUsers.map(normalizeAdminUser).filter(Boolean) as AdminUser[];
   const statsValue = asRecord(value.stats ?? value.summary ?? value.dashboard);
   const currency = normalizeText(value.currency ?? statsValue.currency, "BRL");
+  const inferredMonthlyProfit = users.reduce(
+    (sum, user) => sum + (user.status === "active" ? user.amount : 0),
+    0,
+  );
+  const inferredMonthlyBillings = getUsersWithBillingInMonth(users, new Date()).length;
 
   return {
     stats: {
@@ -720,6 +881,20 @@ function normalizeAdminOverview(input: unknown): AdminOverview {
         normalizeNumber(
           statsValue.total_revenue ?? statsValue.totalRevenue ?? statsValue.real_value,
         ) ?? users.reduce((sum, user) => sum + (user.status === "active" ? user.amount : 0), 0),
+      monthlyProfit:
+        normalizeNumber(
+          statsValue.monthly_profit ??
+            statsValue.monthlyProfit ??
+            statsValue.monthly_revenue ??
+            statsValue.monthlyRevenue,
+        ) ?? inferredMonthlyProfit,
+      monthlyBillings:
+        normalizeNumber(
+          statsValue.monthly_billings ??
+            statsValue.monthlyBillings ??
+            statsValue.billings_this_month ??
+            statsValue.billingsThisMonth,
+        ) ?? inferredMonthlyBillings,
       currency,
     },
     users,
@@ -841,10 +1016,35 @@ const EMPTY_OVERVIEW: AdminOverview = {
     expiredPlans: 0,
     activeTrials: 0,
     totalRevenue: 0,
+    monthlyProfit: 0,
+    monthlyBillings: 0,
     currency: "BRL",
   },
   users: [],
 };
+
+function getUsersWithBillingInMonth(users: AdminUser[], currentDate: Date) {
+  const month = currentDate.getUTCMonth();
+  const year = currentDate.getUTCFullYear();
+
+  return users.filter((user) => {
+    if (!user.nextBillingAt) return false;
+    const nextBillingDate = new Date(user.nextBillingAt);
+    if (Number.isNaN(nextBillingDate.getTime())) return false;
+    return (
+      nextBillingDate.getUTCMonth() === month &&
+      nextBillingDate.getUTCFullYear() === year &&
+      user.amount > 0
+    );
+  });
+}
+
+function formatMonthLabel(value: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+  }).format(value);
+}
 
 function normalizeMoneyInput(value: string) {
   const parsed = Number(value);
