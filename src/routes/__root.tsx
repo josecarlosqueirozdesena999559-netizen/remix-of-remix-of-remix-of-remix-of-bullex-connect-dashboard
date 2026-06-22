@@ -164,17 +164,34 @@ function AuthStateBoundary({ children }: { children: ReactNode }) {
       user_id: nextUserId,
     });
 
-    void queryClient.cancelQueries().then(() => {
-      queryClient.clear();
-      resetBullExAccountState(previousUserId);
-      resetBullExAccountState(nextUserId);
-      resetRobotSettings();
-      resetRobotPresentationState();
-      console.log("[ROBOT STATE RESET]");
-      setReadyUserId(nextUserId);
-    });
+    void queryClient
+      .cancelQueries()
+      .catch((error) => {
+        console.error("[AUTH_QUERY_CANCEL_ERROR]", error);
+      })
+      .finally(() => {
+        queryClient.clear();
+        resetBullExAccountState(previousUserId);
+        resetBullExAccountState(nextUserId);
+        resetRobotSettings();
+        resetRobotPresentationState();
+        console.log("[ROBOT STATE RESET]");
+        setReadyUserId(nextUserId);
+      });
   }, [loading, queryClient, user?.id]);
 
-  if (loading || readyUserId !== (user?.id ?? null)) return null;
+  if (loading || readyUserId !== (user?.id ?? null)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="text-center">
+          <div className="text-lg font-semibold text-foreground">Carregando sessao</div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            Aguarde enquanto restauramos seu painel.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return children;
 }
