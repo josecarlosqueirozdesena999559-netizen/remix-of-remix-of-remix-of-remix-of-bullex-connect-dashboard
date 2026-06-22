@@ -15,6 +15,7 @@ import { isAdminUser } from "@/lib/adminAccess";
 export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(true);
   const [adminWins, setAdminWins] = useState(0);
+  const [adminCycleStartedAt, setAdminCycleStartedAt] = useState(() => Date.now());
   const [adminResultFlash, setAdminResultFlash] = useState<null | { at: number; wins: number }>(null);
   const { account, robotState } = useLiveTradingData();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -33,11 +34,12 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     displayRobotState?.fetched_at,
   );
   const adminModelState = useMemo(
-    () => buildAdminModelRobotState(adminWins, adminResultFlash),
-    [adminResultFlash, adminWins],
+    () => buildAdminModelRobotState(adminWins, adminCycleStartedAt, adminResultFlash),
+    [adminCycleStartedAt, adminResultFlash, adminWins],
   );
   const effectiveRobotState = isAdminModel ? adminModelState : displayRobotState;
-  const effectiveAccount = isAdminModel ? getAdminModelAccount() : account.data;
+  const effectiveAccount = isAdminModel ? getAdminModelAccount(adminWins) : account.data;
+  const overlayAccount = isAdminModel ? effectiveAccount : account.data;
   const effectiveNextCycleSeconds = isAdminModel ? 42 : nextCycleSeconds;
   const narrator = useRobotNarrator(
     effectiveRobotState,
@@ -51,21 +53,29 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     return () => window.clearTimeout(timer);
   }, [adminResultFlash]);
 
+  useEffect(() => {
+    if (!isAdminModel || adminResultFlash) return;
+
+    const elapsedMs = Date.now() - adminCycleStartedAt;
+    const remainingMs = Math.max(0, ADMIN_MODEL_CYCLE_MS - elapsedMs);
+    const timer = window.setTimeout(() => {
+      setAdminWins((current) => {
+        const nextWins = current + 1;
+        setAdminResultFlash({ at: Date.now(), wins: nextWins });
+        return nextWins;
+      });
+    }, remainingMs);
+
+    return () => window.clearTimeout(timer);
+  }, [adminCycleStartedAt, adminResultFlash, isAdminModel]);
+
+  useEffect(() => {
+    if (!isAdminModel || adminResultFlash) return;
+    setAdminCycleStartedAt(Date.now());
+  }, [adminResultFlash, isAdminModel]);
+
   function setOverlayVisible(nextVisible: boolean) {
     setVisible(nextVisible);
-  }
-
-  function handleAdminAddWin() {
-    setAdminWins((current) => {
-      const nextWins = current + 1;
-      setAdminResultFlash({ at: Date.now(), wins: nextWins });
-      return nextWins;
-    });
-  }
-
-  function handleAdminResetScore() {
-    setAdminWins(0);
-    setAdminResultFlash(null);
   }
 
   if (!visible) {
@@ -84,7 +94,7 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   return (
     <RobotOverlay
       robotState={effectiveRobotState}
-      account={effectiveAccount}
+      account={overlayAccount}
       narratorEnabled={settings.narratorEnabled}
       narratorSpeaking={narrator.speaking}
       onSilenceNarrator={narrator.silence}
@@ -102,23 +112,18 @@ export function FloatingRobot({ userId }: { userId?: string }) {
       }
       onClose={() => setOverlayVisible(false)}
       showConfig
-      adminModelControls={
-        isAdminModel
-          ? {
-              onAddWin: handleAdminAddWin,
-              onResetScore: handleAdminResetScore,
-            }
-          : null
-      }
     />
   );
 }
 
 function buildAdminModelRobotState(
   wins: number,
+  cycleStartedAt: number,
   resultFlash: { at: number; wins: number } | null,
 ): RobotState {
   const now = Date.now();
+  const cycleEndsAt = cycleStartedAt + ADMIN_MODEL_CYCLE_MS;
+  const remainingSeconds = Math.max(1, Math.ceil((cycleEndsAt - now) / 1000));
   const showWin = resultFlash != null && now - resultFlash.at < 2200;
   const baseTrade = showWin
     ? {
@@ -132,10 +137,10 @@ function buildAdminModelRobotState(
         expires_at: new Date(now + 60_000).toISOString(),
         sent_at: new Date(now - 10_000).toISOString(),
         finished_at: new Date(now).toISOString(),
-        profit: 8.4,
+        profit: 350,
         gale_step: null,
         is_gale: false,
-        account_mode: "DEMO" as const,
+        account_mode: "REAL" as const,
       }
     : null;
 
@@ -147,13 +152,13 @@ function buildAdminModelRobotState(
     cycle_id: "admin-model-cycle",
     allow_real: false,
     confirm_real: false,
-    account_mode: "DEMO",
-    active_mode: "PRACTICE",
+    account_mode: "REAL",
+    active_mode: "REAL",
     connection_status_source: null,
     real_ready: false,
     real_block_reason: null,
     stop_reason: null,
-    next_cycle_at: new Date(now + 42_000).toISOString(),
+    next_cycle_at: new Date(cycleEndsAt).toISOString(),
     server_time: new Date(now).toISOString(),
     cycle_minutes: 5,
     entry_value: 10,
@@ -173,11 +178,11 @@ function buildAdminModelRobotState(
     gale_active: null,
     gale_direction: null,
     gale_amount: null,
-    seconds_until_analysis_window: 21,
-    seconds_until_next_cycle: 42,
+    seconds_until_analysis_window: remainingSeconds,
+    seconds_until_next_cycle: remainingSeconds,
     seconds_until_entry_window: 0,
     display_countdown_label: null,
-    display_countdown_seconds: 42,
+    display_countdown_seconds: remainingSeconds,
     expiration_seconds: 0,
     expires_at: null,
     entry_window_open: false,
@@ -208,7 +213,7 @@ function buildAdminModelRobotState(
     last_trade: baseTrade,
     wins,
     losses: 0,
-    profit: wins * 8.4,
+    profit: wins * 350,
     last_order_error: null,
     order_fallback_in_progress: false,
     order_fallback_attempt: 0,
@@ -217,20 +222,22 @@ function buildAdminModelRobotState(
     last_rejection_reason: null,
     rejected_at: null,
     disconnected: false,
-    fetched_at: now,
+    fetched_at: cycleStartedAt,
   };
 }
 
-function getAdminModelAccount(): BullExAccountState {
+function getAdminModelAccount(wins: number): BullExAccountState {
   return {
     connected: true,
     email: "admin@modelo.local",
-    mode: "PRACTICE",
-    balance: 0,
-    currency: "USD",
+    mode: "REAL",
+    balance: 5550 + wins * 350,
+    currency: "BRL",
     status: "connected",
   };
 }
+
+const ADMIN_MODEL_CYCLE_MS = 12000;
 
 function getNextCycleResetKey(robotState: RobotState | undefined) {
   if (!robotState) return null;
