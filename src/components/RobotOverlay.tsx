@@ -111,6 +111,7 @@ export function RobotOverlay({
     expirationSeconds: smoothExpirationSeconds,
   });
   const content = getOverlayContent(robotState, presentation);
+  const settingsLocked = isRobotActive(robotState);
 
   useEffect(() => {
     setSettings(savedSettings);
@@ -282,9 +283,14 @@ export function RobotOverlay({
       {configOpen ? (
         <RobotConfigMenu
           settings={settings}
+          locked={settingsLocked}
           onChange={setSettings}
           onClose={() => setConfigOpen(false)}
           onSave={async () => {
+            if (settingsLocked) {
+              toast.error("Pare o robô para alterar configurações.");
+              return;
+            }
             try {
               await Promise.resolve(onSettingsChange?.(settings));
               toast.success("Configurações salvas");
@@ -499,6 +505,14 @@ function formatOverlayTitle(robotState: RobotState | undefined, title: string) {
   return title;
 }
 
+function isRobotActive(robotState: RobotState | undefined) {
+  if (!robotState) return false;
+  const stopped =
+    robotState.status === "STOPPED" ||
+    (robotState.enabled === false && robotState.worker_running === false);
+  return !stopped;
+}
+
 function shouldShowSignalDetails(status: RobotState["status"] | undefined) {
   return status === "WAITING_ENTRY_WINDOW" || status === "WAITING_NEXT_CANDLE_ENTRY";
 }
@@ -516,11 +530,13 @@ function TradeIdentity({ active, direction }: { active: string; direction: Robot
 
 function RobotConfigMenu({
   settings,
+  locked,
   onChange,
   onSave,
   onClose,
 }: {
   settings: RobotSettings;
+  locked: boolean;
   onChange: (settings: RobotSettings) => void;
   onSave: () => Promise<void>;
   onClose: () => void;
@@ -565,15 +581,23 @@ function RobotConfigMenu({
         </button>
       </div>
 
+      {locked ? (
+        <p className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] font-semibold text-warning-foreground">
+          Pare o robô para alterar configurações.
+        </p>
+      ) : null}
+
       <div className="space-y-2">
         <ConfigNumber
           label="Stop Win"
           value={settings.stopWin}
+          disabled={locked}
           onChange={(value) => updateNumber("stopWin", value)}
         />
         <ConfigNumber
           label="Stop Loss"
           value={settings.stopLoss}
+          disabled={locked}
           onChange={(value) => updateNumber("stopLoss", value)}
         />
         <ConfigNumber
@@ -583,6 +607,7 @@ function RobotConfigMenu({
           max={ENTRY_VALUE_MAX}
           step={ENTRY_VALUE_STEP}
           helperText={`Valor minimo: ${formatCurrencyBRL(ENTRY_VALUE_MIN)}\nValor maximo: ${formatCurrencyBRL(ENTRY_VALUE_MAX)}`}
+          disabled={locked}
           onChange={(value) => updateNumber("entryValue", value)}
         />
 
@@ -591,8 +616,9 @@ function RobotConfigMenu({
           <input
             type="checkbox"
             checked={settings.martingaleEnabled}
+            disabled={locked}
             onChange={(event) => onChange({ ...settings, martingaleEnabled: event.target.checked })}
-            className="h-4 w-4 accent-white"
+            className="h-4 w-4 accent-white disabled:cursor-not-allowed disabled:opacity-50"
           />
         </label>
 
@@ -600,12 +626,14 @@ function RobotConfigMenu({
           label="Quantidade de Gales"
           value={settings.martingaleSteps}
           step="1"
+          disabled={locked}
           onChange={(value) => updateNumber("martingaleSteps", value)}
         />
         <ConfigNumber
           label="Multiplicador do Gale"
           value={settings.martingaleMultiplier}
           step="0.1"
+          disabled={locked}
           onChange={(value) => updateNumber("martingaleMultiplier", value)}
         />
       </div>
@@ -613,7 +641,7 @@ function RobotConfigMenu({
       <button
         type="button"
         onClick={async () => {
-          if (saving) return;
+          if (saving || locked) return;
           setSaving(true);
           try {
             await onSave();
@@ -621,7 +649,7 @@ function RobotConfigMenu({
             setSaving(false);
           }
         }}
-        disabled={saving}
+        disabled={saving || locked}
         className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {saving ? "Salvando..." : "Salvar configurações"}
@@ -637,14 +665,16 @@ function ConfigNumber({
   min = 0,
   max,
   helperText,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: number;
-  step?: number;
+  step?: number | string;
   min?: number;
   max?: number;
   helperText?: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -656,8 +686,9 @@ function ConfigNumber({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-border bg-input px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-ring/20"
+        className="w-full rounded-lg border border-border bg-input px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
       />
       {helperText ? (
         <span className="mt-1 block whitespace-pre-line text-[11px] text-muted-foreground">

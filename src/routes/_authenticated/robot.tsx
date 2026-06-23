@@ -48,6 +48,8 @@ function RobotPage() {
   const [realConfirmed, setRealConfirmed] = useState(false);
   const [lastHistoryRefreshKey, setLastHistoryRefreshKey] = useState<string | null>(null);
   const [realBuyError, setRealBuyError] = useState<string | null>(null);
+  const [syncingTimedOut, setSyncingTimedOut] = useState(false);
+  const [reloadStatePending, setReloadStatePending] = useState(false);
   const realBuyAttemptRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -113,6 +115,7 @@ function RobotPage() {
     displayRobotState?.status === "STOPPED" ||
     (displayRobotState?.enabled === false && displayRobotState?.worker_running === false);
   const robotEnabled = Boolean(displayRobotState) && !robotStopped;
+  const settingsLocked = robotEnabled;
   const hasBackend = !!apiConfig.BASE_URL;
   const showResetCycle = shouldShowResetCycle(displayRobotState);
   const disconnectedPresentation = {
@@ -170,6 +173,16 @@ function RobotPage() {
     await account.refetch();
     await robotState.refetch();
   }
+
+  useEffect(() => {
+    if (!syncing) {
+      setSyncingTimedOut(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setSyncingTimedOut(true), 30_000);
+    return () => window.clearTimeout(timer);
+  }, [syncing]);
 
   useEffect(() => {
     if (!displayRobotState) return;
@@ -265,7 +278,14 @@ function RobotPage() {
   ]);
 
   async function handleDemoMode() {
-    if (!hasBackend || syncing || !connected || modeActionPending || activeMode === "PRACTICE") {
+    if (
+      !hasBackend ||
+      syncing ||
+      !connected ||
+      modeActionPending ||
+      activeMode === "PRACTICE" ||
+      settingsLocked
+    ) {
       return;
     }
     setModeActionError(null);
@@ -294,14 +314,23 @@ function RobotPage() {
   }
 
   function handleRealMode() {
-    if (!hasBackend || syncing || !connected || modeActionPending || activeMode === "REAL") return;
+    if (
+      !hasBackend ||
+      syncing ||
+      !connected ||
+      modeActionPending ||
+      activeMode === "REAL" ||
+      settingsLocked
+    ) {
+      return;
+    }
     setModeActionError(null);
     setRealConfirmed(false);
     setShowRealConfirm(true);
   }
 
   async function confirmRealMode() {
-    if (!realConfirmed || modeActionPending) return;
+    if (!realConfirmed || modeActionPending || settingsLocked) return;
     setModeActionError(null);
     setModeActionPending(true);
     try {
@@ -375,6 +404,12 @@ function RobotPage() {
 
   async function handleSaveAiSettings() {
     if (!user?.id || !hasBackend || settingsActionPending) return;
+    if (settingsLocked) {
+      const message = "Pare o robô para alterar configurações.";
+      setSettingsActionError(message);
+      toast.error(message);
+      return;
+    }
     setSettingsActionError(null);
     setSettingsActionPending(true);
     try {
@@ -460,6 +495,34 @@ function RobotPage() {
         </div>
       ) : null}
 
+      {syncingTimedOut ? (
+        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm">
+          <p className="font-medium text-warning-foreground">
+            Sincronizando ha mais de 30 segundos.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            A pagina continua disponivel. Recarregue o estado do robo se a sincronizacao nao sair.
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              if (reloadStatePending) return;
+              setSyncingTimedOut(false);
+              setReloadStatePending(true);
+              try {
+                await robotState.refetch({ cancelRefetch: true });
+              } finally {
+                setReloadStatePending(false);
+              }
+            }}
+            disabled={reloadStatePending}
+            className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {reloadStatePending ? "Recarregando..." : "Recarregar estado"}
+          </button>
+        </div>
+      ) : null}
+
       <section className="rounded-2xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -470,7 +533,7 @@ function RobotPage() {
             <button
               type="button"
               onClick={handleDemoMode}
-              disabled={!hasBackend || syncing || !connected || modeActionPending}
+              disabled={!hasBackend || syncing || !connected || modeActionPending || settingsLocked}
               className={`rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 activeMode === "PRACTICE"
                   ? "bg-success text-success-foreground"
@@ -482,7 +545,7 @@ function RobotPage() {
             <button
               type="button"
               onClick={handleRealMode}
-              disabled={!hasBackend || syncing || !connected || modeActionPending}
+              disabled={!hasBackend || syncing || !connected || modeActionPending || settingsLocked}
               className={`rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 activeMode === "REAL"
                   ? "bg-primary text-primary-foreground"
@@ -494,9 +557,14 @@ function RobotPage() {
           </div>
         </div>
 
-        {modeActionError ? (
-          <p className="mt-3 text-sm text-destructive">{modeActionError}</p>
-        ) : null}
+          {modeActionError ? (
+            <p className="mt-3 text-sm text-destructive">{modeActionError}</p>
+          ) : null}
+          {settingsLocked ? (
+            <p className="mt-3 text-sm font-medium text-warning-foreground">
+              Pare o robô para alterar configurações.
+            </p>
+          ) : null}
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-6">
@@ -678,6 +746,7 @@ function RobotPage() {
             <ConfigField
               label="Stop Win"
               value={settings.stopWin}
+              disabled={settingsLocked}
               onChange={(value) =>
                 setSettings({ ...settings, stopWin: normalizeConfigNumber(value, settings.stopWin) })
               }
@@ -685,6 +754,7 @@ function RobotPage() {
             <ConfigField
               label="Stop Loss"
               value={settings.stopLoss}
+              disabled={settingsLocked}
               onChange={(value) =>
                 setSettings({
                   ...settings,
@@ -699,6 +769,7 @@ function RobotPage() {
               max={ENTRY_VALUE_MAX}
               step={ENTRY_VALUE_STEP}
               helperText={`Valor minimo: ${formatCurrencyBRL(ENTRY_VALUE_MIN)}\nValor maximo: ${formatCurrencyBRL(ENTRY_VALUE_MAX)}`}
+              disabled={settingsLocked}
               onChange={(value) =>
                 setSettings({
                   ...settings,
@@ -711,6 +782,7 @@ function RobotPage() {
               <input
                 type="checkbox"
                 checked={settings.martingaleEnabled}
+                disabled={settingsLocked}
                 onChange={(event) =>
                   setSettings({ ...settings, martingaleEnabled: event.target.checked })
                 }
@@ -721,6 +793,7 @@ function RobotPage() {
               label="Quantidade de Gales"
               value={settings.martingaleSteps}
               step="1"
+              disabled={settingsLocked}
               onChange={(value) =>
                 setSettings({
                   ...settings,
@@ -732,6 +805,7 @@ function RobotPage() {
               label="Multiplicador do Gale"
               value={settings.martingaleMultiplier}
               step="0.1"
+              disabled={settingsLocked}
               onChange={(value) =>
                 setSettings({
                   ...settings,
@@ -742,10 +816,15 @@ function RobotPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            {settingsLocked ? (
+              <p className="w-full text-sm font-medium text-warning-foreground">
+                Pare o robô para alterar configurações.
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={handleSaveAiSettings}
-              disabled={!hasBackend || settingsActionPending}
+              disabled={!hasBackend || settingsActionPending || settingsLocked}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {settingsActionPending ? "Salvando..." : "Salvar configurações"}
@@ -833,14 +912,16 @@ function ConfigField({
   min = 0,
   max,
   helperText,
+  disabled = false,
 }: {
   label: string;
   value: number;
   onChange: (value: string) => void;
-  step?: number;
+  step?: number | string;
   min?: number;
   max?: number;
   helperText?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="block rounded-xl border border-border bg-background/40 px-4 py-3">
@@ -851,8 +932,9 @@ function ConfigField({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20"
+        className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
       />
       {helperText ? (
         <span className="mt-2 block whitespace-pre-line text-xs text-muted-foreground">

@@ -1,8 +1,19 @@
 import type { RobotState } from "@/hooks/useRobotState";
 
 const ACTIVE_ROBOT_POLL_MS = 1000;
-const IDLE_ROBOT_POLL_MS = 10000;
+const IDLE_ROBOT_POLL_MS = 2000;
 const ROBOT_ERROR_BACKOFF_MS = [5000, 10000, 20000, 30000] as const;
+const ACTIVE_STATUSES = new Set([
+  "WAITING_ENTRY_WINDOW",
+  "WAITING_NEXT_CANDLE_ENTRY",
+  "SENDING_ORDER",
+  "PENDING_RESULT",
+  "RESULT_RECEIVED",
+  "WAITING_GALE_ENTRY",
+  "SENDING_GALE_ORDER",
+  "PENDING_GALE_RESULT",
+  "GALE_RESULT_RECEIVED",
+]);
 
 type RobotPollState = {
   consecutiveFailures: number;
@@ -33,7 +44,13 @@ export function getRobotStateRefetchInterval(
     }
   }
 
-  const robotActive = state?.enabled === true && state?.status !== "STOPPED";
+  const status = state?.status?.toUpperCase();
+  const robotActive =
+    (state?.enabled === true && status !== "STOPPED") ||
+    state?.operation_in_progress === true ||
+    state?.result_waiting === true ||
+    state?.last_trade?.result === "PENDING_RESULT" ||
+    (status != null && ACTIVE_STATUSES.has(status));
   return robotActive ? ACTIVE_ROBOT_POLL_MS : IDLE_ROBOT_POLL_MS;
 }
 
