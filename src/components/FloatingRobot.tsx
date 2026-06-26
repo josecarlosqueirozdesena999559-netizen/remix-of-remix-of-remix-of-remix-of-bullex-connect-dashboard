@@ -103,11 +103,9 @@ export function FloatingRobot({ userId }: { userId?: string }) {
         saveSettings(nextSettings, {
           enabled: effectiveRobotState?.enabled ?? false,
           cycleMinutes: effectiveRobotState?.cycle_minutes ?? 5,
-          accountMode:
-            effectiveRobotState?.account_mode ??
-            (effectiveAccount?.mode === "REAL" ? "REAL" : "DEMO"),
-          allowReal: effectiveRobotState?.allow_real ?? effectiveAccount?.mode === "REAL",
-          confirmReal: effectiveRobotState?.confirm_real ?? effectiveAccount?.mode === "REAL",
+          accountMode: "REAL",
+          allowReal: true,
+          confirmReal: true,
         })
       }
       onClose={() => setOverlayVisible(false)}
