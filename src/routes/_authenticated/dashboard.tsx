@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { apiConfig } from "@/lib/api";
 import { formatBullExBalance, isBullExConnected, isBullExDisconnected } from "@/lib/bullexConnection";
+import { useBullExLoginState } from "@/lib/bullexLoginState";
 import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -14,29 +15,40 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { user } = useAuth();
   const { account, accountStatus, robotState } = useLiveTradingData();
+  const loginFlow = useBullExLoginState(user?.id);
   const acc = account.data;
   const syncing = account.isLoading || accountStatus.isLoading || robotState.isLoading;
   const cachedGrace = robotState.data?.connection_status_source === "cached_grace";
+  const connectionPending = loginFlow.isPending;
   const connected = isBullExConnected({
     account: acc,
     accountStatus: accountStatus.data,
     cachedGrace,
+    pendingConnect: connectionPending,
   });
   const robotConnected = connected && (cachedGrace || robotState.data?.connected !== false);
-  const accountStatusLabel = getConnectionStatusLabel({ syncing, connected, cachedGrace });
+  const accountStatusLabel = getConnectionStatusLabel({
+    syncing,
+    connected,
+    cachedGrace,
+    connectionPending,
+  });
   const robotStatus = getConnectionStatusLabel({
     syncing,
     connected: robotConnected,
     cachedGrace,
+    connectionPending,
   });
-  const isLoading = syncing;
+  const isLoading = syncing || connectionPending;
   const hasBackend = !!apiConfig.BASE_URL;
   const disconnected =
     !syncing &&
+    !connectionPending &&
     isBullExDisconnected({
       account: acc,
       accountStatus: accountStatus.data,
       cachedGrace,
+      pendingConnect: connectionPending,
     });
   const apiError = disconnected ? null : account.error;
   const isNoBackend = apiError instanceof Error && apiError.message.includes("VITE_API_BASE_URL");
@@ -50,13 +62,13 @@ function Dashboard() {
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Resumo da sua conta BullEx.</p>
         {user?.id && (
-          <p className="mt-1 text-xs text-muted-foreground">Sessão: {user.id.slice(0, 8)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Sessao: {user.id.slice(0, 8)}</p>
         )}
       </header>
 
       {!hasBackend && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          <strong>Backend não configurado.</strong> Defina{" "}
+          <strong>Backend nao configurado.</strong> Defina{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
           e{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">
@@ -66,7 +78,15 @@ function Dashboard() {
         </div>
       )}
 
-      {hasBackend && disconnected && (
+      {hasBackend && connectionPending && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+          {loginFlow.phase === "reconnecting"
+            ? "Reconectando automaticamente..."
+            : "Conectando a BullEx..."}
+        </div>
+      )}
+
+      {hasBackend && !connectionPending && disconnected && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
           Conta BullEx desconectada. Clique em Conectar BullEx.
         </div>
@@ -83,8 +103,8 @@ function Dashboard() {
           label="Status da conta"
           value={accountStatusLabel}
           Icon={connected ? Plug : Unplug}
-          tone={connected ? "positive" : syncing ? undefined : "negative"}
-          badge={syncing ? "SYNC" : connected ? "LIVE" : "OFFLINE"}
+          tone={connected ? "positive" : syncing || connectionPending ? undefined : "negative"}
+          badge={connectionPending ? "CONNECTING" : syncing ? "SYNC" : connected ? "LIVE" : "OFFLINE"}
         />
         <LiveCard
           label="Saldo"
@@ -100,10 +120,12 @@ function Dashboard() {
           tone={acc?.mode === "REAL" ? "negative" : "positive"}
         />
         <LiveCard
-          label="Robô"
+          label="Robo"
           value={robotStatus}
           Icon={Bot}
-          tone={robotConnected ? "positive" : syncing ? undefined : "negative"}
+          tone={
+            robotConnected ? "positive" : syncing || connectionPending ? undefined : "negative"
+          }
         />
         <LiveCard label="Email BullEx" value={acc?.email ?? "-"} Icon={Mail} />
       </div>
@@ -115,11 +137,14 @@ function getConnectionStatusLabel({
   syncing,
   connected,
   cachedGrace,
+  connectionPending,
 }: {
   syncing: boolean;
   connected: boolean;
   cachedGrace: boolean;
+  connectionPending: boolean;
 }) {
+  if (connectionPending) return "Conectando...";
   if (syncing) return "Sincronizando...";
   if (cachedGrace) return "Reconectando...";
   return connected ? "Conectado" : "Desconectado";
@@ -169,4 +194,3 @@ function LiveCard({
     </div>
   );
 }
-

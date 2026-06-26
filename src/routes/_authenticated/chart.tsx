@@ -9,6 +9,7 @@ import { useMarketData } from "@/hooks/useMarketData";
 import type { RobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
 import { isBullExDisconnected } from "@/lib/bullexConnection";
+import { useBullExLoginState } from "@/lib/bullexLoginState";
 import { useAuth } from "@/lib/useAuth";
 
 const TradingChart = lazy(() =>
@@ -35,6 +36,7 @@ const CHART_TIME_ZONE = "America/Fortaleza";
 
 function MarketPage() {
   const { user } = useAuth();
+  const loginFlow = useBullExLoginState(user?.id);
   const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
   const { account, accountStatus, robotState } = useLiveTradingData();
   const displayRobotState = useRobotDisplayState(robotState.data);
@@ -43,6 +45,7 @@ function MarketPage() {
     account: account.data,
     accountStatus: accountStatus.data,
     cachedGrace: displayRobotState?.connection_status_source === "cached_grace",
+    pendingConnect: loginFlow.isPending,
   });
   const chartSelection = resolveChartSelection(
     displayRobotState,
@@ -138,7 +141,15 @@ function MarketPage() {
         </p>
       </header>
 
-      {sessionMissing && (
+      {loginFlow.isPending ? (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+          {loginFlow.phase === "reconnecting"
+            ? "Reconectando automaticamente..."
+            : "Conectando a BullEx..."}
+        </div>
+      ) : null}
+
+      {sessionMissing && !loginFlow.isPending && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
           {getBinaryMarketErrorMessage("SESSION_DISCONNECTED")}
         </div>

@@ -150,6 +150,12 @@ export interface BullexAccount {
   dayProfit?: number;
 }
 
+export type BullexConnectResponse = {
+  ok?: boolean;
+  connected?: boolean;
+  status?: string;
+};
+
 export type BullexAccountMode = "PRACTICE" | "REAL";
 export type ChangeBullexModePayload = {
   mode: BullexAccountMode;
@@ -236,19 +242,18 @@ export function adminUpdateUser(userId: string, payload: AdminUpdateUserPayload)
 }
 
 export const bullexApi = {
-  connect: (payload: { email: string; password: string; sms_code?: string }) => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 30000);
-
-    return apiRequest<{ ok?: boolean; connected?: boolean; status?: "connected" | "disconnected" }>(
+  connect: (
+    payload: { email: string; password: string; sms_code?: string },
+    options?: { signal?: AbortSignal },
+  ) =>
+    apiRequest<BullexConnectResponse>(
       "/bullex/connect",
       {
-      method: "POST",
-      body: JSON.stringify(payload),
-      signal: controller.signal,
+        method: "POST",
+        body: JSON.stringify(payload),
+        signal: options?.signal,
       },
-    ).finally(() => window.clearTimeout(timeout));
-  },
+    ),
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),
   changeMode: (payload: BullexAccountMode | ChangeBullexModePayload) =>

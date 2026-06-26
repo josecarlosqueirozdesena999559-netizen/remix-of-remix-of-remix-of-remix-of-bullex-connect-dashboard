@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/useAuth";
 export const BULLEX_STATUS_QUERY_KEY = ["bullex-status"] as const;
 
 export type BullexConnectionStatus = {
-  status: "connected" | "disconnected";
+  status: string;
 };
 
 export function useBullExStatusQuery({
@@ -26,7 +26,7 @@ export function useBullExStatusQuery({
       }
 
       return {
-        status: response.data?.status === "connected" ? "connected" : "disconnected",
+        status: typeof response.data?.status === "string" ? response.data.status : "disconnected",
       } satisfies BullexConnectionStatus;
     },
     enabled: enabled && Boolean(userId),

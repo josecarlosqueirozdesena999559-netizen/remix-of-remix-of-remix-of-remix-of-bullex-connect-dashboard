@@ -24,6 +24,7 @@ import { ROBOT_HISTORY_QUERY_KEY, ROBOT_STATS_QUERY_KEY } from "@/hooks/useRobot
 import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { ENTRY_VALUE_MAX, ENTRY_VALUE_MIN, ENTRY_VALUE_STEP } from "@/lib/robotSettings";
+import { useBullExLoginState } from "@/lib/bullexLoginState";
 
 export const Route = createFileRoute("/_authenticated/robot")({
   head: () => ({ meta: [{ title: "Robô - BullEx AutoBot" }] }),
@@ -36,6 +37,7 @@ const FIXED_MIN_PAYOUT = 80;
 
 function RobotPage() {
   const { user } = useAuth();
+  const loginFlow = useBullExLoginState(user?.id);
   const [robotActionPending, setRobotActionPending] = useState(false);
   const [robotActionError, setRobotActionError] = useState<string | null>(null);
   const [modeActionPending, setModeActionPending] = useState(false);
@@ -102,12 +104,15 @@ function RobotPage() {
   });
   const syncing = account.isLoading || robotState.isLoading;
   const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
+  const connectionPending = loginFlow.isPending;
   const accountDisconnected =
     !cachedGrace &&
+    !connectionPending &&
     (account.data?.connected === false ||
       account.data?.status === "disconnected" ||
       account.data?.status === "DISCONNECTED");
-  const connected = !accountDisconnected && (account.data?.connected === true || cachedGrace);
+  const connected =
+    connectionPending || (!accountDisconnected && (account.data?.connected === true || cachedGrace));
   const activeMode = "REAL";
   const cycleResetRequired = shouldShowResetCycle(displayRobotState);
   const robotStopped =
@@ -425,7 +430,20 @@ function RobotPage() {
         </div>
       ) : null}
 
-      {!syncing && accountDisconnected ? (
+      {connectionPending ? (
+        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-sm">
+          <p className="font-medium text-warning-foreground">
+            {loginFlow.phase === "reconnecting"
+              ? "Reconectando automaticamente..."
+              : "Conectando a BullEx..."}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            O backend ainda esta trabalhando. O robo sera liberado assim que a conexao terminar.
+          </p>
+        </div>
+      ) : null}
+
+      {!syncing && !connectionPending && accountDisconnected ? (
         <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-sm">
           <p className="font-medium text-warning-foreground">Conta BullEx desconectada</p>
           <p className="mt-1 text-muted-foreground">

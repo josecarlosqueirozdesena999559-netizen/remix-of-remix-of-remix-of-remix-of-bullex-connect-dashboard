@@ -59,8 +59,12 @@ export function useBullexBalance(enabled = true) {
 export function useConnectBullex() {
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (payload: Parameters<typeof bullexApi.connect>[0]) =>
-      unwrap(await bullexApi.connect(payload)),
+    mutationFn: async (payload: {
+      email: string;
+      password: string;
+      sms_code?: string;
+      signal?: AbortSignal;
+    }) => unwrap(await bullexApi.connect(payload, { signal: payload.signal })),
     onSuccess: () => {
       markBullExAccountConnectBurst(user?.id);
       console.log("[BULLEX CONNECT SUCCESS]");

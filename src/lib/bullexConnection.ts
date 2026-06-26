@@ -5,17 +5,19 @@ export function isBullExConnected({
   account,
   accountStatus,
   cachedGrace = false,
+  pendingConnect = false,
 }: {
   account?: BullExAccountState;
   accountStatus?: BullexConnectionStatus;
   cachedGrace?: boolean;
+  pendingConnect?: boolean;
 }) {
-  if (cachedGrace) return true;
+  if (cachedGrace || pendingConnect) return true;
 
   return (
     account?.connected === true ||
     account?.status === "connected" ||
-    accountStatus?.status === "connected"
+    accountStatus?.status?.toUpperCase() === "CONNECTED"
   );
 }
 
@@ -23,17 +25,19 @@ export function isBullExDisconnected({
   account,
   accountStatus,
   cachedGrace = false,
+  pendingConnect = false,
 }: {
   account?: BullExAccountState;
   accountStatus?: BullexConnectionStatus;
   cachedGrace?: boolean;
+  pendingConnect?: boolean;
 }) {
-  if (isBullExConnected({ account, accountStatus, cachedGrace })) return false;
+  if (isBullExConnected({ account, accountStatus, cachedGrace, pendingConnect })) return false;
 
   return (
     account?.connected === false ||
     account?.status === "disconnected" ||
-    accountStatus?.status === "disconnected"
+    accountStatus?.status?.toUpperCase() === "DISCONNECTED"
   );
 }
 
