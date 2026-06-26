@@ -17,7 +17,7 @@ const BASE_NOW = 1_700_000_000_000;
 test("refresh normal nao passa de uma request a cada 15 segundos", () => {
   resetBullExAccountPolling(USER_ID);
 
-  assert.equal(getBullExAccountRefetchInterval(USER_ID, BASE_NOW), 15000);
+  assert.equal(getBullExAccountRefetchInterval(USER_ID, BASE_NOW), 10000);
   assert.equal(
     getBullExAccountRefetchInterval(USER_ID, BASE_NOW + 1000),
     bullExAccountPollingConfig.normalMs,
@@ -48,7 +48,7 @@ test("404 aplica backoff e nao mantem retry agressivo", () => {
   assert.equal(registerBullExAccountFetchFailure(USER_ID, BASE_NOW), 5000);
   assert.equal(getBullExAccountBackoffRemaining(USER_ID, BASE_NOW), 5000);
   assert.equal(getBullExAccountRefetchInterval(USER_ID, BASE_NOW), 5000);
-  assert.equal(getBullExAccountRefetchInterval(USER_ID, BASE_NOW + 5001), 15000);
+  assert.equal(getBullExAccountRefetchInterval(USER_ID, BASE_NOW + 5001), 10000);
 });
 
 test("falhas repetidas sobem o backoff ate 30 segundos", () => {
@@ -62,9 +62,10 @@ test("falhas repetidas sobem o backoff ate 30 segundos", () => {
 });
 
 test("404 e codigos de sessao sao tratados como disconnected", () => {
-  assert.equal(shouldTreatAccountStatusAsDisconnected(404, undefined), true);
-  assert.equal(shouldTreatAccountStatusAsDisconnected(undefined, "SESSION_NOT_FOUND"), true);
-  assert.equal(shouldTreatAccountStatusAsDisconnected(undefined, "SESSION_DISCONNECTED"), true);
+  assert.equal(shouldTreatAccountStatusAsDisconnected(404, undefined, 1), false);
+  assert.equal(shouldTreatAccountStatusAsDisconnected(404, undefined, 3), true);
+  assert.equal(shouldTreatAccountStatusAsDisconnected(undefined, "SESSION_NOT_FOUND", 3), true);
+  assert.equal(shouldTreatAccountStatusAsDisconnected(undefined, "SESSION_DISCONNECTED", 3), true);
   assert.equal(shouldTreatAccountStatusAsDisconnected(502, undefined), false);
 });
 

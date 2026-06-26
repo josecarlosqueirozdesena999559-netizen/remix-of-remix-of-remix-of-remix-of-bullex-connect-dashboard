@@ -1,7 +1,8 @@
-const NORMAL_ACCOUNT_POLL_MS = 15000;
+const NORMAL_ACCOUNT_POLL_MS = 10000;
 const CONNECT_ACCOUNT_POLL_MS = 10000;
 const CONNECT_ACCOUNT_POLL_WINDOW_MS = 20000;
 const ACCOUNT_ERROR_BACKOFF_MS = [5000, 10000, 20000, 30000] as const;
+const ACCOUNT_DISCONNECT_FAILURE_THRESHOLD = 3;
 
 type AccountPollState = {
   consecutiveFailures: number;
@@ -74,12 +75,28 @@ export function registerBullExAccountFetchFailure(userId?: string, now = Date.no
   return delay;
 }
 
+export function getBullExAccountConsecutiveFailures(userId?: string) {
+  if (!userId) return 0;
+  return getPollState(userId).consecutiveFailures;
+}
+
 export function resetBullExAccountPolling(userId?: string) {
   if (!userId) return;
   pollStateByUser.delete(userId);
 }
 
-export function shouldTreatAccountStatusAsDisconnected(status?: number, code?: string) {
+export function shouldTreatAccountStatusAsDisconnected(
+  status?: number,
+  code?: string,
+  consecutiveFailures = ACCOUNT_DISCONNECT_FAILURE_THRESHOLD,
+) {
+  return (
+    isAccountDisconnectResponse(status, code) &&
+    consecutiveFailures >= ACCOUNT_DISCONNECT_FAILURE_THRESHOLD
+  );
+}
+
+export function isAccountDisconnectResponse(status?: number, code?: string) {
   return status === 404 || code === "SESSION_NOT_FOUND" || code === "SESSION_DISCONNECTED";
 }
 
@@ -103,5 +120,6 @@ export const bullExAccountPollingConfig = {
   connectMs: CONNECT_ACCOUNT_POLL_MS,
   connectWindowMs: CONNECT_ACCOUNT_POLL_WINDOW_MS,
   backoffMs: ACCOUNT_ERROR_BACKOFF_MS,
+  disconnectFailureThreshold: ACCOUNT_DISCONNECT_FAILURE_THRESHOLD,
 };
 import type { BullExAccountState } from "../hooks/useBullExAccount.ts";

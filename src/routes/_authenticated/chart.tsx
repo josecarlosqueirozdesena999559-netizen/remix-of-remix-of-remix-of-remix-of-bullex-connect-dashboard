@@ -8,6 +8,7 @@ import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useMarketData } from "@/hooks/useMarketData";
 import type { RobotState } from "@/hooks/useRobotState";
 import { ApiError, apiRequest, type ApiResult } from "@/lib/api";
+import { isBullExDisconnected } from "@/lib/bullexConnection";
 import { useAuth } from "@/lib/useAuth";
 
 const TradingChart = lazy(() =>
@@ -35,13 +36,14 @@ const CHART_TIME_ZONE = "America/Fortaleza";
 function MarketPage() {
   const { user } = useAuth();
   const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
-  const { account, robotState } = useLiveTradingData();
+  const { account, accountStatus, robotState } = useLiveTradingData();
   const displayRobotState = useRobotDisplayState(robotState.data);
   const now = useCurrentTime();
-  const accountDisconnected =
-    account.data?.connected === false ||
-    account.data?.status === "disconnected" ||
-    account.data?.status === "DISCONNECTED";
+  const accountDisconnected = isBullExDisconnected({
+    account: account.data,
+    accountStatus: accountStatus.data,
+    cachedGrace: displayRobotState?.connection_status_source === "cached_grace",
+  });
   const chartSelection = resolveChartSelection(
     displayRobotState,
     selectedSymbol,

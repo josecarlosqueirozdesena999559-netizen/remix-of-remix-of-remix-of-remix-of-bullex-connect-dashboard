@@ -109,13 +109,15 @@ function RobotPage() {
       account.data?.status === "DISCONNECTED");
   const connected = !accountDisconnected && (account.data?.connected === true || cachedGrace);
   const activeMode = "REAL";
+  const cycleResetRequired = shouldShowResetCycle(displayRobotState);
   const robotStopped =
+    cycleResetRequired ||
     displayRobotState?.status === "STOPPED" ||
     (displayRobotState?.enabled === false && displayRobotState?.worker_running === false);
   const robotEnabled = Boolean(displayRobotState) && !robotStopped;
   const settingsLocked = robotEnabled;
   const hasBackend = !!apiConfig.BASE_URL;
-  const showResetCycle = shouldShowResetCycle(displayRobotState);
+  const showResetCycle = cycleResetRequired;
   const disconnectedPresentation = {
     title: "Conta BullEx desconectada",
     detail: "Reconecte sua conta para voltar a operar.",
@@ -907,8 +909,13 @@ function formatCurrencyBRL(value: number) {
 
 function shouldShowResetCycle(robotState: RobotState | undefined) {
   if (!robotState) return false;
-  return [robotState.last_rejection_reason, robotState.rejection_reason].some((reason) =>
-    reason === "STOP_WIN_HIT" || reason === "STOP_LOSS_HIT",
+  return (
+    robotState.status === "STOP_WIN_HIT" ||
+    robotState.status === "STOP_LOSS_HIT" ||
+    getStopLimit(robotState) != null ||
+    [robotState.last_rejection_reason, robotState.rejection_reason].some(
+      (reason) => reason === "STOP_WIN_HIT" || reason === "STOP_LOSS_HIT",
+    )
   );
 }
 
@@ -941,7 +948,6 @@ function getNextCycleResetKey(robotState: RobotState | undefined) {
 function getEntryWindowResetKey(robotState: RobotState | undefined) {
   if (!robotState) return null;
   return [
-    robotState.status,
     robotState.cycle_id ?? "-",
     robotState.pending_signal?.created_at ?? "-",
     robotState.pending_signal?.symbol ?? "-",

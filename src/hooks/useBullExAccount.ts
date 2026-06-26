@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, type BullexAccount, bullexApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import {
+  getBullExAccountConsecutiveFailures,
   getBullExAccountBackoffRemaining,
   getBullExAccountRefetchInterval,
+  isAccountDisconnectResponse,
   registerBullExAccountFetchFailure,
   registerBullExAccountFetchSuccess,
   resetBullExAccountPolling,
@@ -36,6 +38,10 @@ export function useBullExAccountQuery({
   return useQuery({
     queryKey: [...BULLEX_ACCOUNT_QUERY_KEY, userId],
     queryFn: async () => {
+      const cachedState = queryClient.getQueryData<BullExAccountState>([
+        ...BULLEX_ACCOUNT_QUERY_KEY,
+        userId,
+      ]);
       const now = Date.now();
       const backoffRemainingMs = getBullExAccountBackoffRemaining(userId, now);
       if (backoffRemainingMs > 0) {
@@ -44,10 +50,6 @@ export function useBullExAccountQuery({
           wait_ms: backoffRemainingMs,
         });
 
-        const cachedState = queryClient.getQueryData<BullExAccountState>([
-          ...BULLEX_ACCOUNT_QUERY_KEY,
-          userId,
-        ]);
         return cachedState ?? getDisconnectedState();
       }
 
@@ -57,14 +59,33 @@ export function useBullExAccountQuery({
       const response = await bullexApi.account();
       if (!response.ok) {
         const backoffMs = registerBullExAccountFetchFailure(userId, now);
+        const consecutiveFailures = getBullExAccountConsecutiveFailures(userId);
         console.warn("[ACCOUNT_FETCH_FAILED]", {
           user_id: userId ?? null,
           code: response.code ?? null,
           status: response.status ?? null,
           wait_ms: backoffMs,
+          consecutive_failures: consecutiveFailures,
         });
 
-        if (shouldTreatAccountStatusAsDisconnected(response.status, response.code)) {
+        if (isAccountDisconnectResponse(response.status, response.code)) {
+          const hasConnectedSnapshot = cachedState?.connected === true;
+
+          if (
+            hasConnectedSnapshot &&
+            !shouldTreatAccountStatusAsDisconnected(
+              response.status,
+              response.code,
+              consecutiveFailures,
+            )
+          ) {
+            console.warn("[ACCOUNT_DISCONNECT_DEFERRED]", {
+              user_id: userId ?? null,
+              consecutive_failures: consecutiveFailures,
+            });
+            return cachedState;
+          }
+
           registerBullExAccountFetchSuccess(userId);
           const disconnected = getDisconnectedState();
           console.log("[BULLEX ACCOUNT UPDATED]", disconnected);
@@ -103,7 +124,7 @@ export function useBullExAccountQuery({
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
-    staleTime: 15000,
+    staleTime: 9000,
   });
 }
 
@@ -118,7 +139,7 @@ export function normalizeBullExAccount(data: BullexAccount | null | undefined): 
     connected,
     balance: typeof data?.balance === "number" ? data.balance : null,
     currency: data?.currency ?? null,
-    mode: data?.mode ?? null,
+    mode: data?.mode === "REAL" ? "REAL" : connected ? "REAL" : (data?.mode ?? null),
     email: data?.email ?? null,
     requires_2fa: Boolean((data as { requires_2fa?: unknown } | null | undefined)?.requires_2fa),
     status: connected ? "connected" : "disconnected",

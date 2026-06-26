@@ -1,7 +1,7 @@
 import type { RobotState } from "@/hooks/useRobotState";
 
 const ACTIVE_ROBOT_POLL_MS = 1000;
-const IDLE_ROBOT_POLL_MS = 2000;
+const IDLE_ROBOT_POLL_MS = 5000;
 const ROBOT_ERROR_BACKOFF_MS = [5000, 10000, 20000, 30000] as const;
 const ACTIVE_STATUSES = new Set([
   "WAITING_ENTRY_WINDOW",

@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Bot, Wallet, Plug, Unplug, Gamepad2, Mail, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLiveTradingData } from "@/hooks/useLiveTradingData";
-import { ApiError, apiConfig } from "@/lib/api";
+import { apiConfig } from "@/lib/api";
+import { formatBullExBalance, isBullExConnected, isBullExDisconnected } from "@/lib/bullexConnection";
 import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -12,13 +13,17 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function Dashboard() {
   const { user } = useAuth();
-  const { account, robotState } = useLiveTradingData();
+  const { account, accountStatus, robotState } = useLiveTradingData();
   const acc = account.data;
-  const syncing = account.isLoading || robotState.isLoading;
+  const syncing = account.isLoading || accountStatus.isLoading || robotState.isLoading;
   const cachedGrace = robotState.data?.connection_status_source === "cached_grace";
-  const connected = acc?.connected === true || cachedGrace;
+  const connected = isBullExConnected({
+    account: acc,
+    accountStatus: accountStatus.data,
+    cachedGrace,
+  });
   const robotConnected = connected && (cachedGrace || robotState.data?.connected !== false);
-  const accountStatus = getConnectionStatusLabel({ syncing, connected, cachedGrace });
+  const accountStatusLabel = getConnectionStatusLabel({ syncing, connected, cachedGrace });
   const robotStatus = getConnectionStatusLabel({
     syncing,
     connected: robotConnected,
@@ -28,16 +33,16 @@ function Dashboard() {
   const hasBackend = !!apiConfig.BASE_URL;
   const disconnected =
     !syncing &&
-    !cachedGrace &&
-    (acc?.connected === false ||
-      (account.error instanceof ApiError &&
-        (account.error.code === "SESSION_NOT_FOUND" ||
-          account.error.code === "SESSION_DISCONNECTED")));
+    isBullExDisconnected({
+      account: acc,
+      accountStatus: accountStatus.data,
+      cachedGrace,
+    });
   const apiError = disconnected ? null : account.error;
   const isNoBackend = apiError instanceof Error && apiError.message.includes("VITE_API_BASE_URL");
 
-  const currency = acc?.currency ?? "USD";
-  const realBalance = acc?.balance ?? null;
+  const currency = acc?.currency ?? "-";
+  const realBalance = acc?.balance;
 
   return (
     <div className="space-y-6">
@@ -76,14 +81,14 @@ function Dashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <LiveCard
           label="Status da conta"
-          value={accountStatus}
+          value={accountStatusLabel}
           Icon={connected ? Plug : Unplug}
           tone={connected ? "positive" : syncing ? undefined : "negative"}
           badge={syncing ? "SYNC" : connected ? "LIVE" : "OFFLINE"}
         />
         <LiveCard
           label="Saldo"
-          value={realBalance !== null ? money(realBalance, currency) : isLoading ? "-" : "N/A"}
+          value={isLoading ? "-" : formatBullExBalance(realBalance, currency)}
           Icon={Wallet}
           accent
         />
@@ -165,6 +170,3 @@ function LiveCard({
   );
 }
 
-function money(v: number, currency = "USD") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v);
-}

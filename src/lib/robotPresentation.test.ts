@@ -168,7 +168,47 @@ test("polling acelera enquanto aguarda resultado", () => {
   assert.equal(getRobotStateRefetchInterval(createRobotState({ result_waiting: true })), 1000);
   assert.equal(getRobotStateRefetchInterval(createRobotState({ status: "PENDING_RESULT" })), 1000);
   assert.equal(getRobotStateRefetchInterval(createRobotState()), 1000);
-  assert.equal(getRobotStateRefetchInterval(createRobotState({ enabled: false })), 2000);
+  assert.equal(getRobotStateRefetchInterval(createRobotState({ enabled: false })), 5000);
+});
+
+test("result_waiting prioriza aguardando resultado mesmo fora de pending_result", () => {
+  const pending = getRobotPresentation(
+    createRobotState({
+      status: "ANALYZING",
+      result_waiting: true,
+      pending_signal: createSignal(),
+    }),
+    now,
+  );
+
+  assert.equal(pending.title, "Aguardando resultado");
+});
+
+test("STOP_WIN_HIT e STOP_LOSS_HIT mostram robo pausado", () => {
+  const stopWin = getRobotPresentation(createRobotState({ status: "STOP_WIN_HIT" }), now);
+  const stopLoss = getRobotPresentation(createRobotState({ status: "STOP_LOSS_HIT" }), now);
+
+  assert.equal(stopWin.title, "Stop Win atingido");
+  assert.equal(stopWin.detail, "Robo pausado");
+  assert.equal(stopWin.kind, "stopped");
+  assert.equal(stopLoss.title, "Stop Loss atingido");
+  assert.equal(stopLoss.detail, "Robo pausado");
+  assert.equal(stopLoss.kind, "stopped");
+});
+
+test("WAITING_ENTRY mostra sinal preparado com entrada em MM", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "WAITING_ENTRY",
+      seconds_until_entry: 17,
+      pending_signal: createSignal(),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Sinal preparado");
+  assert.equal(presentation.detail, "Entrada em MM");
+  assert.equal(presentation.footer, "Entrada no inicio da proxima vela em 00:17");
 });
 
 test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima vela", () => {
@@ -182,6 +222,7 @@ test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima ve
   );
 
   assert.equal(presentation.title, "Sinal preparado");
+  assert.equal(presentation.detail, "Entrada em MM");
   assert.equal(presentation.footer, "Entrada no inicio da proxima vela em 00:17");
   assert.equal(presentation.signal?.symbol, "EURUSD-OTC");
 });
@@ -197,7 +238,22 @@ test("WAITING_NEXT_CANDLE_ENTRY nao mostra 00:00 enquanto aguarda a vela", () =>
   );
 
   assert.equal(presentation.title, "Sinal preparado");
+  assert.equal(presentation.detail, "Entrada em MM");
   assert.equal(presentation.footer, "Aguardando abertura da vela...");
+});
+
+test("SIGNAL_EXPIRED mostra motivo real da perda do sinal", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "SIGNAL_EXPIRED",
+      pending_signal: createSignal(),
+      seconds_until_entry: 0,
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Entrada perdida por atraso. Aguardando novo sinal.");
+  assert.equal(presentation.detail, null);
 });
 
 test("enabled false sem worker parado ainda nao mostra robo parado", () => {

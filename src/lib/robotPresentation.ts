@@ -96,6 +96,14 @@ export function getRobotPresentation(
     return createPresentation("stopped", "Robo parado");
   }
 
+  if (status === "STOP_WIN_HIT") {
+    return createPresentation("stopped", "Stop Win atingido", "Robo pausado");
+  }
+
+  if (status === "STOP_LOSS_HIT") {
+    return createPresentation("stopped", "Stop Loss atingido", "Robo pausado");
+  }
+
   if (status === "SIGNAL_REJECTED") {
     return createNextCyclePresentation(robotState, options);
   }
@@ -237,14 +245,14 @@ export function getRobotPresentation(
     };
   }
 
-  if (status === "WAITING_NEXT_CANDLE_ENTRY") {
+  if (status === "WAITING_ENTRY" || status === "WAITING_NEXT_CANDLE_ENTRY") {
     const remainingSeconds = Math.max(0, Math.ceil(resolveEntrySeconds(robotState, options)));
 
     return {
       ...createPresentation(
         "entry",
         "Sinal preparado",
-        null,
+        "Entrada em MM",
         remainingSeconds > 0
           ? `Entrada no inicio da proxima vela em ${formatDuration(remainingSeconds)}`
           : "Aguardando abertura da vela...",
@@ -252,6 +260,13 @@ export function getRobotPresentation(
       signal,
       direction: signal?.direction ?? null,
     };
+  }
+
+  if (status === "SIGNAL_EXPIRED") {
+    return createPresentation(
+      "analyzing",
+      "Entrada perdida por atraso. Aguardando novo sinal.",
+    );
   }
 
   if (status === "ANALYZING") {

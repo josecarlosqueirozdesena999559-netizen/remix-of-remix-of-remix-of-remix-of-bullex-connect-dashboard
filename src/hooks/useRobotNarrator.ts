@@ -131,8 +131,8 @@ function getNarrationEvents(
       ),
       text:
         stopLimit === "STOP_WIN"
-          ? `Stop win atingido. Meta de ganho alcancada. Lucro atual de ${formatProfit(robotState.profit)}. Robo pausado.`
-          : `Stop loss atingido. Limite de perda alcancado. Prejuizo atual de ${formatProfit(robotState.profit)}. Robo pausado.`,
+          ? `Meta de lucro atingida. Resultado atual de ${formatProfit(robotState.profit)}. Respeite o seu gerenciamento e siga com disciplina. Vamos em frente com o robo do Sergio Trader.`
+          : `Limite de perda atingido. Resultado atual de ${formatProfit(robotState.profit)}. Respeite o seu gerenciamento para proteger o capital. O robo foi pausado com seguranca.`,
     });
     return events;
   }
@@ -140,9 +140,9 @@ function getNarrationEvents(
   if (signal && status === "WAITING_ENTRY_WINDOW") {
     events.push({
       key: createSignalEventKey(signal),
-      text: `Melhor ativo encontrado: ${formatSpokenActive(signal.symbol)}. Direcao ${
+      text: `O ElCapo encontrou uma oportunidade em ${formatSpokenActive(signal.symbol)}. Direcao ${
         signal.direction
-      }. Score ${formatScore(signal.strategy_score)}. Estrategias usadas: ${formatUsedStrategies(
+      }. Score ${formatScore(signal.strategy_score)}. Estrategia utilizada: ${formatUsedStrategies(
         signal,
       )}. Aguardando janela de entrada.`,
     });
@@ -157,7 +157,7 @@ function getNarrationEvents(
     } else {
       events.push({
         key: createStatusSignalCycleEventKey(status, signal, robotState.cycle_id),
-        text: "Entrada preparada. Vamos entrar no inicio da proxima vela.",
+        text: `Entrada preparada. Estrategia confirmada: ${formatUsedStrategies(signal)}. Vamos entrar no inicio da proxima vela.`,
       });
     }
   }
@@ -165,7 +165,7 @@ function getNarrationEvents(
   if (status === "ANALYZING" && !operationOpen) {
     events.push({
       key: `ANALYSIS_STARTED|${analysisSequence}`,
-      text: "Iniciando nova analise de mercado.",
+      text: "O ElCapo vai analisar o mercado em busca da melhor oportunidade.",
     });
   }
 
@@ -184,14 +184,14 @@ function getNarrationEvents(
   if (status === "WAITING_GALE_ENTRY") {
     events.push({
       key: createGaleEventKey(robotState, orderId),
-      text: "Loss na primeira entrada. Gale 1 preparado no mesmo ativo e mesma direção.",
+      text: "Loss confirmado na entrada inicial. Gale 1 preparado no mesmo ativo e na mesma direcao.",
     });
   }
 
   if (status === "SENDING_GALE_ORDER") {
     events.push({
       key: createGaleEventKey(robotState, orderId),
-      text: "Enviando Gale 1 agora.",
+      text: "Executando Gale 1 agora.",
     });
   }
 
@@ -224,14 +224,14 @@ function getNarrationEvents(
   if (status === "RESULT_RECEIVED" && result === "WIN") {
     events.push({
       key: createResultKey("WIN", trade),
-      text: "Resultado: WIN",
+      text: "Operacao encerrada com WIN. Resultado positivo confirmado.",
     });
   }
 
   if (status === "RESULT_RECEIVED" && result === "LOSS") {
     events.push({
       key: createResultKey("LOSS", trade),
-      text: "Resultado: LOSS",
+      text: "Operacao encerrada com LOSS. Seguimos o plano com disciplina.",
     });
   }
 
@@ -241,7 +241,7 @@ function getNarrationEvents(
   ) {
     events.push({
       key: createGaleEventKey(robotState, orderId),
-      text: "Resultado do Gale: WIN.",
+      text: "Gale 1 encerrado com WIN. Recuperacao concluida com sucesso.",
     });
   }
 
@@ -251,7 +251,7 @@ function getNarrationEvents(
   ) {
     events.push({
       key: createGaleEventKey(robotState, orderId),
-      text: "Resultado do Gale: LOSS final.",
+      text: "Gale 1 encerrado com LOSS. Ciclo finalizado. Mantenha o gerenciamento com disciplina.",
     });
   }
 
@@ -260,7 +260,7 @@ function getNarrationEvents(
     if (remainingSeconds > 0) {
       events.push({
         key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
-        text: `Robo vai analisar o mercado. A proxima entrada esta prevista para daqui a ${formatSpokenDuration(
+        text: `O ElCapo vai analisar o mercado novamente. A proxima oportunidade esta prevista para daqui a ${formatSpokenDuration(
           remainingSeconds,
         )}.`,
       });

@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2, LockKeyhole, Mail, Plug, Power, X } from "lucide-react";
 import {
@@ -9,6 +9,7 @@ import {
 import { useLiveTradingData } from "@/hooks/useLiveTradingData";
 import { apiConfig } from "@/lib/api";
 import { createOptimisticConnectedBullExAccount } from "@/lib/bullexAccountPolling";
+import { formatBullExBalance, isBullExConnected } from "@/lib/bullexConnection";
 import { useAuth } from "@/lib/useAuth";
 import {
   syncAfterBullExConnect,
@@ -24,13 +25,17 @@ export const Route = createFileRoute("/_authenticated/bullex")({
 
 function BullExPage() {
   const { user } = useAuth();
-  const { account, robotState } = useLiveTradingData();
+  const { account, accountStatus, robotState } = useLiveTradingData();
   const disconnect = useDisconnectBullex();
   const reconnect = useReconnectBullex();
   const [loginOpen, setLoginOpen] = useState(false);
-  const syncing = account.isLoading || robotState.isLoading;
+  const syncing = account.isLoading || accountStatus.isLoading || robotState.isLoading;
   const cachedGrace = robotState.data?.connection_status_source === "cached_grace";
-  const connected = account.data?.connected === true || cachedGrace;
+  const connected = isBullExConnected({
+    account: account.data,
+    accountStatus: accountStatus.data,
+    cachedGrace,
+  });
   const statusLabel = getConnectionStatusLabel({ syncing, connected, cachedGrace });
   const hasBackend = !!apiConfig.BASE_URL;
   const isToggling = disconnect.isPending || reconnect.isPending;
@@ -95,17 +100,17 @@ function BullExPage() {
                 : connected
                   ? cachedGrace
                     ? "Reconectando conta BullEx"
-                    : "Conta BullEx online"
-                  : "Conta BullEx offline"}
+                    : "Conta BullEx conectada"
+                  : "Conta BullEx desconectada"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {syncing
                 ? "Buscando conta BullEx e estado do robo."
                 : connected
                   ? cachedGrace
-                    ? "Usando estado recente enquanto a reconexao finaliza."
+                    ? "Usando estado recente enquanto a reconexão finaliza."
                     : "Sua conta está pronta para ser usada pelo robô."
-                  : "Faça login para deixar a conta online."}
+                  : "Faça login para deixar a conta conectada."}
             </p>
           </div>
           <span
@@ -124,13 +129,9 @@ function BullExPage() {
           <Info label="Modo" value={account.data?.mode ?? "-"} />
           <Info
             label="Saldo"
-            value={
-              account.data?.balance != null
-                ? formatBalance(account.data.balance, account.data.currency)
-                : "-"
-            }
+            value={formatBullExBalance(account.data?.balance, account.data?.currency)}
           />
-          <Info label="Sessão" value={account.data?.status ?? "-"} />
+          <Info label="Sessão" value={accountStatus.data?.status ?? account.data?.status ?? "-"} />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -205,7 +206,7 @@ function getConnectionStatusLabel({
 }) {
   if (syncing) return "Sincronizando...";
   if (cachedGrace) return "Reconectando...";
-  return connected ? "Online" : "Offline";
+  return connected ? "Conectado" : "Desconectado";
 }
 
 function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
@@ -334,11 +335,4 @@ function Info({ label, value }: { label: string; value: string }) {
       <div className="mt-1 break-all text-sm font-medium">{value}</div>
     </div>
   );
-}
-
-function formatBalance(value: number, currency: string | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: currency ?? "USD",
-  }).format(value);
 }
