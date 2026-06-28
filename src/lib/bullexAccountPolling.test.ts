@@ -83,5 +83,7 @@ test("connect ok atualiza estado para online imediatamente", () => {
   assert.equal(optimistic.connected, true);
   assert.equal(optimistic.status, "connected");
   assert.equal(optimistic.email, "demo@bullex.com");
-  assert.equal(optimistic.balance, 120.5);
+  assert.equal(optimistic.mode, "REAL");
+  assert.equal(optimistic.balance, null);
+  assert.equal(optimistic.currency, null);
 });

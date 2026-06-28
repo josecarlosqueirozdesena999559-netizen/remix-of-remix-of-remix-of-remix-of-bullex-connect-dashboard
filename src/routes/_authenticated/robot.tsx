@@ -34,6 +34,8 @@ export const Route = createFileRoute("/_authenticated/robot")({
 const FIXED_CYCLE_MINUTES = 5;
 const FIXED_MIN_CONFIDENCE = 80;
 const FIXED_MIN_PAYOUT = 80;
+const INSUFFICIENT_BALANCE_MESSAGE =
+  "Você está sem saldo para iniciar. Faça um depósito na BullEx.";
 
 function RobotPage() {
   const { user } = useAuth();
@@ -52,6 +54,7 @@ function RobotPage() {
   const [reloadStatePending, setReloadStatePending] = useState(false);
   const realBuyAttemptRef = useRef<string | null>(null);
   const autoRealSyncStartedRef = useRef(false);
+  const balanceStopAttemptRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
   const { account, robotState } = useLiveTradingData();
@@ -115,8 +118,14 @@ function RobotPage() {
     connectionPending || (!accountDisconnected && (account.data?.connected === true || cachedGrace));
   const activeMode = "REAL";
   const cycleResetRequired = shouldShowResetCycle(displayRobotState);
+  const realSelected = activeMode === "REAL";
+  const realBalance = account.data?.balance ?? null;
+  const robotInsufficientBalance = displayRobotState?.status === "INSUFFICIENT_BALANCE";
+  const realAccountWithoutBalance = realSelected && realBalance != null && realBalance <= 0;
+  const depositRequired = Boolean(robotInsufficientBalance || realAccountWithoutBalance);
   const robotStopped =
     cycleResetRequired ||
+    depositRequired ||
     displayRobotState?.status === "STOPPED" ||
     (displayRobotState?.enabled === false && displayRobotState?.worker_running === false);
   const robotEnabled = Boolean(displayRobotState) && !robotStopped;
@@ -130,15 +139,19 @@ function RobotPage() {
   };
   const robotStatusTitle = accountDisconnected
     ? disconnectedPresentation.title
-    : realBuyError
-      ? "Compra REAL bloqueada"
-      : robotPresentation.title;
+    : depositRequired
+      ? "Saldo insuficiente"
+      : realBuyError
+        ? "Compra REAL bloqueada"
+        : robotPresentation.title;
   const robotStatusDetail = accountDisconnected
     ? disconnectedPresentation.detail
-    : realBuyError
-      ? `Compra REAL bloqueada: ${realBuyError}`
-      : robotPresentation.detail;
-  const robotStatusFooter = accountDisconnected ? null : robotPresentation.footer;
+    : depositRequired
+      ? INSUFFICIENT_BALANCE_MESSAGE
+      : realBuyError
+        ? `Compra REAL bloqueada: ${realBuyError}`
+        : robotPresentation.detail;
+  const robotStatusFooter = accountDisconnected || depositRequired ? null : robotPresentation.footer;
 
   function buildRobotConfigPayload(
     overrides: Partial<Parameters<typeof robotConfig>[0]> = {},
@@ -265,12 +278,38 @@ function RobotPage() {
       setRealBuyError(null);
       await refetchRobotState();
     })();
-  }, [
-    activeMode,
-    displayRobotState,
-    hasBackend,
-    refetchRobotState,
-  ]);
+  }, [activeMode, displayRobotState, hasBackend, refetchRobotState]);
+
+  useEffect(() => {
+    if (!hasBackend || !displayRobotState || !depositRequired) {
+      balanceStopAttemptRef.current = null;
+      return;
+    }
+
+    const stillRunning = displayRobotState.enabled || displayRobotState.worker_running;
+    if (!stillRunning) {
+      balanceStopAttemptRef.current = null;
+      return;
+    }
+
+    const stopKey = [
+      displayRobotState.status,
+      displayRobotState.cycle_id ?? "-",
+      realBalance ?? "null",
+    ].join("|");
+    if (balanceStopAttemptRef.current === stopKey) return;
+    balanceStopAttemptRef.current = stopKey;
+
+    void (async () => {
+      try {
+        unwrapApiResult(await robotConfig({ enabled: false }));
+        unwrapApiResult(await robotStop());
+        await robotState.refetch();
+      } catch (error) {
+        console.warn("[ROBOT_AUTO_STOP_INSUFFICIENT_BALANCE_ERROR]", error);
+      }
+    })();
+  }, [depositRequired, displayRobotState, hasBackend, realBalance, robotState]);
 
   useEffect(() => {
     if (!hasBackend || !connected || syncing || modeActionPending || settingsLocked) return;

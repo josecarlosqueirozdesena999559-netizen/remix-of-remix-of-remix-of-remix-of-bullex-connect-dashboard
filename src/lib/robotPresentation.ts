@@ -71,6 +71,14 @@ export function getRobotPresentation(
   }
 
   const status = robotState.status;
+  if (status === "INSUFFICIENT_BALANCE") {
+    return createPresentation(
+      "stopped",
+      "Saldo insuficiente",
+      "Você está sem saldo para iniciar. Faça um depósito na BullEx.",
+    );
+  }
+
   const trade = robotState.last_trade;
   const signal = robotState.pending_signal;
   const bestCandidate = robotState.best_candidate;

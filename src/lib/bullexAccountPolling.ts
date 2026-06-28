@@ -102,13 +102,13 @@ export function isAccountDisconnectResponse(status?: number, code?: string) {
 
 export function createOptimisticConnectedBullExAccount(
   email: string,
-  current?: BullExAccountState,
+  _current?: BullExAccountState,
 ): BullExAccountState {
   return {
     connected: true,
-    balance: current?.balance ?? null,
-    currency: current?.currency ?? null,
-    mode: current?.mode ?? null,
+    balance: null,
+    currency: null,
+    mode: "REAL",
     email,
     requires_2fa: false,
     status: "connected",
