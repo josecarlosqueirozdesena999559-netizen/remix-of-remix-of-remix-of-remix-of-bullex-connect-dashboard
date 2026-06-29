@@ -91,6 +91,26 @@ export async function syncAfterBullExConnect(
     console.warn("[ROBOT SYNC CONNECTION ERROR]", error);
   }
 
+  try {
+    unwrap(await bullexApi.changeMode({ mode: "REAL", confirm_real: true }));
+    if (userId) {
+      qc.setQueryData([...BULLEX_ACCOUNT_QUERY_KEY, userId], (current) =>
+        current
+          ? {
+              ...current,
+              connected: true,
+              status: "connected" as const,
+              mode: "REAL" as const,
+              balance: null,
+            }
+          : current,
+      );
+    }
+    console.log("[BULLEX MODE SYNCED]", { user_id: userId ?? null, mode: "REAL" });
+  } catch (error) {
+    console.warn("[BULLEX MODE SYNC ERROR]", error);
+  }
+
   if (userId) {
     const remainingBackoffMs = getBullExAccountBackoffRemaining(userId);
     if (remainingBackoffMs > 0) {

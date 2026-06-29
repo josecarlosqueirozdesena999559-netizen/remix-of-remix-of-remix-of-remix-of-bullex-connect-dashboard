@@ -118,7 +118,7 @@ export function useRobotStateQuery(userId?: string, isDocumentVisible = true) {
   return useQuery({
     queryKey: [...ROBOT_STATE_QUERY_KEY, userId],
     queryFn: async () => {
-      if (!userId) throw new ApiError("NÃ£o autenticado", "NO_AUTH");
+      if (!userId) throw new ApiError("Não autenticado", "NO_AUTH");
 
       const now = Date.now();
       console.log("[ROBOT STATE REFETCH]");

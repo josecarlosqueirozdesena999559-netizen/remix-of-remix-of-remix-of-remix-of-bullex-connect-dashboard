@@ -100,7 +100,7 @@ function BullExPage() {
 
       {!hasBackend ? (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
-          <strong>Backend nao configurado.</strong> Defina{" "}
+          <strong>Backend não configurado.</strong> Defina{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
           e{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">
@@ -114,7 +114,7 @@ function BullExPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Status da conexao
+              Status da conexão
             </p>
             <h2 className="mt-1 text-xl font-semibold">
               {connectionPending
@@ -131,14 +131,14 @@ function BullExPage() {
               {connectionPending
                 ? loginFlow.phase === "reconnecting"
                   ? "Reconectando automaticamente..."
-                  : "O backend continua trabalhando para abrir e reaproveitar sua sessao."
+                  : "O backend continua trabalhando para abrir e reaproveitar sua sessão."
                 : syncing
-                  ? "Buscando conta BullEx e estado do robo."
+                  ? "Buscando conta BullEx e estado do robô."
                   : connected
                     ? cachedGrace
-                      ? "Usando estado recente enquanto a reconexao finaliza."
-                      : "Sua conta esta pronta para ser usada pelo robo."
-                    : "Faca login para deixar a conta conectada."}
+                      ? "Usando estado recente enquanto a reconexão finaliza."
+                      : "Sua conta está pronta para ser usada pelo robô."
+                    : "Faça login para deixar a conta conectada."}
             </p>
           </div>
           <span
@@ -159,7 +159,7 @@ function BullExPage() {
             label="Saldo"
             value={formatBullExBalance(account.data?.balance, account.data?.currency)}
           />
-          <Info label="Sessao" value={accountStatus.data?.status ?? account.data?.status ?? "-"} />
+          <Info label="Sessão" value={accountStatus.data?.status ?? account.data?.status ?? "-"} />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -206,7 +206,7 @@ function BullExPage() {
               ? disconnect.error.message
               : reconnect.error instanceof Error
                 ? reconnect.error.message
-                : "Falha ao atualizar conexao."}
+                : "Falha ao atualizar conexão."}
           </p>
         )}
       </section>
@@ -300,7 +300,7 @@ function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     if (accountStatus.data?.status?.toUpperCase() === "LOGIN_FAILED") {
       abortRef.current?.abort();
       abortRef.current = null;
-      failBullExLogin("Email ou senha BullEx invalidos.", user?.id);
+      failBullExLogin("Email ou senha BullEx inválidos.", user?.id);
       setPassword("");
       setSmsCode("");
     }
@@ -438,7 +438,7 @@ function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               </div>
               <p className="mt-1 text-muted-foreground">
                 {loginFlow.phase === "reconnecting"
-                  ? "O backend esta tentando restaurar sua sessao automaticamente."
+                  ? "O backend está tentando restaurar sua sessão automaticamente."
                   : "O sistema continua tentando conectar sua conta sem exigir novos cliques."}
               </p>
             </div>
@@ -446,7 +446,7 @@ function BullExLoginModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
           {showTimeoutNote ? (
             <p className="text-sm text-warning-foreground">
-              90 segundos se passaram, mas o backend ainda pode concluir a conexao. Vamos seguir
+              90 segundos se passaram, mas o backend ainda pode concluir a conexão. Vamos seguir
               acompanhando automaticamente.
             </p>
           ) : null}
