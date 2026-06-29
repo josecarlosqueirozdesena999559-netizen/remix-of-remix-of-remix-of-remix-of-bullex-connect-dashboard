@@ -142,7 +142,7 @@ export interface BullexAccount {
   ok?: boolean;
   connected?: boolean;
   status?: "connected" | "disconnected";
-  mode?: "PRACTICE" | "REAL";
+  mode?: "REAL";
   balance?: number;
   currency?: string;
   email?: string;
@@ -158,7 +158,7 @@ export type BullexConnectResponse = {
 
 export type RobotConfigPayload = {
   enabled: boolean;
-  account_mode?: "DEMO" | "REAL";
+  account_mode?: "REAL";
   allow_real?: boolean;
   confirm_real?: boolean;
   entry_value?: number;

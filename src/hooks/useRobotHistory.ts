@@ -9,7 +9,7 @@ export const ROBOT_STATS_QUERY_KEY = ["robot-stats"] as const;
 export type RobotHistoryItem = {
   id: string;
   createdAt: string | null;
-  accountMode: "DEMO" | "REAL" | null;
+  accountMode: "REAL" | null;
   active: string;
   direction: "CALL" | "PUT";
   amount: number;
@@ -251,11 +251,8 @@ function normalizeHistoryResult(input: unknown): RobotHistoryItem["result"] | nu
   return null;
 }
 
-function normalizeAccountMode(input: unknown): "DEMO" | "REAL" | null {
-  const mode = text(input).toUpperCase();
-  if (mode === "REAL") return "REAL";
-  if (mode === "DEMO" || mode === "PRACTICE") return "DEMO";
-  return null;
+function normalizeAccountMode(input: unknown): "REAL" | null {
+  return input == null ? null : "REAL";
 }
 
 function percentage(input: unknown) {

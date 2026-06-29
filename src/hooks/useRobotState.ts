@@ -49,7 +49,7 @@ export type RobotTrade = {
   profit: number | null;
   gale_step: number | null;
   is_gale: boolean;
-  account_mode: "DEMO" | "REAL" | null;
+  account_mode: "REAL" | null;
 };
 
 export type RobotState = {
@@ -60,7 +60,7 @@ export type RobotState = {
   cycle_id: string | null;
   allow_real: boolean;
   confirm_real: boolean;
-  account_mode: "DEMO" | "REAL";
+  account_mode: "REAL";
   active_mode: string | null;
   connection_status_source: string | null;
   real_ready: boolean;
@@ -184,12 +184,12 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     connected: !disconnected,
     status: disconnected ? "ACCOUNT_DISCONNECTED" : "STOPPED",
     cycle_id: null,
-    allow_real: false,
-    confirm_real: false,
-    account_mode: "DEMO",
-    active_mode: null,
+    allow_real: true,
+    confirm_real: true,
+    account_mode: "REAL",
+    active_mode: "REAL",
     connection_status_source: null,
-    real_ready: false,
+    real_ready: true,
     real_block_reason: disconnected ? "Conta BullEx desconectada" : null,
     stop_reason: null,
     next_cycle_at: null,

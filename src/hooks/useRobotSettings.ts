@@ -27,7 +27,7 @@ export function useRobotSettings(userId?: string) {
     robotConfigState: {
       enabled: boolean;
       cycleMinutes: number;
-      accountMode: "DEMO" | "REAL";
+      accountMode: "REAL";
       allowReal: boolean;
       confirmReal: boolean;
     },

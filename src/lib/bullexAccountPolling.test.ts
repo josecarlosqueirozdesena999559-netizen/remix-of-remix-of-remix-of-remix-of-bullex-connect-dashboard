@@ -74,7 +74,7 @@ test("connect ok atualiza estado para online imediatamente", () => {
     connected: false,
     balance: 120.5,
     currency: "USD",
-    mode: "PRACTICE",
+    mode: "REAL",
     email: null,
     requires_2fa: false,
     status: "disconnected",

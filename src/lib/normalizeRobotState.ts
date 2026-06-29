@@ -118,10 +118,10 @@ export function normalizeRobotState(input: unknown): RobotState {
     connected: !disconnected,
     status,
     cycle_id: normalizeOptionalText(value.cycle_id ?? value.cycleId),
-    allow_real: normalizeBoolean(value.allow_real ?? value.allowReal),
-    confirm_real: normalizeBoolean(value.confirm_real ?? value.confirmReal),
-    account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode),
-    active_mode: normalizeOptionalText(value.active_mode ?? value.activeMode),
+    allow_real: true,
+    confirm_real: true,
+    account_mode: "REAL",
+    active_mode: normalizeOptionalText(value.active_mode ?? value.activeMode) ?? "REAL",
     connection_status_source: connectionStatusSource,
     real_ready: normalizeBoolean(value.real_ready ?? value.realReady),
     real_block_reason: normalizeOptionalText(value.real_block_reason ?? value.realBlockReason),
@@ -276,8 +276,8 @@ export function normalizeRobotState(input: unknown): RobotState {
   };
 }
 
-function normalizeAccountMode(input: unknown): "DEMO" | "REAL" {
-  return normalizeText(input).toUpperCase() === "REAL" ? "REAL" : "DEMO";
+function normalizeAccountMode(_input: unknown): "REAL" {
+  return "REAL";
 }
 
 function normalizeSignal(input: unknown): RobotSignal | null {
@@ -410,7 +410,7 @@ function normalizeTrade(input: unknown): RobotTrade | null {
         value.martingale ??
         ((normalizeNumber(value.gale_step ?? value.galeStep) ?? 0) > 0 ? 1 : 0),
     ),
-    account_mode: normalizeAccountMode(value.account_mode ?? value.accountMode ?? value.mode),
+    account_mode: "REAL",
   };
 }
 

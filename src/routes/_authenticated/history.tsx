@@ -192,9 +192,7 @@ function HistoryRow({ item }: { item: RobotHistoryItem }) {
   const accountClass =
     item.accountMode === "REAL"
       ? "bg-primary/15 text-primary"
-      : item.accountMode === "DEMO"
-        ? "bg-sky-500/15 text-sky-300"
-        : "bg-muted text-muted-foreground";
+      : "bg-muted text-muted-foreground";
 
   return (
     <TableRow>
