@@ -156,12 +156,6 @@ export type BullexConnectResponse = {
   status?: string;
 };
 
-export type BullexAccountMode = "PRACTICE" | "REAL";
-export type ChangeBullexModePayload = {
-  mode: BullexAccountMode;
-  confirm_real?: boolean;
-};
-
 export type RobotConfigPayload = {
   enabled: boolean;
   account_mode?: "DEMO" | "REAL";
@@ -243,7 +237,7 @@ export function adminUpdateUser(userId: string, payload: AdminUpdateUserPayload)
 
 export const bullexApi = {
   connect: (
-    payload: { email: string; password: string; sms_code?: string },
+    payload: { email: string; password: string; sms_code?: string; mode: "REAL" },
     options?: { signal?: AbortSignal },
   ) =>
     apiRequest<BullexConnectResponse>(
@@ -256,11 +250,6 @@ export const bullexApi = {
     ),
   disconnect: () => apiRequest<{ ok: boolean }>("/bullex/disconnect", { method: "POST" }),
   reconnect: () => apiRequest<{ ok: boolean }>("/bullex/reconnect", { method: "POST" }),
-  changeMode: (payload: BullexAccountMode | ChangeBullexModePayload) =>
-    apiRequest<{ ok: boolean }>("/bullex/change-mode", {
-      method: "POST",
-      body: JSON.stringify(typeof payload === "string" ? { mode: payload } : payload),
-    }),
   status: () => apiRequest<{ status: string }>("/bullex/status"),
   account: () => apiRequest<BullexAccount>("/bullex/account"),
   balance: () => apiRequest<{ balance: number; currency: string }>("/bullex/balance"),

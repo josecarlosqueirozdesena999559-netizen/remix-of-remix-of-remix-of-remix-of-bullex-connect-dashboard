@@ -6,7 +6,6 @@ import { resetRobotPresentationState } from "@/lib/robotPresentation";
 import {
   ApiError,
   type ApiResult,
-  type ChangeBullexModePayload,
   bullexApi,
   isKnownApiError,
   robotSyncConnection,
@@ -64,7 +63,10 @@ export function useConnectBullex() {
       password: string;
       sms_code?: string;
       signal?: AbortSignal;
-    }) => unwrap(await bullexApi.connect(payload, { signal: payload.signal })),
+    }) => {
+      const { signal, ...credentials } = payload;
+      return unwrap(await bullexApi.connect({ ...credentials, mode: "REAL" }, { signal }));
+    },
     onSuccess: () => {
       markBullExAccountConnectBurst(user?.id);
       console.log("[BULLEX CONNECT SUCCESS]");
@@ -89,26 +91,6 @@ export async function syncAfterBullExConnect(
     await robotSyncConnection();
   } catch (error) {
     console.warn("[ROBOT SYNC CONNECTION ERROR]", error);
-  }
-
-  try {
-    unwrap(await bullexApi.changeMode({ mode: "REAL", confirm_real: true }));
-    if (userId) {
-      qc.setQueryData([...BULLEX_ACCOUNT_QUERY_KEY, userId], (current) =>
-        current
-          ? {
-              ...current,
-              connected: true,
-              status: "connected" as const,
-              mode: "REAL" as const,
-              balance: null,
-            }
-          : current,
-      );
-    }
-    console.log("[BULLEX MODE SYNCED]", { user_id: userId ?? null, mode: "REAL" });
-  } catch (error) {
-    console.warn("[BULLEX MODE SYNC ERROR]", error);
   }
 
   if (userId) {
@@ -152,18 +134,6 @@ export function useReconnectBullex() {
       markBullExAccountConnectBurst(user?.id);
       await qc.invalidateQueries({ queryKey: ["bullex"] });
       await qc.invalidateQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY });
-    },
-    onError: toastGenericError,
-  });
-}
-
-export function useChangeBullexMode() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: ChangeBullexModePayload) =>
-      unwrap(await bullexApi.changeMode(payload)),
-    onSuccess: async () => {
-      await qc.refetchQueries({ queryKey: BULLEX_ACCOUNT_QUERY_KEY, type: "active" });
     },
     onError: toastGenericError,
   });

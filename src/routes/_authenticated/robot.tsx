@@ -11,7 +11,6 @@ import {
   robotStart,
   robotStop,
   type ApiResult,
-  bullexApi,
   buyReal,
   type BullexBuyRealPayload,
 } from "@/lib/api";
@@ -42,8 +41,6 @@ function RobotPage() {
   const loginFlow = useBullExLoginState(user?.id);
   const [robotActionPending, setRobotActionPending] = useState(false);
   const [robotActionError, setRobotActionError] = useState<string | null>(null);
-  const [modeActionPending, setModeActionPending] = useState(false);
-  const [modeActionError, setModeActionError] = useState<string | null>(null);
   const [settingsActionPending, setSettingsActionPending] = useState(false);
   const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [resetCyclePending, setResetCyclePending] = useState(false);
@@ -53,7 +50,6 @@ function RobotPage() {
   const [syncingTimedOut, setSyncingTimedOut] = useState(false);
   const [reloadStatePending, setReloadStatePending] = useState(false);
   const realBuyAttemptRef = useRef<string | null>(null);
-  const autoRealSyncStartedRef = useRef(false);
   const balanceStopAttemptRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -175,11 +171,6 @@ function RobotPage() {
       ai_min_confidence: null,
       ...overrides,
     };
-  }
-
-  async function refreshAccountAndRobot() {
-    await account.refetch();
-    await robotState.refetch();
   }
 
   useEffect(() => {
@@ -310,42 +301,6 @@ function RobotPage() {
       }
     })();
   }, [depositRequired, displayRobotState, hasBackend, realBalance, robotState]);
-
-  useEffect(() => {
-    if (!hasBackend || !connected || syncing || modeActionPending || settingsLocked) return;
-    if (account.data?.mode === "REAL" && displayRobotState?.account_mode === "REAL") {
-      autoRealSyncStartedRef.current = false;
-      return;
-    }
-    if (autoRealSyncStartedRef.current) return;
-
-    autoRealSyncStartedRef.current = true;
-    setModeActionError(null);
-    setModeActionPending(true);
-
-    void (async () => {
-      try {
-        unwrapApiResult(await bullexApi.changeMode({ mode: "REAL", confirm_real: true }));
-        unwrapApiResult(await robotConfig(buildRobotConfigPayload()));
-        await refreshAccountAndRobot();
-      } catch (error) {
-        setModeActionError(
-          error instanceof Error ? error.message : "Nao foi possivel sincronizar a conta REAL.",
-        );
-      } finally {
-        setModeActionPending(false);
-        autoRealSyncStartedRef.current = false;
-      }
-    })();
-  }, [
-    account.data?.mode,
-    connected,
-    displayRobotState?.account_mode,
-    hasBackend,
-    modeActionPending,
-    settingsLocked,
-    syncing,
-  ]);
 
   async function handleRobotToggle() {
     if (!hasBackend || robotActionPending) return;
@@ -540,9 +495,6 @@ function RobotPage() {
           </div>
         </div>
 
-          {modeActionError ? (
-            <p className="mt-3 text-sm text-destructive">{modeActionError}</p>
-          ) : null}
           {settingsLocked ? (
             <p className="mt-3 text-sm font-medium text-warning-foreground">
               Pare o robô para alterar configurações.
