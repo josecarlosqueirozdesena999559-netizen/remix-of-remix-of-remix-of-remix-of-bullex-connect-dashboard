@@ -1,21 +1,12 @@
 import type { RobotDirection, RobotSignal, RobotState, RobotTrade } from "@/hooks/useRobotState";
 
 type RobotResult = "WIN" | "LOSS" | null;
-const RESULT_DISPLAY_MS = 5000;
 const REJECTION_DISPLAY_MS = 5000;
 let orderRejectionSnapshot: OrderRejectionSnapshot | null = null;
-let resultSnapshot: ResultSnapshot | null = null;
 
 type OrderRejectionSnapshot = {
   key: string;
   reason: string;
-  observedAt: number;
-};
-
-type ResultSnapshot = {
-  key: string;
-  result: Exclude<RobotResult, null>;
-  trade: RobotTrade | null;
   observedAt: number;
 };
 
@@ -83,20 +74,64 @@ export function getRobotPresentation(
   const signal = robotState.pending_signal;
   const bestCandidate = robotState.best_candidate;
   const result = getCycleResult(robotState) ?? getTradeResult(trade);
+  const activeSignal = signal ?? bestCandidate;
 
-  if (isResultStatus(status) && result) {
-    const key = createResultEventKey(robotState, trade, result);
-    if (resultSnapshot?.key !== key) {
-      resultSnapshot = { key, result, trade, observedAt: now };
-    }
+  const operationOpen =
+    !result &&
+    (robotState.operation_in_progress ||
+      robotState.result_waiting ||
+      status === "ORDER_OPEN" ||
+      status === "WAITING_RESULT" ||
+      status === "PENDING_RESULT" ||
+      trade?.result === "PENDING_RESULT");
+
+  if (
+    status !== "ORDER_REJECTED" &&
+    trade?.result !== "ORDER_REJECTED" &&
+    isOrderFallbackInProgress(robotState)
+  ) {
+    return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
   }
 
-  if (resultSnapshot && now - resultSnapshot.observedAt < RESULT_DISPLAY_MS) {
+  if (status === "BUYING" || status === "SENDING_ORDER") {
     return {
-      ...createPresentation("result", formatResultTitle(resultSnapshot.result)),
-      trade: resultSnapshot.trade,
-      direction: resultSnapshot.trade?.direction ?? null,
-      result: resultSnapshot.result,
+      ...createPresentation(
+        "operation",
+        "Executando ordem",
+        robotState.operation_message ?? "Enviando ordem...",
+      ),
+      trade,
+      signal: trade ? null : activeSignal,
+      direction: trade?.direction ?? activeSignal?.direction ?? null,
+    };
+  }
+
+  if (operationOpen) {
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil(options.expirationSeconds ?? robotState.expiration_seconds),
+    );
+
+    return {
+      ...createPresentation(
+        "operation",
+        robotState.operation_message ?? "Operacao aberta",
+        "Aguardando resultado",
+        remainingSeconds > 0 ? `Resultado em ${formatDuration(remainingSeconds)}` : null,
+      ),
+      trade,
+      signal: trade ? null : activeSignal,
+      direction: trade?.direction ?? activeSignal?.direction ?? null,
+    };
+  }
+
+  if (result && shouldShowResult(robotState, now)) {
+    return {
+      ...createPresentation("result", formatResultTitle(result)),
+      trade,
+      signal: trade ? null : activeSignal,
+      direction: trade?.direction ?? activeSignal?.direction ?? null,
+      result,
     };
   }
 
@@ -151,10 +186,6 @@ export function getRobotPresentation(
     orderRejectionSnapshot = null;
   }
 
-  if (isOrderFallbackInProgress(robotState)) {
-    return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
-  }
-
   if (status === "WAITING_GALE_ENTRY" || robotState.gale_pending) {
     const gale = getGale(robotState);
     return {
@@ -182,56 +213,11 @@ export function getRobotPresentation(
     };
   }
 
-  if (status === "SENDING_ORDER") {
-    return createPresentation("operation", "Entrada liberada", "Enviando ordem...");
-  }
-
-  if (status === "PENDING_RESULT" && !result) {
-    const remainingSeconds = Math.max(
-      0,
-      Math.ceil(options.expirationSeconds ?? robotState.expiration_seconds),
-    );
-
+  if (status === "SIGNAL_FOUND") {
     return {
-      ...createPresentation(
-        "operation",
-        "Aguardando resultado",
-        null,
-        remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
-      ),
-      trade,
-      direction: trade?.direction ?? null,
-    };
-  }
-
-  const operationInProgress =
-    !result && (robotState.operation_in_progress || trade?.result === "PENDING_RESULT");
-  const resultWaiting = !result && robotState.result_waiting;
-
-  if (resultWaiting) {
-    return {
-      ...createPresentation("operation", "Aguardando resultado"),
-      trade,
-      signal: trade ? null : signal,
-      direction: trade?.direction ?? signal?.direction ?? null,
-    };
-  }
-
-  if (operationInProgress) {
-    const remainingSeconds = Math.max(
-      0,
-      Math.ceil(options.expirationSeconds ?? robotState.expiration_seconds),
-    );
-
-    return {
-      ...createPresentation(
-        "operation",
-        "Aguardando resultado",
-        null,
-        remainingSeconds > 0 ? `Expira em ${formatDuration(remainingSeconds)}` : null,
-      ),
-      trade,
-      direction: trade?.direction ?? null,
+      ...createPresentation("entry", "Melhor ativo encontrado", null, "Entrada em instantes"),
+      signal: activeSignal,
+      direction: activeSignal?.direction ?? null,
     };
   }
 
@@ -259,29 +245,32 @@ export function getRobotPresentation(
     return {
       ...createPresentation(
         "entry",
-        "Sinal preparado",
-        "Entrada em MM",
+        "Melhor ativo encontrado",
+        null,
         remainingSeconds > 0
-          ? `Entrada no inicio da proxima vela em ${formatDuration(remainingSeconds)}`
+          ? `Entrada em ${formatDuration(remainingSeconds)}`
           : "Aguardando abertura da vela...",
       ),
-      signal,
-      direction: signal?.direction ?? null,
+      signal: activeSignal,
+      direction: activeSignal?.direction ?? null,
     };
   }
 
   if (status === "SIGNAL_EXPIRED") {
-    return createPresentation(
-      "analyzing",
-      "Entrada perdida por atraso. Aguardando novo sinal.",
-    );
+    return createPresentation("analyzing", "Entrada perdida por atraso. Aguardando novo sinal.");
+  }
+
+  if (activeSignal) {
+    return {
+      ...createPresentation("entry", "Melhor ativo encontrado", null),
+      signal: activeSignal,
+      direction: activeSignal.direction,
+    };
   }
 
   if (status === "ANALYZING") {
     return {
-      ...createPresentation("analyzing", "Analisando mercado...", "Escolhendo melhor ativo..."),
-      signal: bestCandidate,
-      direction: bestCandidate?.direction ?? null,
+      ...createPresentation("analyzing", "Analisando mercado..."),
     };
   }
 
@@ -352,7 +341,6 @@ export function formatFriendlyRobotText(value: string | null | undefined) {
 
 export function resetRobotPresentationState() {
   orderRejectionSnapshot = null;
-  resultSnapshot = null;
 }
 
 function isDisconnected(robotState: RobotState) {
@@ -420,7 +408,11 @@ function createNextCyclePresentation(
     return createPresentation("analyzing", title);
   }
 
-  return createPresentation("analyzing", title, `Proxima entrada em ${formatDuration(remainingSeconds)}`);
+  return createPresentation(
+    "analyzing",
+    title,
+    `Proxima entrada em ${formatDuration(remainingSeconds)}`,
+  );
 }
 
 function createWaitingNextCyclePresentation(
@@ -471,19 +463,6 @@ function resolveNextCycleSeconds(
     : fallbackSeconds;
 }
 
-function createResultEventKey(
-  robotState: RobotState,
-  trade: RobotTrade | null,
-  result: Exclude<RobotResult, null>,
-) {
-  return [
-    robotState.cycle_id ?? "-",
-    trade?.order_id ?? "-",
-    robotState.gale_step ?? trade?.gale_step ?? "-",
-    result,
-  ].join("|");
-}
-
 function createPresentation(
   kind: RobotPresentation["kind"],
   title: string,
@@ -529,8 +508,23 @@ function getTradeResult(trade: RobotTrade | null): Exclude<RobotResult, null> | 
   return null;
 }
 
+function shouldShowResult(robotState: RobotState, now: number) {
+  if (robotState.status === "WIN" || robotState.status === "LOSS") return true;
+  if (isResultStatus(robotState.status) && !robotState.result_display_until) return true;
+  if (!robotState.result_display_until) return false;
+  const displayUntil = Date.parse(robotState.result_display_until);
+  return Number.isFinite(displayUntil) && now < displayUntil;
+}
+
 function isResultStatus(status: string) {
-  return status === "RESULT_RECEIVED" || status === "GALE_RESULT_RECEIVED";
+  return (
+    status === "WIN" ||
+    status === "LOSS" ||
+    status === "RESULT_WIN" ||
+    status === "RESULT_LOSS" ||
+    status === "RESULT_RECEIVED" ||
+    status === "GALE_RESULT_RECEIVED"
+  );
 }
 
 function formatResultTitle(result: Exclude<RobotResult, null>) {

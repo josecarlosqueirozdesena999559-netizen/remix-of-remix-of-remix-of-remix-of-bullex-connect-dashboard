@@ -16,7 +16,9 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const [visible, setVisible] = useState(true);
   const [adminWins, setAdminWins] = useState(0);
   const [adminCycleStartedAt, setAdminCycleStartedAt] = useState(() => Date.now());
-  const [adminResultFlash, setAdminResultFlash] = useState<null | { at: number; wins: number }>(null);
+  const [adminResultFlash, setAdminResultFlash] = useState<null | { at: number; wins: number }>(
+    null,
+  );
   const { account, robotState } = useLiveTradingData();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user } = useAuth();
@@ -28,8 +30,8 @@ export function FloatingRobot({ userId }: { userId?: string }) {
     getNextCycleResetKey(displayRobotState),
     Boolean(
       displayRobotState?.enabled &&
-        ((displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
-          0),
+      (displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
+        0,
     ),
     displayRobotState?.fetched_at,
   );
@@ -131,6 +133,11 @@ function buildAdminModelRobotState(
         order_id: `admin-model-${resultFlash.wins}`,
         confidence: 92,
         payout: 84,
+        strategy_score: 88,
+        strategy_name: "Trend",
+        used_strategies: ["Trend", "RSI"],
+        strategy_reason: "Confluencia de tendencia",
+        entry_reason: "Modelo visual do admin",
         result: "WIN",
         expires_at: new Date(now + 60_000).toISOString(),
         sent_at: new Date(now - 10_000).toISOString(),
@@ -184,8 +191,11 @@ function buildAdminModelRobotState(
     expiration_seconds: 0,
     expires_at: null,
     entry_window_open: false,
+    entry_target: null,
     operation_in_progress: false,
     result_waiting: false,
+    operation_message: null,
+    result_display_until: showWin ? new Date(now + 2200).toISOString() : null,
     pending_signal: null,
     best_candidate: {
       symbol: "EURUSD-OTC",

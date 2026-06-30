@@ -89,6 +89,8 @@ function RobotPage() {
     Boolean(
       displayRobotState?.enabled &&
       (displayRobotState.operation_in_progress ||
+        displayRobotState.status === "ORDER_OPEN" ||
+        displayRobotState.status === "WAITING_RESULT" ||
         displayRobotState.status === "PENDING_RESULT" ||
         displayRobotState.last_trade?.result === "PENDING_RESULT") &&
       displayRobotState.expiration_seconds > 0,
@@ -111,7 +113,8 @@ function RobotPage() {
       account.data?.status === "disconnected" ||
       account.data?.status === "DISCONNECTED");
   const connected =
-    connectionPending || (!accountDisconnected && (account.data?.connected === true || cachedGrace));
+    connectionPending ||
+    (!accountDisconnected && (account.data?.connected === true || cachedGrace));
   const activeMode = "REAL";
   const cycleResetRequired = shouldShowResetCycle(displayRobotState);
   const realSelected = activeMode === "REAL";
@@ -147,7 +150,8 @@ function RobotPage() {
       : realBuyError
         ? `Compra REAL bloqueada: ${realBuyError}`
         : robotPresentation.detail;
-  const robotStatusFooter = accountDisconnected || depositRequired ? null : robotPresentation.footer;
+  const robotStatusFooter =
+    accountDisconnected || depositRequired ? null : robotPresentation.footer;
 
   function buildRobotConfigPayload(
     overrides: Partial<Parameters<typeof robotConfig>[0]> = {},
@@ -233,6 +237,8 @@ function RobotPage() {
 
     if (
       displayRobotState.status === "PENDING_RESULT" ||
+      displayRobotState.status === "ORDER_OPEN" ||
+      displayRobotState.status === "WAITING_RESULT" ||
       displayRobotState.status === "PENDING_GALE_RESULT" ||
       displayRobotState.last_trade?.result === "PENDING_RESULT"
     ) {
@@ -390,7 +396,8 @@ function RobotPage() {
       await queryClient.invalidateQueries({ queryKey: ROBOT_STATS_QUERY_KEY });
       toast.success("Ciclo reiniciado");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Não foi possível reiniciar o ciclo.";
+      const message =
+        error instanceof Error ? error.message : "Não foi possível reiniciar o ciclo.";
       setRobotActionError(message);
       toast.error(message);
     } finally {
@@ -495,11 +502,11 @@ function RobotPage() {
           </div>
         </div>
 
-          {settingsLocked ? (
-            <p className="mt-3 text-sm font-medium text-warning-foreground">
-              Pare o robô para alterar configurações.
-            </p>
-          ) : null}
+        {settingsLocked ? (
+          <p className="mt-3 text-sm font-medium text-warning-foreground">
+            Pare o robô para alterar configurações.
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-6">
@@ -683,7 +690,10 @@ function RobotPage() {
               value={settings.stopWin}
               disabled={settingsLocked}
               onChange={(value) =>
-                setSettings({ ...settings, stopWin: normalizeConfigNumber(value, settings.stopWin) })
+                setSettings({
+                  ...settings,
+                  stopWin: normalizeConfigNumber(value, settings.stopWin),
+                })
               }
             />
             <ConfigField
@@ -770,7 +780,6 @@ function RobotPage() {
           </div>
         </section>
       ) : null}
-
     </div>
   );
 }
@@ -855,13 +864,13 @@ function getRealBuyPayload(robotState: RobotState): BullexBuyRealPayload | null 
 
   const isGale = robotState.status === "SENDING_GALE_ORDER" || robotState.gale_in_progress;
   const assetId = isGale
-    ? robotState.gale_active ?? robotState.last_trade?.active
+    ? (robotState.gale_active ?? robotState.last_trade?.active)
     : robotState.pending_signal?.symbol;
   const direction = isGale
-    ? robotState.gale_direction ?? robotState.last_trade?.direction
+    ? (robotState.gale_direction ?? robotState.last_trade?.direction)
     : robotState.pending_signal?.direction;
   const amount = isGale
-    ? robotState.gale_amount ?? robotState.last_trade?.amount ?? robotState.entry_value
+    ? (robotState.gale_amount ?? robotState.last_trade?.amount ?? robotState.entry_value)
     : robotState.entry_value;
   const duration = robotState.cycle_minutes || FIXED_CYCLE_MINUTES;
 
@@ -884,6 +893,8 @@ function shouldSendRealBuy(robotState: RobotState) {
   if (robotState.result_waiting) return false;
   if (
     robotState.status === "PENDING_RESULT" ||
+    robotState.status === "ORDER_OPEN" ||
+    robotState.status === "WAITING_RESULT" ||
     robotState.status === "PENDING_GALE_RESULT" ||
     robotState.last_trade?.result === "PENDING_RESULT"
   ) {
@@ -891,6 +902,7 @@ function shouldSendRealBuy(robotState: RobotState) {
   }
 
   return (
+    robotState.status === "BUYING" ||
     robotState.status === "SENDING_ORDER" ||
     robotState.status === "SENDING_GALE_ORDER" ||
     (robotState.entry_window_open && robotState.pending_signal != null)

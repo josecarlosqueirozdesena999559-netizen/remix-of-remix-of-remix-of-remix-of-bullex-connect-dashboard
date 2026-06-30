@@ -88,7 +88,7 @@ export function RobotOverlay({
     getEntryWindowResetKey(robotState),
     Boolean(
       robotState?.enabled &&
-        ((robotState.seconds_until_entry ?? robotState.seconds_until_entry_window) > 0),
+      (robotState.seconds_until_entry ?? robotState.seconds_until_entry_window) > 0,
     ),
     robotState?.fetched_at,
   );
@@ -98,6 +98,8 @@ export function RobotOverlay({
     Boolean(
       robotState?.enabled &&
       (robotState.operation_in_progress ||
+        robotState.status === "ORDER_OPEN" ||
+        robotState.status === "WAITING_RESULT" ||
         robotState.status === "PENDING_RESULT" ||
         robotState.last_trade?.result === "PENDING_RESULT") &&
       robotState.expiration_seconds > 0,
@@ -297,7 +299,9 @@ export function RobotOverlay({
               setConfigOpen(false);
             } catch (error) {
               const message =
-                error instanceof Error ? error.message : "Não foi possível salvar as configurações.";
+                error instanceof Error
+                  ? error.message
+                  : "Não foi possível salvar as configurações.";
               toast.error(message);
               console.error("[ROBOT CONFIG SAVE ERROR]", error);
               throw error;
@@ -440,9 +444,11 @@ function getOverlayContent(
       <>
         {presentation.detail ? <span>{presentation.detail}</span> : null}
         <TradeIdentity active={trade.active} direction={trade.direction} />
-        {presentation.kind === "operation" && trade.amount != null ? (
-          <span>Valor: {formatEntryAmount(trade.amount)}</span>
+        {trade.confidence != null ? (
+          <span>Confiança: {formatPercentage(trade.confidence)}%</span>
         ) : null}
+        {trade.payout != null ? <span>Payout: {formatPercentage(trade.payout)}%</span> : null}
+        {trade.amount != null ? <span>Valor: {formatEntryAmount(trade.amount)}</span> : null}
         {presentation.kind === "result" && trade.profit != null ? (
           <span>
             {isPositiveResult ? "Lucro" : "Prejuízo"}:{" "}
@@ -465,7 +471,7 @@ function getOverlayContent(
         ) : null}
       </>
     );
-  } else if (signal && shouldShowSignalDetails(robotState?.status)) {
+  } else if (signal) {
     const usedStrategies =
       signal.used_strategies.length > 0
         ? signal.used_strategies
@@ -481,6 +487,9 @@ function getOverlayContent(
           <span>Confiança: {formatPercentage(signal.confidence)}%</span>
         ) : null}
         {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
+        {robotState?.entry_value != null ? (
+          <span>Valor: {formatEntryAmount(robotState.entry_value)}</span>
+        ) : null}
         <span>Estratégia: {usedStrategies.join(", ")}</span>
         {signal.reason || signal.strategy_reason ? (
           <span>Motivo: {signal.reason ?? signal.strategy_reason ?? "Nao informado"}</span>
@@ -511,10 +520,6 @@ function isRobotActive(robotState: RobotState | undefined) {
     robotState.status === "STOPPED" ||
     (robotState.enabled === false && robotState.worker_running === false);
   return !stopped;
-}
-
-function shouldShowSignalDetails(status: RobotState["status"] | undefined) {
-  return status === "WAITING_ENTRY_WINDOW" || status === "WAITING_NEXT_CANDLE_ENTRY";
 }
 
 function TradeIdentity({ active, direction }: { active: string; direction: RobotDirection }) {
@@ -554,12 +559,12 @@ function RobotConfigMenu({
           ? Math.min(ENTRY_VALUE_MAX, Math.max(ENTRY_VALUE_MIN, Math.round(next)))
           : settings.entryValue
         : key === "martingaleSteps"
-        ? Number.isFinite(next)
-          ? Math.max(1, Math.round(next))
-          : settings.martingaleSteps
-        : Number.isFinite(next)
-          ? next
-          : settings[key];
+          ? Number.isFinite(next)
+            ? Math.max(1, Math.round(next))
+            : settings.martingaleSteps
+          : Number.isFinite(next)
+            ? next
+            : settings[key];
     onChange({ ...settings, [key]: normalized });
   }
 

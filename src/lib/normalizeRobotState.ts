@@ -246,10 +246,15 @@ export function normalizeRobotState(input: unknown): RobotState {
     expiration_seconds: Math.max(0, expirationSeconds),
     expires_at: expiresAt,
     entry_window_open: normalizeBoolean(value.entry_window_open ?? value.entryWindowOpen),
+    entry_target: normalizeOptionalText(value.entry_target ?? value.entryTarget),
     operation_in_progress: normalizeBoolean(
       value.operation_in_progress ?? value.operationInProgress,
     ),
     result_waiting: normalizeBoolean(value.result_waiting ?? value.resultWaiting),
+    operation_message: normalizeOptionalText(value.operation_message ?? value.operationMessage),
+    result_display_until: normalizeOptionalText(
+      value.result_display_until ?? value.resultDisplayUntil,
+    ),
     pending_signal: pendingSignal,
     best_candidate: bestCandidate,
     last_signal: normalizeSignal(value.last_signal ?? value.lastSignal),
@@ -344,10 +349,7 @@ function normalizeSignal(input: unknown): RobotSignal | null {
         value.openaiEntryReason,
     ),
     ai_voice_text: normalizeOptionalText(
-      value.ai_voice_text ??
-        value.aiVoiceText ??
-        value.openai_voice_text ??
-        value.openaiVoiceText,
+      value.ai_voice_text ?? value.aiVoiceText ?? value.openai_voice_text ?? value.openaiVoiceText,
     ),
     ai_block_reason: normalizeReason(
       value.ai_block_reason ??
@@ -395,6 +397,24 @@ function normalizeTrade(input: unknown): RobotTrade | null {
     order_id: normalizeIdentifier(value.order_id ?? value.orderId),
     confidence: normalizePercentage(value.confidence),
     payout: normalizePercentage(value.payout),
+    strategy_score: normalizeNumber(value.strategy_score ?? value.strategyScore ?? value.score),
+    strategy_name: normalizeOptionalText(
+      value.strategy_name ?? value.strategyName ?? value.strategy,
+    ),
+    used_strategies: normalizeTextList(
+      value.used_strategies ??
+        value.usedStrategies ??
+        value.strategies_used ??
+        value.strategiesUsed ??
+        value.strategies ??
+        value.strategy_name ??
+        value.strategyName ??
+        value.strategy,
+    ),
+    strategy_reason: normalizeReason(value.strategy_reason ?? value.strategyReason),
+    entry_reason: normalizeReason(
+      value.entry_reason ?? value.entryReason ?? value.reason ?? value.reasons,
+    ),
     result: normalizeText(value.result, "PENDING_RESULT").toUpperCase(),
     expires_at: normalizeOptionalText(
       value.expires_at ?? value.expiresAt ?? value.expiration_at ?? value.expirationAt,

@@ -42,6 +42,11 @@ export type RobotTrade = {
   order_id: string | null;
   confidence: number | null;
   payout: number | null;
+  strategy_score: number | null;
+  strategy_name: string | null;
+  used_strategies: string[];
+  strategy_reason: string | null;
+  entry_reason: string | null;
   result: string;
   expires_at: string | null;
   sent_at: string | null;
@@ -94,8 +99,11 @@ export type RobotState = {
   expiration_seconds: number;
   expires_at: string | null;
   entry_window_open: boolean;
+  entry_target: string | null;
   operation_in_progress: boolean;
   result_waiting: boolean;
+  operation_message: string | null;
+  result_display_until: string | null;
   pending_signal: RobotSignal | null;
   best_candidate: RobotSignal | null;
   last_signal: RobotSignal | null;
@@ -220,8 +228,11 @@ export function createStoppedRobotState(disconnected = false): RobotState {
     expiration_seconds: 0,
     expires_at: null,
     entry_window_open: false,
+    entry_target: null,
     operation_in_progress: false,
     result_waiting: false,
+    operation_message: null,
+    result_display_until: null,
     pending_signal: null,
     best_candidate: null,
     last_signal: null,

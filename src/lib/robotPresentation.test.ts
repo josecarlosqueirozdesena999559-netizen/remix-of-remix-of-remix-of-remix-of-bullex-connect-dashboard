@@ -61,6 +61,7 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
   resetRobotPresentationState();
   const state = createRobotState({
     status: "RESULT_RECEIVED",
+    result_display_until: "2026-06-14T12:00:05Z",
     last_trade: createTrade({ result: "WIN", order_id: "order-123" }),
   });
 
@@ -68,6 +69,7 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
   const nextCycleState = {
     ...state,
     status: "WAITING_NEXT_CYCLE",
+    result_display_until: "2026-06-14T12:00:05Z",
     seconds_until_next_cycle: 42,
   };
   const beforeTimeout = getRobotPresentation(nextCycleState, now + 4999);
@@ -181,7 +183,8 @@ test("result_waiting prioriza aguardando resultado mesmo fora de pending_result"
     now,
   );
 
-  assert.equal(pending.title, "Aguardando resultado");
+  assert.equal(pending.title, "Operacao aberta");
+  assert.equal(pending.detail, "Aguardando resultado");
 });
 
 test("STOP_WIN_HIT e STOP_LOSS_HIT mostram robo pausado", () => {
@@ -206,9 +209,9 @@ test("WAITING_ENTRY mostra sinal preparado com entrada em MM", () => {
     now,
   );
 
-  assert.equal(presentation.title, "Sinal preparado");
-  assert.equal(presentation.detail, "Entrada em MM");
-  assert.equal(presentation.footer, "Entrada no inicio da proxima vela em 00:17");
+  assert.equal(presentation.title, "Melhor ativo encontrado");
+  assert.equal(presentation.detail, null);
+  assert.equal(presentation.footer, "Entrada em 00:17");
 });
 
 test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima vela", () => {
@@ -221,9 +224,9 @@ test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima ve
     now,
   );
 
-  assert.equal(presentation.title, "Sinal preparado");
-  assert.equal(presentation.detail, "Entrada em MM");
-  assert.equal(presentation.footer, "Entrada no inicio da proxima vela em 00:17");
+  assert.equal(presentation.title, "Melhor ativo encontrado");
+  assert.equal(presentation.detail, null);
+  assert.equal(presentation.footer, "Entrada em 00:17");
   assert.equal(presentation.signal?.symbol, "EURUSD-OTC");
 });
 
@@ -237,8 +240,8 @@ test("WAITING_NEXT_CANDLE_ENTRY nao mostra 00:00 enquanto aguarda a vela", () =>
     now,
   );
 
-  assert.equal(presentation.title, "Sinal preparado");
-  assert.equal(presentation.detail, "Entrada em MM");
+  assert.equal(presentation.title, "Melhor ativo encontrado");
+  assert.equal(presentation.detail, null);
   assert.equal(presentation.footer, "Aguardando abertura da vela...");
 });
 
@@ -301,21 +304,24 @@ test("status DISCONNECTED nunca mostra analise operacional", () => {
   assert.equal(presentation.signal, null);
 });
 
-test("SENDING_ORDER e PENDING_RESULT usam os novos textos de operacao", () => {
-  const sending = getRobotPresentation(createRobotState({ status: "SENDING_ORDER" }), now);
+test("BUYING e WAITING_RESULT usam os novos textos de operacao", () => {
+  const sending = getRobotPresentation(createRobotState({ status: "BUYING" }), now);
   const pending = getRobotPresentation(
     createRobotState({
-      status: "PENDING_RESULT",
+      status: "WAITING_RESULT",
+      operation_in_progress: true,
+      result_waiting: true,
       expiration_seconds: 29,
       last_trade: createTrade(),
     }),
     now,
   );
 
-  assert.equal(sending.title, "Entrada liberada");
+  assert.equal(sending.title, "Executando ordem");
   assert.equal(sending.detail, "Enviando ordem...");
-  assert.equal(pending.title, "Aguardando resultado");
-  assert.equal(pending.footer, "Expira em 00:29");
+  assert.equal(pending.title, "Operacao aberta");
+  assert.equal(pending.detail, "Aguardando resultado");
+  assert.equal(pending.footer, "Resultado em 00:29");
 });
 
 test("analise da IA mostra bloqueio e fallback local quando necessario", () => {
@@ -369,6 +375,11 @@ function createTrade(overrides: Partial<NonNullable<RobotState["last_trade"]>> =
     order_id: "order-1",
     confidence: 90,
     payout: 80,
+    strategy_score: 88,
+    strategy_name: "Trend",
+    used_strategies: ["Trend"],
+    strategy_reason: "Confluencia de tendencia",
+    entry_reason: "Rompimento com confirmacao",
     result: "PENDING_RESULT",
     expires_at: null,
     sent_at: null,
@@ -424,8 +435,11 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     expiration_seconds: 0,
     expires_at: null,
     entry_window_open: false,
+    entry_target: null,
     operation_in_progress: false,
     result_waiting: false,
+    operation_message: null,
+    result_display_until: null,
     pending_signal: null,
     best_candidate: null,
     last_signal: null,
