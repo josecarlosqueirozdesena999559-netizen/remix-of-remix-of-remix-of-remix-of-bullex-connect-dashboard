@@ -117,6 +117,7 @@ export function normalizeRobotState(input: unknown): RobotState {
     ),
     connected: !disconnected,
     status,
+    status_message: normalizeOptionalText(value.status_message ?? value.statusMessage),
     cycle_id: normalizeOptionalText(value.cycle_id ?? value.cycleId),
     allow_real: true,
     confirm_real: true,

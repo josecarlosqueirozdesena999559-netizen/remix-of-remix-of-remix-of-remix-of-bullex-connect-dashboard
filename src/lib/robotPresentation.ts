@@ -75,6 +75,7 @@ export function getRobotPresentation(
   const bestCandidate = robotState.best_candidate;
   const result = getCycleResult(robotState) ?? getTradeResult(trade);
   const activeSignal = signal ?? bestCandidate;
+  const officialCountdown = getOfficialCountdown(robotState);
 
   const operationOpen =
     robotState.operation_in_progress ||
@@ -84,12 +85,13 @@ export function getRobotPresentation(
     status === "PENDING_RESULT" ||
     trade?.result === "PENDING_RESULT";
 
-  if (
-    status !== "ORDER_REJECTED" &&
-    trade?.result !== "ORDER_REJECTED" &&
-    isOrderFallbackInProgress(robotState)
-  ) {
-    return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
+  if (robotState.last_order_error && status === "BUY_ERROR") {
+    return createPresentation(
+      "rejected",
+      "Compra REAL bloqueada",
+      formatFriendlyRobotText(robotState.last_order_error),
+      officialCountdown ? `Próxima entrada em ${officialCountdown}` : null,
+    );
   }
 
   if (status === "BUYING" || status === "SENDING_ORDER") {
@@ -106,14 +108,12 @@ export function getRobotPresentation(
   }
 
   if (operationOpen) {
-    const remainingSeconds = Math.max(0, Math.ceil(robotState.expiration_seconds));
-
     return {
       ...createPresentation(
         "operation",
+        "Operação aberta",
         "Aguardando resultado",
-        robotState.operation_message ?? "Operação aberta",
-        remainingSeconds > 0 ? `Resultado em ${formatDuration(remainingSeconds)}` : null,
+        officialCountdown ? `Resultado em ${officialCountdown}` : null,
       ),
       trade,
       signal: trade ? null : activeSignal,
@@ -145,6 +145,18 @@ export function getRobotPresentation(
 
   if (status === "SIGNAL_REJECTED") {
     return createNextCyclePresentation(robotState, options);
+  }
+
+  if (status === "WAITING_NEXT_CYCLE") {
+    return createWaitingNextCyclePresentation(robotState, options);
+  }
+
+  if (
+    status !== "ORDER_REJECTED" &&
+    trade?.result !== "ORDER_REJECTED" &&
+    isOrderFallbackInProgress(robotState)
+  ) {
+    return createPresentation("analyzing", "Ativo indisponivel, tentando proximo melhor ativo...");
   }
 
   const orderRejected = status === "ORDER_REJECTED" || trade?.result === "ORDER_REJECTED";
@@ -210,13 +222,12 @@ export function getRobotPresentation(
   }
 
   if (status === "SIGNAL_FOUND") {
-    const remainingSeconds = Math.max(0, Math.ceil(resolveEntrySeconds(robotState)));
     return {
       ...createPresentation(
         "entry",
         "Melhor ativo encontrado",
         null,
-        remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
+        officialCountdown ? `Entrada em ${officialCountdown}` : null,
       ),
       signal: activeSignal,
       direction: activeSignal?.direction ?? null,
@@ -224,14 +235,12 @@ export function getRobotPresentation(
   }
 
   if (status === "WAITING_ENTRY_WINDOW") {
-    const remainingSeconds = Math.max(0, Math.ceil(resolveEntrySeconds(robotState)));
-
     return {
       ...createPresentation(
         "entry",
         "Melhor ativo encontrado",
         null,
-        `Entrada em ${formatDuration(remainingSeconds)}`,
+        officialCountdown ? `Entrada em ${officialCountdown}` : null,
       ),
       signal: activeSignal,
       direction: activeSignal?.direction ?? null,
@@ -239,16 +248,12 @@ export function getRobotPresentation(
   }
 
   if (status === "WAITING_ENTRY" || status === "WAITING_NEXT_CANDLE_ENTRY") {
-    const remainingSeconds = Math.max(0, Math.ceil(resolveEntrySeconds(robotState)));
-
     return {
       ...createPresentation(
         "entry",
         "Melhor ativo encontrado",
         null,
-        remainingSeconds > 0
-          ? `Entrada em ${formatDuration(remainingSeconds)}`
-          : "Aguardando abertura da vela...",
+        officialCountdown ? `Entrada em ${officialCountdown}` : "Aguardando abertura da vela...",
       ),
       signal: activeSignal,
       direction: activeSignal?.direction ?? null,
@@ -260,13 +265,12 @@ export function getRobotPresentation(
   }
 
   if (activeSignal) {
-    const remainingSeconds = Math.max(0, Math.ceil(resolveEntrySeconds(robotState)));
     return {
       ...createPresentation(
         "entry",
         "Melhor ativo encontrado",
         null,
-        remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
+        officialCountdown ? `Entrada em ${officialCountdown}` : null,
       ),
       signal: activeSignal,
       direction: activeSignal.direction,
@@ -280,24 +284,7 @@ export function getRobotPresentation(
   }
 
   if (status === "WAITING_ANALYSIS_WINDOW") {
-    const remainingSeconds = Math.max(0, Math.ceil(robotState.seconds_until_analysis_window));
-
-    return {
-      ...createPresentation(
-        "analyzing",
-        "Analisando mercado...",
-        bestCandidate ? `Melhor ativo: ${bestCandidate.symbol}` : "Escolhendo melhor ativo...",
-        remainingSeconds > 0
-          ? `Analise em ${formatDuration(remainingSeconds)}`
-          : "Analise em 00:00",
-      ),
-      signal: bestCandidate,
-      direction: bestCandidate?.direction ?? null,
-    };
-  }
-
-  if (status === "WAITING_NEXT_CYCLE") {
-    return createWaitingNextCyclePresentation(robotState, options);
+    return createPresentation("analyzing", "Analisando mercado...");
   }
 
   if (trade && result) {
@@ -404,65 +391,32 @@ function createNextCyclePresentation(
   title = "Analisando...",
   fallbackSeconds = 0,
 ) {
-  const remainingSeconds = resolveNextCycleSeconds(robotState, options, fallbackSeconds);
+  const officialCountdown = getOfficialCountdown(robotState);
 
-  if (remainingSeconds <= 0) {
+  if (!officialCountdown) {
     return createPresentation("analyzing", title);
   }
 
-  return createPresentation(
-    "analyzing",
-    title,
-    `Proxima entrada em ${formatDuration(remainingSeconds)}`,
-  );
+  return createPresentation("analyzing", title, `Próxima entrada em ${officialCountdown}`);
 }
 
 function createWaitingNextCyclePresentation(
   robotState: RobotState,
   options: RobotPresentationOptions = {},
 ) {
-  const remainingSeconds = Math.max(
-    0,
-    Math.ceil(
-      options.nextCycleSeconds ??
-        robotState.display_countdown_seconds ??
-        robotState.seconds_until_next_cycle,
-    ),
-  );
-  const bestCandidate = robotState.best_candidate;
+  const officialCountdown = getOfficialCountdown(robotState);
 
-  return {
-    ...createPresentation(
-      "analyzing",
-      "Analisando mercado...",
-      bestCandidate ? `Melhor ativo: ${bestCandidate.symbol}` : null,
-      remainingSeconds > 0 ? `Entrada em ${formatDuration(remainingSeconds)}` : null,
-    ),
-    signal: bestCandidate,
-    direction: bestCandidate?.direction ?? null,
-  };
-}
-
-function resolveEntrySeconds(robotState: RobotState) {
-  return (
-    robotState.display_countdown_seconds ??
-    robotState.seconds_until_entry ??
-    robotState.seconds_until_entry_window
+  return createPresentation(
+    "analyzing",
+    "Robô aguardando próximo ciclo",
+    officialCountdown ? `Próxima entrada em ${officialCountdown}` : null,
   );
 }
 
-function resolveNextCycleSeconds(
-  robotState: RobotState,
-  options: RobotPresentationOptions,
-  fallbackSeconds = 0,
-) {
-  if ("nextCycleSeconds" in options) {
-    return options.nextCycleSeconds ?? fallbackSeconds;
-  }
-
-  return robotState.seconds_until_next_cycle > 0
-    ? robotState.seconds_until_next_cycle
-    : fallbackSeconds;
+function getOfficialCountdown(robotState: RobotState) {
+  if (robotState.display_countdown_label) return robotState.display_countdown_label;
+  const seconds = robotState.display_countdown_seconds;
+  return seconds != null && seconds > 0 ? formatDuration(seconds) : null;
 }
 
 function createPresentation(

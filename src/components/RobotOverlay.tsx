@@ -326,32 +326,12 @@ function useCurrentTime() {
   return now;
 }
 
-function formatRobotStatus(status: string) {
-  return status.replace(/_/g, " ");
-}
-
 function formatOfficialCountdown(robotState: RobotState | undefined) {
   if (!robotState) return "-";
-  const seconds =
-    robotState.display_countdown_seconds ??
-    (hasOpenOperation(robotState)
-      ? robotState.expiration_seconds
-      : (robotState.pending_signal ?? robotState.best_candidate)
-        ? robotState.seconds_until_entry || robotState.seconds_until_entry_window
-        : robotState.seconds_until_analysis_window || robotState.seconds_until_next_cycle);
+  if (robotState.display_countdown_label) return robotState.display_countdown_label;
+  const seconds = robotState.display_countdown_seconds;
 
-  return seconds > 0 ? formatClock(seconds) : "-";
-}
-
-function hasOpenOperation(robotState: RobotState) {
-  return (
-    robotState.operation_in_progress ||
-    robotState.result_waiting ||
-    robotState.status === "ORDER_OPEN" ||
-    robotState.status === "WAITING_RESULT" ||
-    robotState.status === "PENDING_RESULT" ||
-    robotState.last_trade?.result === "PENDING_RESULT"
-  );
+  return seconds != null && seconds > 0 ? formatClock(seconds) : "-";
 }
 
 function formatClock(totalSeconds: number) {
@@ -488,11 +468,17 @@ function TradeIdentity({ active, direction }: { active: string; direction: Robot
 
 function OfficialStateDetails({ robotState }: { robotState: RobotState | undefined }) {
   if (!robotState) return null;
+  const countdown = formatOfficialCountdown(robotState);
+  if (countdown === "-") return null;
+  const label =
+    robotState.operation_in_progress || robotState.result_waiting
+      ? "Resultado em"
+      : "Próxima entrada em";
+
   return (
-    <>
-      <span>Status atual: {formatRobotStatus(robotState.status)}</span>
-      <span>Contador oficial: {formatOfficialCountdown(robotState)}</span>
-    </>
+    <span>
+      {label} {countdown}
+    </span>
   );
 }
 

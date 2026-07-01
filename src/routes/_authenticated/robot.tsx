@@ -504,8 +504,16 @@ function RobotPage() {
 
         {!accountDisconnected && displayRobotState ? (
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
-            <Pill label="Status atual" value={formatRobotStatus(displayRobotState.status)} />
-            <Pill label="Contador oficial" value={formatOfficialCountdown(displayRobotState)} />
+            {formatOfficialCountdown(displayRobotState) !== "-" ? (
+              <Pill
+                label={
+                  displayRobotState.operation_in_progress || displayRobotState.result_waiting
+                    ? "Resultado em"
+                    : "Próxima entrada em"
+                }
+                value={formatOfficialCountdown(displayRobotState)}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -913,31 +921,11 @@ function useCurrentTime() {
   return now;
 }
 
-function formatRobotStatus(status: string) {
-  return status.replace(/_/g, " ");
-}
-
 function formatOfficialCountdown(robotState: RobotState) {
-  const seconds =
-    robotState.display_countdown_seconds ??
-    (hasOpenOperation(robotState)
-      ? robotState.expiration_seconds
-      : (robotState.pending_signal ?? robotState.best_candidate)
-        ? robotState.seconds_until_entry || robotState.seconds_until_entry_window
-        : robotState.seconds_until_analysis_window || robotState.seconds_until_next_cycle);
+  if (robotState.display_countdown_label) return robotState.display_countdown_label;
+  const seconds = robotState.display_countdown_seconds;
 
-  return seconds > 0 ? formatClock(seconds) : "-";
-}
-
-function hasOpenOperation(robotState: RobotState) {
-  return (
-    robotState.operation_in_progress ||
-    robotState.result_waiting ||
-    robotState.status === "ORDER_OPEN" ||
-    robotState.status === "WAITING_RESULT" ||
-    robotState.status === "PENDING_RESULT" ||
-    robotState.last_trade?.result === "PENDING_RESULT"
-  );
+  return seconds != null && seconds > 0 ? formatClock(seconds) : "-";
 }
 
 function formatClock(totalSeconds: number) {

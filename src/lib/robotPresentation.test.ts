@@ -7,7 +7,7 @@ import { getRobotStateRefetchInterval } from "./robotPolling.ts";
 
 const now = Date.parse("2026-06-14T12:00:00Z");
 
-test("primeiro ativo indisponivel mostra fallback para tentar o segundo", () => {
+test("SENDING_ORDER com fallback ainda mostra execucao de ordem", () => {
   resetRobotPresentationState();
 
   const presentation = getRobotPresentation(
@@ -19,8 +19,8 @@ test("primeiro ativo indisponivel mostra fallback para tentar o segundo", () => 
     now,
   );
 
-  assert.equal(presentation.title, "Ativo indisponivel, tentando proximo melhor ativo...");
-  assert.equal(presentation.kind, "analyzing");
+  assert.equal(presentation.title, "Executando ordem");
+  assert.equal(presentation.kind, "operation");
 });
 
 test("fallback permanece visivel ate 3 tentativas", () => {
@@ -57,6 +57,26 @@ test("se todos os ativos falharem mostra ORDER_REJECTED", () => {
   assert.equal(presentation.kind, "rejected");
 });
 
+test("BUY_ERROR com erro de ordem mostra compra real bloqueada e proxima entrada", () => {
+  resetRobotPresentationState();
+
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "BUY_ERROR",
+      last_order_error: "Field required: amount",
+      display_countdown_seconds: 300,
+      best_candidate: createSignal(),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.kind, "rejected");
+  assert.equal(presentation.title, "Compra REAL bloqueada");
+  assert.equal(presentation.detail, "Field required: amount");
+  assert.equal(presentation.footer, "Próxima entrada em 05:00");
+  assert.equal(presentation.signal, null);
+});
+
 test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos", () => {
   resetRobotPresentationState();
   const state = createRobotState({
@@ -70,7 +90,7 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
     ...state,
     status: "WAITING_NEXT_CYCLE",
     result_display_until: "2026-06-14T12:00:05Z",
-    seconds_until_next_cycle: 42,
+    display_countdown_seconds: 42,
   };
   const beforeTimeout = getRobotPresentation(nextCycleState, now + 4999);
   const afterTimeout = getRobotPresentation(nextCycleState, now + 5000);
@@ -78,8 +98,8 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
   assert.equal(received.title, "WIN");
   assert.equal(received.kind, "result");
   assert.equal(beforeTimeout.title, "WIN");
-  assert.equal(afterTimeout.title, "Analisando mercado...");
-  assert.equal(afterTimeout.footer, "Entrada em 00:42");
+  assert.equal(afterTimeout.title, "Robô aguardando próximo ciclo");
+  assert.equal(afterTimeout.detail, "Próxima entrada em 00:42");
 });
 
 test("WAITING_GALE_ENTRY mostra Gale preparado sem tratar loss inicial como final", () => {
@@ -183,8 +203,8 @@ test("result_waiting prioriza aguardando resultado mesmo fora de pending_result"
     now,
   );
 
-  assert.equal(pending.title, "Aguardando resultado");
-  assert.equal(pending.detail, "Operação aberta");
+  assert.equal(pending.title, "Operação aberta");
+  assert.equal(pending.detail, "Aguardando resultado");
 });
 
 test("STOP_WIN_HIT e STOP_LOSS_HIT mostram robo pausado", () => {
@@ -203,7 +223,7 @@ test("WAITING_ENTRY mostra sinal preparado com entrada em MM", () => {
   const presentation = getRobotPresentation(
     createRobotState({
       status: "WAITING_ENTRY",
-      seconds_until_entry: 17,
+      display_countdown_seconds: 17,
       pending_signal: createSignal(),
     }),
     now,
@@ -218,7 +238,7 @@ test("WAITING_NEXT_CANDLE_ENTRY mostra sinal preparado e countdown da proxima ve
   const presentation = getRobotPresentation(
     createRobotState({
       status: "WAITING_NEXT_CANDLE_ENTRY",
-      seconds_until_entry: 17,
+      display_countdown_seconds: 17,
       pending_signal: createSignal(),
     }),
     now,
@@ -282,8 +302,8 @@ test("WAITING_NEXT_CYCLE nao mostra entrada liberada antes de SENDING_ORDER", ()
     now,
   );
 
-  assert.equal(presentation.title, "Analisando mercado...");
-  assert.equal(presentation.footer, null);
+  assert.equal(presentation.title, "Robô aguardando próximo ciclo");
+  assert.equal(presentation.detail, null);
 });
 
 test("status DISCONNECTED nunca mostra analise operacional", () => {
@@ -311,7 +331,7 @@ test("BUYING e WAITING_RESULT usam os novos textos de operacao", () => {
       status: "WAITING_RESULT",
       operation_in_progress: true,
       result_waiting: true,
-      expiration_seconds: 29,
+      display_countdown_seconds: 29,
       last_trade: createTrade(),
     }),
     now,
@@ -319,8 +339,8 @@ test("BUYING e WAITING_RESULT usam os novos textos de operacao", () => {
 
   assert.equal(sending.title, "Executando ordem");
   assert.equal(sending.detail, "Enviando ordem...");
-  assert.equal(pending.title, "Aguardando resultado");
-  assert.equal(pending.detail, "Operação aberta");
+  assert.equal(pending.title, "Operação aberta");
+  assert.equal(pending.detail, "Aguardando resultado");
   assert.equal(pending.footer, "Resultado em 00:29");
 });
 
@@ -398,6 +418,7 @@ function createRobotState(overrides: Partial<RobotState> = {}): RobotState {
     worker_running: true,
     connected: true,
     status: "WAITING_NEXT_CYCLE",
+    status_message: null,
     cycle_id: null,
     allow_real: true,
     confirm_real: true,
