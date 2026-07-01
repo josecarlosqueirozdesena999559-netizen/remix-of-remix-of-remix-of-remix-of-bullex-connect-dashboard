@@ -8,7 +8,6 @@ import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import { useRobotNarrator } from "@/hooks/useRobotNarrator";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import type { RobotState } from "@/hooks/useRobotState";
-import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { useAuth } from "@/lib/useAuth";
 import { isAdminUser } from "@/lib/adminAccess";
 
@@ -25,16 +24,10 @@ export function FloatingRobot({ userId }: { userId?: string }) {
   const displayRobotState = useRobotDisplayState(robotState.data);
   const { settings, saveSettings } = useRobotSettings(userId);
   const isAdminModel = isAdminUser(user) && pathname === "/admin";
-  const nextCycleSeconds = useSmoothCountdown(
-    displayRobotState?.display_countdown_seconds ?? displayRobotState?.seconds_until_next_cycle,
-    getNextCycleResetKey(displayRobotState),
-    Boolean(
-      displayRobotState?.enabled &&
-      (displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
-        0,
-    ),
-    displayRobotState?.fetched_at,
-  );
+  const nextCycleSeconds =
+    displayRobotState?.display_countdown_seconds ??
+    displayRobotState?.seconds_until_next_cycle ??
+    0;
   const adminModelState = useMemo(
     () => buildAdminModelRobotState(adminWins, adminCycleStartedAt, adminResultFlash),
     [adminCycleStartedAt, adminResultFlash, adminWins],
@@ -246,13 +239,3 @@ function getAdminModelAccount(wins: number): BullExAccountState {
 }
 
 const ADMIN_MODEL_CYCLE_MS = 12000;
-
-function getNextCycleResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.next_cycle_at ?? "-",
-    robotState.display_countdown_label ?? "-",
-    robotState.last_trade?.finished_at ?? "-",
-  ].join("|");
-}

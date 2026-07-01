@@ -20,7 +20,6 @@ import { useRobotDisplayState } from "@/hooks/useRobotDisplayState";
 import type { RobotState } from "@/hooks/useRobotState";
 import { useRobotSettings } from "@/hooks/useRobotSettings";
 import { ROBOT_HISTORY_QUERY_KEY, ROBOT_STATS_QUERY_KEY } from "@/hooks/useRobotHistory";
-import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import { ENTRY_VALUE_MAX, ENTRY_VALUE_MIN, ENTRY_VALUE_STEP } from "@/lib/robotSettings";
 import { useBullExLoginState } from "@/lib/bullexLoginState";
@@ -58,51 +57,7 @@ function RobotPage() {
   const displayRobotState = useRobotDisplayState(robotState.data);
   const { settings, setSettings, saveSettings } = useRobotSettings(user?.id);
   const now = useCurrentTime();
-  const analysisWindowSeconds = useSmoothCountdown(
-    displayRobotState?.seconds_until_analysis_window,
-    getAnalysisWindowResetKey(displayRobotState),
-    Boolean(displayRobotState?.enabled && displayRobotState.seconds_until_analysis_window > 0),
-    displayRobotState?.fetched_at,
-  );
-  const nextCycleSeconds = useSmoothCountdown(
-    displayRobotState?.display_countdown_seconds ?? displayRobotState?.seconds_until_next_cycle,
-    getNextCycleResetKey(displayRobotState),
-    Boolean(
-      displayRobotState?.enabled &&
-      (displayRobotState.display_countdown_seconds ?? displayRobotState.seconds_until_next_cycle) >
-        0,
-    ),
-    displayRobotState?.fetched_at,
-  );
-  const smoothEntryWindowSeconds = useSmoothCountdown(
-    displayRobotState?.seconds_until_entry ?? displayRobotState?.seconds_until_entry_window,
-    getEntryWindowResetKey(displayRobotState),
-    Boolean(
-      displayRobotState?.enabled &&
-      (displayRobotState.seconds_until_entry ?? displayRobotState.seconds_until_entry_window) > 0,
-    ),
-    displayRobotState?.fetched_at,
-  );
-  const smoothExpirationSeconds = useSmoothCountdown(
-    displayRobotState?.expiration_seconds,
-    getExpirationResetKey(displayRobotState),
-    Boolean(
-      displayRobotState?.enabled &&
-      (displayRobotState.operation_in_progress ||
-        displayRobotState.status === "ORDER_OPEN" ||
-        displayRobotState.status === "WAITING_RESULT" ||
-        displayRobotState.status === "PENDING_RESULT" ||
-        displayRobotState.last_trade?.result === "PENDING_RESULT") &&
-      displayRobotState.expiration_seconds > 0,
-    ),
-    displayRobotState?.fetched_at,
-  );
-  const robotPresentation = getRobotPresentation(displayRobotState, now, {
-    analysisWindowSeconds,
-    nextCycleSeconds,
-    entryWindowSeconds: smoothEntryWindowSeconds,
-    expirationSeconds: smoothExpirationSeconds,
-  });
+  const robotPresentation = getRobotPresentation(displayRobotState, now);
   const syncing = account.isLoading || robotState.isLoading;
   const cachedGrace = displayRobotState?.connection_status_source === "cached_grace";
   const connectionPending = loginFlow.isPending;
@@ -547,6 +502,13 @@ function RobotPage() {
           </div>
         ) : null}
 
+        {!accountDisconnected && displayRobotState ? (
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <Pill label="Status atual" value={formatRobotStatus(displayRobotState.status)} />
+            <Pill label="Contador oficial" value={formatOfficialCountdown(displayRobotState)} />
+          </div>
+        ) : null}
+
         {!accountDisconnected && robotPresentation.gale ? (
           <div className="mt-5 flex flex-wrap gap-2 text-sm">
             <Pill label="Mesmo ativo" value={robotPresentation.gale.active} />
@@ -951,39 +913,38 @@ function useCurrentTime() {
   return now;
 }
 
-function getAnalysisWindowResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [robotState.status, robotState.next_cycle_at ?? "-"].join("|");
+function formatRobotStatus(status: string) {
+  return status.replace(/_/g, " ");
 }
 
-function getNextCycleResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.next_cycle_at ?? "-",
-    robotState.display_countdown_label ?? "-",
-    robotState.last_trade?.finished_at ?? "-",
-  ].join("|");
+function formatOfficialCountdown(robotState: RobotState) {
+  const seconds =
+    robotState.display_countdown_seconds ??
+    (hasOpenOperation(robotState)
+      ? robotState.expiration_seconds
+      : (robotState.pending_signal ?? robotState.best_candidate)
+        ? robotState.seconds_until_entry || robotState.seconds_until_entry_window
+        : robotState.seconds_until_analysis_window || robotState.seconds_until_next_cycle);
+
+  return seconds > 0 ? formatClock(seconds) : "-";
 }
 
-function getEntryWindowResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.cycle_id ?? "-",
-    robotState.pending_signal?.created_at ?? "-",
-    robotState.pending_signal?.symbol ?? "-",
-    robotState.pending_signal?.direction ?? "-",
-  ].join("|");
+function hasOpenOperation(robotState: RobotState) {
+  return (
+    robotState.operation_in_progress ||
+    robotState.result_waiting ||
+    robotState.status === "ORDER_OPEN" ||
+    robotState.status === "WAITING_RESULT" ||
+    robotState.status === "PENDING_RESULT" ||
+    robotState.last_trade?.result === "PENDING_RESULT"
+  );
 }
 
-function getExpirationResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.last_trade?.order_id ?? "-",
-    robotState.last_trade?.sent_at ?? "-",
-    robotState.last_trade?.expires_at ?? robotState.expires_at ?? "-",
-  ].join("|");
+function formatClock(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const secondsPart = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
 }
 
 function unwrapApiResult<T>(result: ApiResult<T>) {

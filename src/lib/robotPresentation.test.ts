@@ -183,8 +183,8 @@ test("result_waiting prioriza aguardando resultado mesmo fora de pending_result"
     now,
   );
 
-  assert.equal(pending.title, "Operacao aberta");
-  assert.equal(pending.detail, "Aguardando resultado");
+  assert.equal(pending.title, "Aguardando resultado");
+  assert.equal(pending.detail, "Operação aberta");
 });
 
 test("STOP_WIN_HIT e STOP_LOSS_HIT mostram robo pausado", () => {
@@ -319,8 +319,8 @@ test("BUYING e WAITING_RESULT usam os novos textos de operacao", () => {
 
   assert.equal(sending.title, "Executando ordem");
   assert.equal(sending.detail, "Enviando ordem...");
-  assert.equal(pending.title, "Operacao aberta");
-  assert.equal(pending.detail, "Aguardando resultado");
+  assert.equal(pending.title, "Aguardando resultado");
+  assert.equal(pending.detail, "Operação aberta");
   assert.equal(pending.footer, "Resultado em 00:29");
 });
 

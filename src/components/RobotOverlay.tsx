@@ -9,7 +9,6 @@ import { RotateCcw, Settings, Trophy, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
 import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
-import { useSmoothCountdown } from "@/hooks/useSmoothCountdown";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import {
   DEFAULT_ROBOT_SETTINGS,
@@ -68,50 +67,7 @@ export function RobotOverlay({
   const [configOpen, setConfigOpen] = useState(false);
   const [settings, setSettings] = useState<RobotSettings>(savedSettings);
   const now = useCurrentTime();
-  const analysisWindowSeconds = useSmoothCountdown(
-    robotState?.seconds_until_analysis_window,
-    getAnalysisWindowResetKey(robotState),
-    Boolean(robotState?.enabled && robotState.seconds_until_analysis_window > 0),
-    robotState?.fetched_at,
-  );
-  const nextCycleSeconds = useSmoothCountdown(
-    robotState?.display_countdown_seconds ?? robotState?.seconds_until_next_cycle,
-    getNextCycleResetKey(robotState),
-    Boolean(
-      robotState?.enabled &&
-      (robotState.display_countdown_seconds ?? robotState.seconds_until_next_cycle) > 0,
-    ),
-    robotState?.fetched_at,
-  );
-  const smoothEntryWindowSeconds = useSmoothCountdown(
-    robotState?.seconds_until_entry ?? robotState?.seconds_until_entry_window,
-    getEntryWindowResetKey(robotState),
-    Boolean(
-      robotState?.enabled &&
-      (robotState.seconds_until_entry ?? robotState.seconds_until_entry_window) > 0,
-    ),
-    robotState?.fetched_at,
-  );
-  const smoothExpirationSeconds = useSmoothCountdown(
-    robotState?.expiration_seconds,
-    getExpirationResetKey(robotState),
-    Boolean(
-      robotState?.enabled &&
-      (robotState.operation_in_progress ||
-        robotState.status === "ORDER_OPEN" ||
-        robotState.status === "WAITING_RESULT" ||
-        robotState.status === "PENDING_RESULT" ||
-        robotState.last_trade?.result === "PENDING_RESULT") &&
-      robotState.expiration_seconds > 0,
-    ),
-    robotState?.fetched_at,
-  );
-  const presentation = getRobotPresentation(robotState, now, {
-    analysisWindowSeconds,
-    nextCycleSeconds,
-    entryWindowSeconds: smoothEntryWindowSeconds,
-    expirationSeconds: smoothExpirationSeconds,
-  });
+  const presentation = getRobotPresentation(robotState, now);
   const content = getOverlayContent(robotState, presentation);
   const settingsLocked = isRobotActive(robotState);
 
@@ -382,40 +338,39 @@ function useCurrentTime() {
   return now;
 }
 
-function getAnalysisWindowResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [robotState.status, robotState.next_cycle_at ?? "-"].join("|");
+function formatRobotStatus(status: string) {
+  return status.replace(/_/g, " ");
 }
 
-function getNextCycleResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.next_cycle_at ?? "-",
-    robotState.display_countdown_label ?? "-",
-    robotState.last_trade?.finished_at ?? "-",
-  ].join("|");
+function formatOfficialCountdown(robotState: RobotState | undefined) {
+  if (!robotState) return "-";
+  const seconds =
+    robotState.display_countdown_seconds ??
+    (hasOpenOperation(robotState)
+      ? robotState.expiration_seconds
+      : (robotState.pending_signal ?? robotState.best_candidate)
+        ? robotState.seconds_until_entry || robotState.seconds_until_entry_window
+        : robotState.seconds_until_analysis_window || robotState.seconds_until_next_cycle);
+
+  return seconds > 0 ? formatClock(seconds) : "-";
 }
 
-function getEntryWindowResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.cycle_id ?? "-",
-    robotState.pending_signal?.created_at ?? "-",
-    robotState.pending_signal?.symbol ?? "-",
-    robotState.pending_signal?.direction ?? "-",
-  ].join("|");
+function hasOpenOperation(robotState: RobotState) {
+  return (
+    robotState.operation_in_progress ||
+    robotState.result_waiting ||
+    robotState.status === "ORDER_OPEN" ||
+    robotState.status === "WAITING_RESULT" ||
+    robotState.status === "PENDING_RESULT" ||
+    robotState.last_trade?.result === "PENDING_RESULT"
+  );
 }
 
-function getExpirationResetKey(robotState: RobotState | undefined) {
-  if (!robotState) return null;
-  return [
-    robotState.status,
-    robotState.last_trade?.order_id ?? "-",
-    robotState.last_trade?.sent_at ?? "-",
-    robotState.last_trade?.expires_at ?? robotState.expires_at ?? "-",
-  ].join("|");
+function formatClock(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const secondsPart = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(secondsPart).padStart(2, "0")}`;
 }
 
 function getOverlayContent(
@@ -444,6 +399,7 @@ function getOverlayContent(
       <>
         {presentation.detail ? <span>{presentation.detail}</span> : null}
         <TradeIdentity active={trade.active} direction={trade.direction} />
+        <OfficialStateDetails robotState={robotState} />
         {trade.confidence != null ? (
           <span>Confiança: {formatPercentage(trade.confidence)}%</span>
         ) : null}
@@ -466,6 +422,7 @@ function getOverlayContent(
         >
           Mesma direção: {presentation.gale.direction}
         </span>
+        <OfficialStateDetails robotState={robotState} />
         {presentation.gale.amount != null ? (
           <span>Valor: {formatEntryAmount(presentation.gale.amount)}</span>
         ) : null}
@@ -480,6 +437,7 @@ function getOverlayContent(
       <>
         {presentation.detail ? <span>{presentation.detail}</span> : null}
         <TradeIdentity active={signal.symbol} direction={signal.direction} />
+        <OfficialStateDetails robotState={robotState} />
         {signal.strategy_score != null ? (
           <span>Score: {formatScore(signal.strategy_score)}</span>
         ) : null}
@@ -494,6 +452,13 @@ function getOverlayContent(
         {signal.reason || signal.strategy_reason ? (
           <span>Motivo: {signal.reason ?? signal.strategy_reason ?? "Nao informado"}</span>
         ) : null}
+      </>
+    );
+  } else if (robotState) {
+    details = (
+      <>
+        {presentation.detail ? <span>{presentation.detail}</span> : null}
+        <OfficialStateDetails robotState={robotState} />
       </>
     );
   }
@@ -529,6 +494,16 @@ function TradeIdentity({ active, direction }: { active: string; direction: Robot
       <span className={direction === "CALL" ? "text-emerald-300" : "text-red-300"}>
         Direção: {direction}
       </span>
+    </>
+  );
+}
+
+function OfficialStateDetails({ robotState }: { robotState: RobotState | undefined }) {
+  if (!robotState) return null;
+  return (
+    <>
+      <span>Status atual: {formatRobotStatus(robotState.status)}</span>
+      <span>Contador oficial: {formatOfficialCountdown(robotState)}</span>
     </>
   );
 }
