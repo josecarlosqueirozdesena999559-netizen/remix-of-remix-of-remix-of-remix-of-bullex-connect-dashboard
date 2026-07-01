@@ -8,7 +8,7 @@ import {
 import { RotateCcw, Settings, Trophy, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
 import type { BullExAccountState } from "@/hooks/useBullExAccount";
-import type { RobotDirection, RobotState } from "@/hooks/useRobotState";
+import type { RobotState } from "@/hooks/useRobotState";
 import { getRobotPresentation } from "@/lib/robotPresentation";
 import {
   DEFAULT_ROBOT_SETTINGS,
@@ -282,13 +282,10 @@ export function RobotOverlay({
         >
           {content.title}
         </p>
-        {content.details ? (
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 break-words text-[10px] font-semibold leading-snug sm:text-xs">
-            {content.details}
-          </div>
-        ) : null}
         {content.footer ? (
-          <p className="mt-0.5 text-[11px] font-semibold sm:text-xs">{content.footer}</p>
+          <p className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-tight sm:text-xs">
+            {content.footer}
+          </p>
         ) : null}
         {adminModelControls ? (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
@@ -345,10 +342,7 @@ function getOverlayContent(
   robotState: RobotState | undefined,
   presentation: ReturnType<typeof getRobotPresentation>,
 ): OverlayContent {
-  const trade = presentation.trade;
-  const signal = presentation.signal;
   const isPositiveResult = presentation.result === "WIN";
-  const isNegativeResult = presentation.result === "LOSS";
   const tone =
     presentation.kind === "result"
       ? isPositiveResult
@@ -359,83 +353,20 @@ function getOverlayContent(
         : presentation.kind === "rejected"
           ? "text-red-300"
           : "";
-
-  let details: ReactNode = presentation.detail ? <span>{presentation.detail}</span> : null;
-
-  if (trade) {
-    details = (
-      <>
-        {presentation.detail ? <span>{presentation.detail}</span> : null}
-        <TradeIdentity active={trade.active} direction={trade.direction} />
-        <OfficialStateDetails robotState={robotState} />
-        {trade.confidence != null ? (
-          <span>Confiança: {formatPercentage(trade.confidence)}%</span>
-        ) : null}
-        {trade.payout != null ? <span>Payout: {formatPercentage(trade.payout)}%</span> : null}
-        {trade.amount != null ? <span>Valor: {formatEntryAmount(trade.amount)}</span> : null}
-        {presentation.kind === "result" && trade.profit != null ? (
-          <span>
-            {isPositiveResult ? "Lucro" : "Prejuízo"}:{" "}
-            {formatMoney(isNegativeResult ? Math.abs(trade.profit) : trade.profit)}
-          </span>
-        ) : null}
-      </>
-    );
-  } else if (presentation.gale) {
-    details = (
-      <>
-        <span>Mesmo ativo: {presentation.gale.active}</span>
-        <span
-          className={presentation.gale.direction === "CALL" ? "text-emerald-300" : "text-red-300"}
-        >
-          Mesma direção: {presentation.gale.direction}
-        </span>
-        <OfficialStateDetails robotState={robotState} />
-        {presentation.gale.amount != null ? (
-          <span>Valor: {formatEntryAmount(presentation.gale.amount)}</span>
-        ) : null}
-      </>
-    );
-  } else if (signal) {
-    const usedStrategies =
-      signal.used_strategies.length > 0
-        ? signal.used_strategies
-        : [signal.strategy_name ?? "Não informada"];
-    details = (
-      <>
-        {presentation.detail ? <span>{presentation.detail}</span> : null}
-        <TradeIdentity active={signal.symbol} direction={signal.direction} />
-        <OfficialStateDetails robotState={robotState} />
-        {signal.strategy_score != null ? (
-          <span>Score: {formatScore(signal.strategy_score)}</span>
-        ) : null}
-        {signal.confidence != null ? (
-          <span>Confiança: {formatPercentage(signal.confidence)}%</span>
-        ) : null}
-        {signal.payout != null ? <span>Payout: {formatPercentage(signal.payout)}%</span> : null}
-        {robotState?.entry_value != null ? (
-          <span>Valor: {formatEntryAmount(robotState.entry_value)}</span>
-        ) : null}
-        <span>Estratégia: {usedStrategies.join(", ")}</span>
-        {signal.reason || signal.strategy_reason ? (
-          <span>Motivo: {signal.reason ?? signal.strategy_reason ?? "Nao informado"}</span>
-        ) : null}
-      </>
-    );
-  } else if (robotState) {
-    details = (
-      <>
-        {presentation.detail ? <span>{presentation.detail}</span> : null}
-        <OfficialStateDetails robotState={robotState} />
-      </>
-    );
-  }
+  const countdown = formatOfficialCountdown(robotState);
+  const footer =
+    presentation.footer ??
+    (countdown !== "-"
+      ? robotState?.operation_in_progress || robotState?.result_waiting
+        ? `Resultado em ${countdown}`
+        : `Entrada em ${countdown}`
+      : null);
 
   return {
     title: formatOverlayTitle(robotState, presentation.title),
     tone,
-    details,
-    footer: presentation.footer,
+    details: null,
+    footer: normalizeOverlayFooter(footer),
   };
 }
 
@@ -455,31 +386,11 @@ function isRobotActive(robotState: RobotState | undefined) {
   return !stopped;
 }
 
-function TradeIdentity({ active, direction }: { active: string; direction: RobotDirection }) {
-  return (
-    <>
-      <span>Ativo: {active}</span>
-      <span className={direction === "CALL" ? "text-emerald-300" : "text-red-300"}>
-        Direção: {direction}
-      </span>
-    </>
-  );
-}
-
-function OfficialStateDetails({ robotState }: { robotState: RobotState | undefined }) {
-  if (!robotState) return null;
-  const countdown = formatOfficialCountdown(robotState);
-  if (countdown === "-") return null;
-  const label =
-    robotState.operation_in_progress || robotState.result_waiting
-      ? "Resultado em"
-      : "Próxima entrada em";
-
-  return (
-    <span>
-      {label} {countdown}
-    </span>
-  );
+function normalizeOverlayFooter(value: string | null) {
+  if (!value) return null;
+  return value
+    .replace(/^Próxima entrada em/i, "Entrada em")
+    .replace(/^Proxima entrada em/i, "Entrada em");
 }
 
 function RobotConfigMenu({
@@ -707,30 +618,11 @@ function getViewportBounds() {
     : { minX: VIEWPORT_GAP, minY: 92 };
 }
 
-function formatPercentage(value: number) {
-  return Math.round(value);
-}
-
-function formatScore(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-}
-
 function formatCurrencyBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
   }).format(value);
-}
-
-function formatEntryAmount(value: number) {
-  return `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
 }
 
 function formatAccountBalance(value: number, currency: string | null) {
