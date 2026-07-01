@@ -75,7 +75,6 @@ export function RobotOverlay({
     setSettings(savedSettings);
   }, [savedSettings]);
 
-  const lastCountdownLogRef = useRef<string | null>(null);
   const lastWaitingUiLogRef = useRef<string | null>(null);
   const lastSendingUiLogRef = useRef<string | null>(null);
 
@@ -95,17 +94,6 @@ export function RobotOverlay({
       direction: robotState.pending_signal?.direction ?? null,
     });
   }, [robotState]);
-
-  useEffect(() => {
-    if (!robotState || robotState.status !== "WAITING_NEXT_CANDLE_ENTRY") return;
-    const logKey = [robotState.cycle_id ?? "-", smoothEntryWindowSeconds ?? "null"].join("|");
-    if (lastCountdownLogRef.current === logKey) return;
-    lastCountdownLogRef.current = logKey;
-    console.log("[NEXT_CANDLE_COUNTDOWN]", {
-      cycleId: robotState.cycle_id ?? null,
-      secondsUntilEntry: smoothEntryWindowSeconds,
-    });
-  }, [robotState, smoothEntryWindowSeconds]);
 
   useEffect(() => {
     if (!robotState || robotState.status !== "SENDING_ORDER") return;
