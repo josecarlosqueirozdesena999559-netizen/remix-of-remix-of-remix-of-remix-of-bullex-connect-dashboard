@@ -62,7 +62,7 @@ export function useRobotNarrator(
     const utterance = new SpeechSynthesisUtterance(event.text);
     utterance.lang = "pt-BR";
     utterance.voice = getPortugueseVoice();
-    utterance.rate = 0.78;
+    utterance.rate = 0.64;
     utterance.pitch = 1;
     utterance.onstart = () => {
       spokenKeysRef.current.add(event.key);
@@ -103,16 +103,21 @@ function getNarrationEvents(
 ): NarrationEvent[] {
   const events: NarrationEvent[] = [];
   const status = robotState.status;
-  const signal = robotState.pending_signal;
+  const signal = robotState.pending_signal ?? robotState.best_candidate;
   const trade = robotState.last_trade;
   const orderId = trade?.order_id ?? "-";
   const signalCreatedAt = signal?.created_at ?? "-";
-  const result = getTradeResult(trade);
+  const result = getRobotResult(robotState, trade);
   const stopLimit = getStopLimit(robotState);
   const aiReview = getRobotAiReview(signal);
+  const galeCycleResult =
+    robotState.cycle_result === "GALE_WIN" || robotState.cycle_result === "GALE_LOSS";
   const operationOpen =
     robotState.operation_in_progress ||
     robotState.result_waiting ||
+    status === "ORDER_OPEN" ||
+    status === "WAITING_RESULT" ||
+    status === "BUYING" ||
     status === "SENDING_ORDER" ||
     status === "PENDING_RESULT" ||
     status === "WAITING_GALE_ENTRY" ||
@@ -137,27 +142,43 @@ function getNarrationEvents(
     return events;
   }
 
-  if (signal && status === "WAITING_ENTRY_WINDOW") {
+  if (!robotState.enabled || status === "STOPPED") {
+    events.push({
+      key: "WELCOME_STOPPED",
+      text: "Bem-vindo ao robô do Sérgio Trader. Para iniciar, faça login na BullEx. Depois, ligue o robô. Não esqueça de configurar o valor da entrada, o stop win, e o stop loss.",
+    });
+    return events;
+  }
+
+  if (signal && (status === "SIGNAL_FOUND" || status === "WAITING_ENTRY_WINDOW")) {
     events.push({
       key: createSignalEventKey(signal),
-      text: `O ElCapo encontrou uma oportunidade em ${formatSpokenActive(signal.symbol)}. Direcao ${
-        signal.direction
-      }. Score ${formatScore(signal.strategy_score)}. Estrategia utilizada: ${formatUsedStrategies(
+      text: `Melhor ativo encontrado. Ativo: ${formatSpokenActive(
+        signal.symbol,
+      )}. Direção: ${formatDirection(signal.direction)}. Confiança: ${formatScore(
+        signal.confidence,
+      )} por cento. Payout: ${formatScore(signal.payout)} por cento. Valor da entrada: ${formatEntryValue(
+        robotState.entry_value,
+      )}. Estratégia utilizada: ${formatUsedStrategies(signal)}. Motivo: ${formatSignalReason(
         signal,
       )}. Aguardando janela de entrada.`,
     });
   }
 
-  if (signal && status === "WAITING_NEXT_CANDLE_ENTRY") {
+  if (signal && (status === "WAITING_ENTRY" || status === "WAITING_NEXT_CANDLE_ENTRY")) {
     if (aiReview?.voiceText) {
       events.push({
         key: createAiVoiceEventKey(robotState, signal, aiReview.voiceText),
-        text: aiReview.voiceText,
+        text: formatTechnicalSpeech(aiReview.voiceText),
       });
     } else {
       events.push({
         key: createStatusSignalCycleEventKey(status, signal, robotState.cycle_id),
-        text: `Entrada preparada. Estrategia confirmada: ${formatUsedStrategies(signal)}. Vamos entrar no inicio da proxima vela.`,
+        text: `Entrada preparada. Ativo: ${formatSpokenActive(
+          signal.symbol,
+        )}. Direção: ${formatDirection(signal.direction)}. Estratégia confirmada: ${formatUsedStrategies(
+          signal,
+        )}. Entrada no início da próxima vela.`,
       });
     }
   }
@@ -165,11 +186,11 @@ function getNarrationEvents(
   if (status === "ANALYZING" && !operationOpen) {
     events.push({
       key: `ANALYSIS_STARTED|${analysisSequence}`,
-      text: "O ElCapo vai analisar o mercado em busca da melhor oportunidade.",
+      text: "O robô do Sérgio Trader está analisando o mercado. Aguarde a melhor oportunidade.",
     });
   }
 
-  if (status === "SENDING_ORDER") {
+  if (status === "BUYING" || status === "SENDING_ORDER") {
     events.push({
       key: createStatusSignalCycleEventKey(
         status,
@@ -177,7 +198,7 @@ function getNarrationEvents(
         robotState.cycle_id,
         `${trade?.order_id ?? "-"}|${signalCreatedAt}`,
       ),
-      text: "Entrada liberada. Enviando ordem agora.",
+      text: "Entrada liberada. Executando ordem agora.",
     });
   }
 
@@ -202,12 +223,19 @@ function getNarrationEvents(
     });
   }
 
-  if (!result && (status === "PENDING_RESULT" || robotState.operation_in_progress)) {
+  if (
+    !result &&
+    (status === "ORDER_OPEN" ||
+      status === "WAITING_RESULT" ||
+      status === "PENDING_RESULT" ||
+      robotState.operation_in_progress ||
+      robotState.result_waiting)
+  ) {
     const active = trade?.active;
     if (active) {
       events.push({
         key: createEventKey("PENDING_RESULT", orderId, signalCreatedAt, signal),
-        text: `Operacao aberta em ${formatSpokenActive(active)}. Aguardando resultado.`,
+        text: `Operação aberta em ${formatSpokenActive(active)}. Aguardando resultado.`,
       });
     }
   }
@@ -221,17 +249,17 @@ function getNarrationEvents(
     });
   }
 
-  if (status === "RESULT_RECEIVED" && result === "WIN") {
+  if (!galeCycleResult && isResultReceived(status, result) && result === "WIN") {
     events.push({
-      key: createResultKey("WIN", trade),
-      text: "Operacao encerrada com WIN. Resultado positivo confirmado.",
+      key: createResultKey("WIN", robotState, trade),
+      text: `Resultado confirmado. WIN. Operação encerrada com lucro. Placar atualizado: ${robotState.wins} wins, e ${robotState.losses} losses. Lucro atual: ${formatProfit(robotState.profit)}.`,
     });
   }
 
-  if (status === "RESULT_RECEIVED" && result === "LOSS") {
+  if (!galeCycleResult && isResultReceived(status, result) && result === "LOSS") {
     events.push({
-      key: createResultKey("LOSS", trade),
-      text: "Operacao encerrada com LOSS. Seguimos o plano com disciplina.",
+      key: createResultKey("LOSS", robotState, trade),
+      text: `Resultado confirmado. LOSS. Operação encerrada com perda. Placar atualizado: ${robotState.wins} wins, e ${robotState.losses} losses. Resultado atual: ${formatProfit(robotState.profit)}. Seguimos o gerenciamento com disciplina.`,
     });
   }
 
@@ -293,9 +321,7 @@ function createStatusSignalCycleEventKey(
   cycleId: string | null,
   extra = "",
 ) {
-  return [status, signal?.symbol ?? "-", signal?.direction ?? "-", cycleId ?? "-", extra].join(
-    "|",
-  );
+  return [status, signal?.symbol ?? "-", signal?.direction ?? "-", cycleId ?? "-", extra].join("|");
 }
 
 function createSignalEventKey(signal: RobotSignal) {
@@ -306,8 +332,13 @@ function createAiVoiceEventKey(robotState: RobotState, signal: RobotSignal, aiVo
   return `${robotState.cycle_id ?? "-"}${signal.symbol}${aiVoiceText}`;
 }
 
-function createResultKey(result: "WIN" | "LOSS", trade: RobotTrade | null) {
-  return `${trade?.order_id ?? "-"}|${result}`;
+function createResultKey(result: "WIN" | "LOSS", robotState: RobotState, trade: RobotTrade | null) {
+  return [
+    robotState.cycle_id ?? "-",
+    trade?.order_id ?? "-",
+    trade?.finished_at ?? robotState.result_display_until ?? "-",
+    result,
+  ].join("|");
 }
 
 function createGaleEventKey(robotState: RobotState, orderId: string) {
@@ -319,13 +350,36 @@ function createGaleEventKey(robotState: RobotState, orderId: string) {
   ].join("|");
 }
 
-function getTradeResult(trade: RobotTrade | null) {
+function getRobotResult(robotState: RobotState, trade: RobotTrade | null): "WIN" | "LOSS" | null {
+  if (robotState.status === "WIN" || robotState.status === "RESULT_WIN") return "WIN";
+  if (robotState.status === "LOSS" || robotState.status === "RESULT_LOSS") return "LOSS";
+  if (robotState.cycle_result === "WIN" || robotState.cycle_result === "GALE_WIN") return "WIN";
+  if (robotState.cycle_result === "LOSS" || robotState.cycle_result === "GALE_LOSS") {
+    return "LOSS";
+  }
   return trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+}
+
+function isResultReceived(status: string, result: "WIN" | "LOSS" | null) {
+  if (!result) return false;
+  return (
+    status === "WIN" ||
+    status === "LOSS" ||
+    status === "RESULT_WIN" ||
+    status === "RESULT_LOSS" ||
+    status === "RESULT_RECEIVED" ||
+    status === "GALE_RESULT_RECEIVED"
+  );
 }
 
 function isGaleResultReceived(status: string, cycleResult: string | null) {
   return (
-    (status === "RESULT_RECEIVED" || status === "GALE_RESULT_RECEIVED") &&
+    (status === "WIN" ||
+      status === "LOSS" ||
+      status === "RESULT_WIN" ||
+      status === "RESULT_LOSS" ||
+      status === "RESULT_RECEIVED" ||
+      status === "GALE_RESULT_RECEIVED") &&
     (cycleResult === "GALE_WIN" || cycleResult === "GALE_LOSS")
   );
 }
@@ -406,6 +460,18 @@ function formatSpokenStrategy(strategy: string) {
   return formatTechnicalSpeech(formatFriendlyRobotText(strategy)).replace(/[.!?]+$/, "");
 }
 
+function formatSignalReason(signal: RobotSignal) {
+  return formatTechnicalSpeech(
+    formatFriendlyRobotText(
+      signal.ai_entry_reason ??
+        signal.reason ??
+        signal.strategy_reason ??
+        signal.ai_candle_reading ??
+        "motivo nao informado",
+    ),
+  ).replace(/[.!?]+$/, "");
+}
+
 function formatUsedStrategies(signal: RobotSignal) {
   const strategies =
     signal.used_strategies.length > 0
@@ -415,13 +481,27 @@ function formatUsedStrategies(signal: RobotSignal) {
   return strategies.map(formatSpokenStrategy).join(", ");
 }
 
+function formatDirection(direction: RobotSignal["direction"] | RobotTrade["direction"]) {
+  if (direction === "CALL") return "compra";
+  if (direction === "PUT") return "venda";
+  return "aguardar";
+}
+
 function formatScore(value: number | null) {
   if (value == null) return "nao informado";
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
 }
 
+function formatEntryValue(value: number | null) {
+  if (value == null) return "não informado";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+}
+
 function formatTechnicalSpeech(value: string) {
-  return removeSpeechDiacritics(value)
+  return value
     .replace(/([a-zA-Z])([A-Z])/g, "$1 $2")
     .replace(/[_/\\-]+/g, " ")
     .replace(/\bRSI\b/gi, "R S I")
@@ -432,10 +512,6 @@ function formatTechnicalSpeech(value: string) {
     .replace(/\bOTC\b/gi, "O T C")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function removeSpeechDiacritics(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function formatSpokenDuration(totalSeconds: number) {
