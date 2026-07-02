@@ -233,9 +233,10 @@ function getNarrationEvents(
   ) {
     const active = trade?.active;
     if (active) {
+      const directionText = trade?.direction ? ` Direção: ${formatDirection(trade.direction)}.` : "";
       events.push({
         key: createEventKey("PENDING_RESULT", orderId, signalCreatedAt, signal),
-        text: `Operação aberta em ${formatSpokenActive(active)}. Aguardando resultado.`,
+        text: `Operação aberta em ${formatSpokenActive(active)}.${directionText} Aguardando resultado.`,
       });
     }
   }
@@ -283,9 +284,9 @@ function getNarrationEvents(
     });
   }
 
-  if (status === "WAITING_NEXT_CYCLE") {
+  if (status === "WAITING_NEXT_CYCLE" && hasFinalResultForNextCycle(robotState, trade)) {
     const remainingSeconds = nextCycleSeconds ?? 0;
-    if (remainingSeconds > 0) {
+    if (remainingSeconds >= 240) {
       events.push({
         key: createEventKey(status, orderId, signalCreatedAt, signal, robotState.next_cycle_at),
         text: `O ElCapo vai analisar o mercado novamente. A proxima oportunidade esta prevista para daqui a ${formatSpokenDuration(
@@ -358,6 +359,17 @@ function getRobotResult(robotState: RobotState, trade: RobotTrade | null): "WIN"
     return "LOSS";
   }
   return trade?.result === "WIN" || trade?.result === "LOSS" ? trade.result : null;
+}
+
+function hasFinalResultForNextCycle(robotState: RobotState, trade: RobotTrade | null) {
+  return (
+    trade?.result === "WIN" ||
+    trade?.result === "LOSS" ||
+    robotState.cycle_result === "WIN" ||
+    robotState.cycle_result === "LOSS" ||
+    robotState.cycle_result === "GALE_WIN" ||
+    robotState.cycle_result === "GALE_LOSS"
+  );
 }
 
 function isResultReceived(status: string, result: "WIN" | "LOSS" | null) {

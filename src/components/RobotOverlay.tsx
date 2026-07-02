@@ -282,6 +282,11 @@ export function RobotOverlay({
         >
           {content.title}
         </p>
+        {content.details ? (
+          <div className="mt-1 text-[11px] font-semibold leading-tight text-cyan-100 sm:text-xs">
+            {content.details}
+          </div>
+        ) : null}
         {content.footer ? (
           <p className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-tight sm:text-xs">
             {content.footer}
@@ -355,18 +360,24 @@ function getOverlayContent(
           ? "text-red-300"
           : "";
   const countdown = formatOfficialCountdown(robotState);
+  const detailParts = getOperationDetails(presentation);
   const footer =
     presentation.footer ??
     (countdown !== "-"
       ? robotState?.operation_in_progress || robotState?.result_waiting
         ? `Resultado em ${countdown}`
-        : `Entrada em ${countdown}`
+        : isAnalysisCountdown(countdown)
+          ? countdown
+          : `Entrada em ${countdown}`
       : null);
 
   return {
     title: formatOverlayTitle(robotState, presentation.title),
     tone,
-    details: null,
+    details:
+      detailParts.length > 0 ? (
+        <span>{detailParts.join(" | ")}</span>
+      ) : null,
     footer: normalizeOverlayFooter(footer),
   };
 }
@@ -393,6 +404,32 @@ function normalizeOverlayFooter(value: string | null) {
   return value
     .replace(/^Próxima entrada em/i, "Entrada em")
     .replace(/^Proxima entrada em/i, "Entrada em");
+}
+
+function getOperationDetails(presentation: ReturnType<typeof getRobotPresentation>) {
+  const active =
+    presentation.trade?.active ?? presentation.signal?.symbol ?? presentation.gale?.active ?? null;
+  const direction =
+    presentation.trade?.direction ??
+    presentation.signal?.direction ??
+    presentation.gale?.direction ??
+    presentation.direction;
+  const details: string[] = [];
+
+  if (active) details.push(active);
+  if (direction) details.push(formatDirectionLabel(direction));
+
+  return details;
+}
+
+function formatDirectionLabel(direction: string) {
+  if (direction === "CALL") return "COMPRA";
+  if (direction === "PUT") return "VENDA";
+  return direction;
+}
+
+function isAnalysisCountdown(value: string) {
+  return /^Analisando por/i.test(value);
 }
 
 function RobotConfigMenu({

@@ -535,7 +535,7 @@ function RobotPage() {
                       ? "Analise"
                       : "Próxima entrada em"
                 }
-                value={formatOfficialCountdown(displayRobotState)}
+                value={formatCountdownForStatus(displayRobotState)}
               />
             ) : null}
           </div>
@@ -964,6 +964,12 @@ function formatOfficialCountdown(robotState: RobotState) {
 
   if (!robotState.display_countdown_label) return countdown ?? "-";
   return countdown ? `${robotState.display_countdown_label} ${countdown}` : robotState.display_countdown_label;
+}
+
+function formatCountdownForStatus(robotState: RobotState) {
+  const official = formatOfficialCountdown(robotState);
+  if (robotState.status !== "WAITING_NEXT_CYCLE") return official;
+  return official.replace(/^Analisando por\s*/i, "") || official;
 }
 
 function formatClock(totalSeconds: number) {
