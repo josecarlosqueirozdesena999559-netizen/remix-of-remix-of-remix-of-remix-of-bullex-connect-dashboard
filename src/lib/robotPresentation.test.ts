@@ -98,8 +98,8 @@ test("RESULT_RECEIVED mostra WIN imediatamente e volta ao ciclo apos 5 segundos"
   assert.equal(received.title, "WIN");
   assert.equal(received.kind, "result");
   assert.equal(beforeTimeout.title, "WIN");
-  assert.equal(afterTimeout.title, "Robô aguardando próximo ciclo");
-  assert.equal(afterTimeout.detail, "Próxima entrada em 00:42");
+  assert.equal(afterTimeout.title, "Analisando mercado...");
+  assert.equal(afterTimeout.detail, "00:42");
 });
 
 test("WAITING_GALE_ENTRY mostra Gale preparado sem tratar loss inicial como final", () => {
@@ -302,8 +302,24 @@ test("WAITING_NEXT_CYCLE nao mostra entrada liberada antes de SENDING_ORDER", ()
     now,
   );
 
-  assert.equal(presentation.title, "Robô aguardando próximo ciclo");
+  assert.equal(presentation.title, "Analisando mercado...");
   assert.equal(presentation.detail, null);
+});
+
+test("WAITING_NEXT_CYCLE mostra cronometro de analise quando backend envia label", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "WAITING_NEXT_CYCLE",
+      display_countdown_label: "Analisando por",
+      display_countdown_seconds: 300,
+      best_candidate: createSignal(),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Analisando mercado...");
+  assert.equal(presentation.detail, "Analisando por 05:00");
+  assert.equal(presentation.signal, null);
 });
 
 test("status DISCONNECTED nunca mostra analise operacional", () => {

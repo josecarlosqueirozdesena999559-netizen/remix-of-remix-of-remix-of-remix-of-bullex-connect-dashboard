@@ -30,11 +30,11 @@ export function useBullExStatusQuery({
       } satisfies BullexConnectionStatus;
     },
     enabled: enabled && Boolean(userId),
-    refetchInterval: isDocumentVisible ? 15000 : false,
+    refetchInterval: isDocumentVisible ? 10000 : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
-    staleTime: 14000,
+    staleTime: 9000,
   });
 }
 

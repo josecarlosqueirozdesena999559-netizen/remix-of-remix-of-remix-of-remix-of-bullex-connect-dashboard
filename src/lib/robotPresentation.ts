@@ -397,7 +397,7 @@ function createNextCyclePresentation(
     return createPresentation("analyzing", title);
   }
 
-  return createPresentation("analyzing", title, `Próxima entrada em ${officialCountdown}`);
+  return createPresentation("analyzing", title, officialCountdown);
 }
 
 function createWaitingNextCyclePresentation(
@@ -408,15 +408,16 @@ function createWaitingNextCyclePresentation(
 
   return createPresentation(
     "analyzing",
-    "Robô aguardando próximo ciclo",
-    officialCountdown ? `Próxima entrada em ${officialCountdown}` : null,
+    "Analisando mercado...",
+    officialCountdown,
   );
 }
 
 function getOfficialCountdown(robotState: RobotState) {
-  if (robotState.display_countdown_label) return robotState.display_countdown_label;
   const seconds = robotState.display_countdown_seconds;
-  return seconds != null && seconds > 0 ? formatDuration(seconds) : null;
+  const countdown = seconds != null && seconds > 0 ? formatDuration(seconds) : null;
+  if (!robotState.display_countdown_label) return countdown;
+  return countdown ? `${robotState.display_countdown_label} ${countdown}` : robotState.display_countdown_label;
 }
 
 function createPresentation(

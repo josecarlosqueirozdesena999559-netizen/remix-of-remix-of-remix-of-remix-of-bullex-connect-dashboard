@@ -202,6 +202,10 @@ export function robotResetCycle() {
   return apiRequest<unknown>("/robot/reset-cycle", { method: "POST" });
 }
 
+export function robotResetScore() {
+  return apiRequest<unknown>("/robot/reset-score", { method: "POST" });
+}
+
 export function robotState(userId: string) {
   return apiRequest<unknown>("/robot/state", {}, userId);
 }

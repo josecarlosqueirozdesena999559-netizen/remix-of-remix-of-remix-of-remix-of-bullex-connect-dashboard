@@ -1,13 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Bot, Loader2, Power } from "lucide-react";
+import { Bot, Loader2, Power, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   ApiError,
   apiConfig,
   robotConfig,
   robotResetCycle,
+  robotResetScore,
   robotStart,
   robotStop,
   type ApiResult,
@@ -43,6 +44,7 @@ function RobotPage() {
   const [settingsActionPending, setSettingsActionPending] = useState(false);
   const [settingsActionError, setSettingsActionError] = useState<string | null>(null);
   const [resetCyclePending, setResetCyclePending] = useState(false);
+  const [resetScorePending, setResetScorePending] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [lastHistoryRefreshKey, setLastHistoryRefreshKey] = useState<string | null>(null);
   const [realBuyError, setRealBuyError] = useState<string | null>(null);
@@ -360,6 +362,26 @@ function RobotPage() {
     }
   }
 
+  async function handleResetScore() {
+    if (!hasBackend || resetScorePending) return;
+    setRobotActionError(null);
+    setResetScorePending(true);
+    try {
+      unwrapApiResult(await robotResetScore());
+      await robotState.refetch();
+      await queryClient.invalidateQueries({ queryKey: ROBOT_HISTORY_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: ROBOT_STATS_QUERY_KEY });
+      toast.success("Placar reiniciado");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel reiniciar o placar.";
+      setRobotActionError(message);
+      toast.error(message);
+    } finally {
+      setResetScorePending(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl min-w-0 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -509,7 +531,9 @@ function RobotPage() {
                 label={
                   displayRobotState.operation_in_progress || displayRobotState.result_waiting
                     ? "Resultado em"
-                    : "Próxima entrada em"
+                    : displayRobotState.status === "WAITING_NEXT_CYCLE"
+                      ? "Analise"
+                      : "Próxima entrada em"
                 }
                 value={formatOfficialCountdown(displayRobotState)}
               />
@@ -597,6 +621,19 @@ function RobotPage() {
             className="w-full rounded-xl border border-border bg-background/40 px-5 py-3 font-semibold transition hover:bg-accent sm:w-auto"
           >
             {configOpen ? "Fechar configurações" : "Abrir configurações"}
+          </button>
+          <button
+            type="button"
+            onClick={handleResetScore}
+            disabled={!hasBackend || resetScorePending}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background/40 px-5 py-3 font-semibold transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            {resetScorePending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="h-4 w-4" />
+            )}
+            Reiniciar placar
           </button>
         </div>
 
@@ -922,10 +959,11 @@ function useCurrentTime() {
 }
 
 function formatOfficialCountdown(robotState: RobotState) {
-  if (robotState.display_countdown_label) return robotState.display_countdown_label;
   const seconds = robotState.display_countdown_seconds;
+  const countdown = seconds != null && seconds > 0 ? formatClock(seconds) : null;
 
-  return seconds != null && seconds > 0 ? formatClock(seconds) : "-";
+  if (!robotState.display_countdown_label) return countdown ?? "-";
+  return countdown ? `${robotState.display_countdown_label} ${countdown}` : robotState.display_countdown_label;
 }
 
 function formatClock(totalSeconds: number) {

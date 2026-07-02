@@ -325,10 +325,11 @@ function useCurrentTime() {
 
 function formatOfficialCountdown(robotState: RobotState | undefined) {
   if (!robotState) return "-";
-  if (robotState.display_countdown_label) return robotState.display_countdown_label;
   const seconds = robotState.display_countdown_seconds;
+  const countdown = seconds != null && seconds > 0 ? formatClock(seconds) : null;
 
-  return seconds != null && seconds > 0 ? formatClock(seconds) : "-";
+  if (!robotState.display_countdown_label) return countdown ?? "-";
+  return countdown ? `${robotState.display_countdown_label} ${countdown}` : robotState.display_countdown_label;
 }
 
 function formatClock(totalSeconds: number) {
@@ -388,6 +389,7 @@ function isRobotActive(robotState: RobotState | undefined) {
 
 function normalizeOverlayFooter(value: string | null) {
   if (!value) return null;
+  if (/^Analisando por/i.test(value)) return value;
   return value
     .replace(/^Próxima entrada em/i, "Entrada em")
     .replace(/^Proxima entrada em/i, "Entrada em");
