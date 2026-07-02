@@ -637,10 +637,6 @@ function RobotPage() {
           </button>
         </div>
 
-        {robotActionError ? (
-          <p className="mt-3 text-sm text-destructive">{robotActionError}</p>
-        ) : null}
-
         {showResetCycle ? (
           <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-4">
             <p className="text-sm font-medium text-warning-foreground">

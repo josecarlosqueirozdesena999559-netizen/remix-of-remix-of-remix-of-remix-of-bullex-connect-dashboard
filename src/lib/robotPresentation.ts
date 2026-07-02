@@ -311,6 +311,9 @@ export function formatDuration(totalSeconds: number) {
 
 export function formatFriendlyRobotText(value: string | null | undefined) {
   if (!value) return "Motivo nao informado.";
+  if (/field required/i.test(value)) {
+    return "A corretora recusou a ordem. O robo vai analisar novamente.";
+  }
 
   const replacements: Record<string, string> = {
     TREND_CLEAR: "Tendencia clara",

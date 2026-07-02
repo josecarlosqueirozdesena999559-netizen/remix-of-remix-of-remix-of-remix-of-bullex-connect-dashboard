@@ -57,7 +57,7 @@ test("se todos os ativos falharem mostra ORDER_REJECTED", () => {
   assert.equal(presentation.kind, "rejected");
 });
 
-test("BUY_ERROR com erro de ordem mostra compra real bloqueada e proxima entrada", () => {
+test("BUY_ERROR com erro de ordem mostra mensagem amigavel e proxima entrada", () => {
   resetRobotPresentationState();
 
   const presentation = getRobotPresentation(
@@ -72,7 +72,10 @@ test("BUY_ERROR com erro de ordem mostra compra real bloqueada e proxima entrada
 
   assert.equal(presentation.kind, "rejected");
   assert.equal(presentation.title, "Compra REAL bloqueada");
-  assert.equal(presentation.detail, "Field required: amount");
+  assert.equal(
+    presentation.detail,
+    "A corretora recusou a ordem. O robo vai analisar novamente.",
+  );
   assert.equal(presentation.footer, "Próxima entrada em 05:00");
   assert.equal(presentation.signal, null);
 });
