@@ -325,6 +325,25 @@ test("WAITING_NEXT_CYCLE mostra cronometro de analise quando backend envia label
   assert.equal(presentation.signal, null);
 });
 
+test("contador oficial de analise esconde candidato antigo mesmo se status vier como sinal", () => {
+  const presentation = getRobotPresentation(
+    createRobotState({
+      status: "SIGNAL_FOUND",
+      display_countdown_label: "Analisando por",
+      display_countdown_seconds: 274,
+      best_candidate: createSignal({
+        symbol: "EURUSD-OTC",
+        direction: "CALL",
+      }),
+    }),
+    now,
+  );
+
+  assert.equal(presentation.title, "Analisando mercado...");
+  assert.equal(presentation.detail, "Analisando por 04:34");
+  assert.equal(presentation.signal, null);
+});
+
 test("status DISCONNECTED nunca mostra analise operacional", () => {
   const presentation = getRobotPresentation(
     createRobotState({

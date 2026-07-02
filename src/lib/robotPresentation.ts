@@ -147,7 +147,7 @@ export function getRobotPresentation(
     return createNextCyclePresentation(robotState, options);
   }
 
-  if (status === "WAITING_NEXT_CYCLE") {
+  if (status === "WAITING_NEXT_CYCLE" || isOfficialAnalysisCountdown(robotState)) {
     return createWaitingNextCyclePresentation(robotState, options);
   }
 
@@ -421,6 +421,10 @@ function getOfficialCountdown(robotState: RobotState) {
   const countdown = seconds != null && seconds > 0 ? formatDuration(seconds) : null;
   if (!robotState.display_countdown_label) return countdown;
   return countdown ? `${robotState.display_countdown_label} ${countdown}` : robotState.display_countdown_label;
+}
+
+function isOfficialAnalysisCountdown(robotState: RobotState) {
+  return /^Analisando por/i.test(robotState.display_countdown_label ?? "");
 }
 
 function createPresentation(
