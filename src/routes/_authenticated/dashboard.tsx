@@ -60,14 +60,10 @@ function Dashboard() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Resumo da sua conta BullEx.</p>
-        {user?.id && (
-          <p className="mt-1 text-xs text-muted-foreground">Sessao: {user.id.slice(0, 8)}</p>
-        )}
       </header>
 
       {!hasBackend && (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           <strong>Backend nao configurado.</strong> Defina{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
           e{" "}
@@ -79,7 +75,7 @@ function Dashboard() {
       )}
 
       {hasBackend && connectionPending && (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           {loginFlow.phase === "reconnecting"
             ? "Reconectando automaticamente..."
             : "Conectando a BullEx..."}
@@ -87,7 +83,7 @@ function Dashboard() {
       )}
 
       {hasBackend && !connectionPending && disconnected && (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           Conta BullEx desconectada. Clique em Conectar BullEx.
         </div>
       )}

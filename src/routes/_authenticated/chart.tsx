@@ -76,6 +76,7 @@ function MarketPage() {
     isCandlesLoading,
     isPayoutLoading,
     lastCandleReceivedAt,
+    lastServerTime,
     lastCandleTimestamp,
     lastPrice,
     payoutError,
@@ -84,11 +85,20 @@ function MarketPage() {
   } = useMarketData(chartSymbol || null, DEFAULT_TIMEFRAME);
 
   const realtimeAgeSeconds =
-    lastCandleReceivedAt == null
+    lastCandleReceivedAt == null || lastCandleTimestamp == null || lastServerTime == null
       ? null
-      : Math.max(0, Math.floor((now - lastCandleReceivedAt.getTime()) / 1000));
+      : Math.max(
+          0,
+          Math.floor(
+            lastServerTime - Number(lastCandleTimestamp) + (now - lastCandleReceivedAt.getTime()) / 1000,
+          ),
+        );
   const realtimeStatus =
-    realtimeAgeSeconds == null ? "Atrasado" : realtimeAgeSeconds <= 3 ? "Tempo real" : "Atrasado";
+    realtimeAgeSeconds == null
+      ? "Atrasado"
+      : realtimeAgeSeconds <= timeframeSeconds(DEFAULT_TIMEFRAME)
+        ? "Tempo real"
+        : "Atrasado";
 
   const lastRealtimeStatusRef = useRef<string | null>(null);
   useEffect(() => {
@@ -142,7 +152,7 @@ function MarketPage() {
       </header>
 
       {loginFlow.isPending ? (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           {loginFlow.phase === "reconnecting"
             ? "Reconectando automaticamente..."
             : "Conectando a BullEx..."}
@@ -150,7 +160,7 @@ function MarketPage() {
       ) : null}
 
       {sessionMissing && !loginFlow.isPending && (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           {getBinaryMarketErrorMessage("SESSION_DISCONNECTED")}
         </div>
       )}
@@ -440,6 +450,14 @@ function formatChartSource(source: ReturnType<typeof resolveChartSelection>["sou
 
 function formatRealtimeStatus(status: string, ageSeconds: number | null) {
   return ageSeconds == null ? status : `${status} (${ageSeconds}s)`;
+}
+
+function timeframeSeconds(timeframe: string) {
+  const normalized = timeframe.trim().toUpperCase();
+  if (normalized === "M1") return 60;
+  if (normalized === "M5") return 300;
+  if (normalized === "M15") return 900;
+  return 60;
 }
 
 function unwrap<T>(res: ApiResult<T>): T {

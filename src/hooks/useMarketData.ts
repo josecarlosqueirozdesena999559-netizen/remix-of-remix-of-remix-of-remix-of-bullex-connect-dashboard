@@ -26,6 +26,7 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
   const [candlesError, setCandlesError] = useState<unknown>(null);
   const [payoutError, setPayoutError] = useState<unknown>(null);
   const [lastCandleReceivedAt, setLastCandleReceivedAt] = useState<Date | null>(null);
+  const [lastServerTime, setLastServerTime] = useState<number | null>(null);
   const [lastCandleTimestamp, setLastCandleTimestamp] = useState<UTCTimestamp | null>(null);
   const [pollingStatus, setPollingStatus] = useState<MarketPollingStatus>("idle");
   const candlesCacheRef = useRef(new Map<string, MarketCandle[]>());
@@ -41,6 +42,7 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
       setCandlesError(null);
       setPayoutError(null);
       setLastCandleReceivedAt(null);
+      setLastServerTime(null);
       setLastCandleTimestamp(null);
       setPollingStatus("idle");
       return;
@@ -66,6 +68,7 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
     } else {
       setLastPrice(null);
       setLastCandleTimestamp(null);
+      setLastServerTime(null);
     }
 
     setSelectedPayout(null);
@@ -91,7 +94,9 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
         const candlesResponse = await apiRequest<unknown>(url, {
           signal: candlesController.signal,
         });
-        const nextCandles = normalizeCandlesPayload(symbol, unwrap(candlesResponse)).slice(-200);
+        const candlesPayload = unwrap(candlesResponse);
+        const nextCandles = normalizeCandlesPayload(symbol, candlesPayload).slice(-200);
+        const serverTime = getServerTime(candlesPayload);
 
         if (cancelled) return;
 
@@ -113,6 +118,7 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
           setLastPrice(latestCandle.close);
           setLastCandleTimestamp(latestCandle.time);
           setLastCandleReceivedAt(new Date());
+          setLastServerTime(serverTime);
         }
 
         setCandlesError(null);
@@ -190,6 +196,7 @@ export function useMarketData(symbol: string | null, timeframe = "M1") {
     isCandlesLoading,
     isPayoutLoading,
     lastCandleReceivedAt,
+    lastServerTime,
     lastCandleTimestamp,
     lastPrice,
     payoutError,
@@ -357,6 +364,13 @@ function getRawCandles(input: unknown): unknown[] {
   if (value.candle && typeof value.candle === "object") return [value];
   if (hasCandlePrices(value)) return [value];
   return [];
+}
+
+function getServerTime(input: unknown) {
+  if (!input || typeof input !== "object") return null;
+  const value = input as Record<string, unknown>;
+  const data = value.data && typeof value.data === "object" ? (value.data as Record<string, unknown>) : null;
+  return normalizeNumber(value.server_time ?? data?.server_time);
 }
 
 function hasCandlePrices(value: Record<string, unknown>) {

@@ -234,7 +234,7 @@ export function RobotOverlay({
           onClose={() => setConfigOpen(false)}
           onSave={async () => {
             if (settingsLocked) {
-              toast.error("Pare o robô para alterar configurações.");
+              toast.error("Robo ativo no momento.");
               return;
             }
             try {
@@ -484,12 +484,6 @@ function RobotConfigMenu({
           Fechar
         </button>
       </div>
-
-      {locked ? (
-        <p className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] font-semibold text-warning-foreground">
-          Pare o robô para alterar configurações.
-        </p>
-      ) : null}
 
       <div className="space-y-2">
         <ConfigNumber

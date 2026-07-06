@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   LogOut,
   Plug,
-  Settings,
   ShieldCheck,
 } from "lucide-react";
 import { TrialBanner } from "@/components/TrialBanner";
@@ -26,14 +25,12 @@ const nav = [
   { to: "/robot", label: "Robô", Icon: Bot },
   { to: "/history", label: "Histórico", Icon: History },
   { to: "/payments", label: "Pagamentos", Icon: CreditCard },
-  { to: "/settings", label: "Configurações", Icon: Settings },
 ] as const;
 
 const adminNav = { to: "/admin", label: "Admin", Icon: ShieldCheck } as const;
 const adminOnlyNav = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   adminNav,
-  { to: "/settings", label: "Configurações", Icon: Settings },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -60,7 +57,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <div className="font-bold leading-tight">ElCapo</div>
-            <div className="text-xs text-muted-foreground leading-tight">AutoBot</div>
           </div>
         </div>
         <nav className="scrollbar-none flex gap-2 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:gap-1 md:px-3 md:pb-0">

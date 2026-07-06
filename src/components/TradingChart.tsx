@@ -240,13 +240,13 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       />
 
       <div
-        className="pointer-events-none absolute left-8 top-8 z-20 max-w-[min(92%,420px)] rounded-xl border px-4 py-3 text-xs shadow-lg backdrop-blur"
+        className="pointer-events-none absolute left-4 top-4 z-20 max-w-[calc(100%-2rem)] rounded-xl border px-4 py-3 text-xs shadow-lg backdrop-blur sm:left-8 sm:top-8 sm:max-w-[560px]"
         style={{
           background: CHART_THEME.overlayBg,
           borderColor: "rgba(255, 255, 255, 0.16)",
         }}
       >
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-2 sm:grid-cols-3">
           <OverlayRow label="Ativo atual" value={symbol} />
           <OverlayRow
             label="Preço atual"
@@ -288,9 +288,11 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
 
 function OverlayRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="font-semibold text-foreground">{value}</div>
+    <div className="min-w-0">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="break-words text-sm font-semibold leading-snug text-foreground">{value}</div>
     </div>
   );
 }

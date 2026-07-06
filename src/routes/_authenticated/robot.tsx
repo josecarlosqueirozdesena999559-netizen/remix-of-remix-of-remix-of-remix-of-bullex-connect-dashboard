@@ -314,7 +314,7 @@ function RobotPage() {
   async function handleSaveAiSettings() {
     if (!user?.id || !hasBackend || settingsActionPending) return;
     if (settingsLocked) {
-      const message = "Pare o robô para alterar configurações.";
+      const message = "Robo ativo no momento.";
       setSettingsActionError(message);
       toast.error(message);
       return;
@@ -389,7 +389,7 @@ function RobotPage() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <Bot className="h-6 w-6" /> Robô
           </h1>
-          <p className="text-sm text-muted-foreground">Ligue ou pare o AutoBot.</p>
+          <p className="text-sm text-muted-foreground">Ligue ou pare o robô.</p>
         </div>
         <span className="rounded-md bg-muted px-3 py-1 text-sm">
           Conta: <strong>{activeMode ?? "-"}</strong>
@@ -397,7 +397,7 @@ function RobotPage() {
       </header>
 
       {!hasBackend ? (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           <strong>Backend não configurado.</strong> Defina{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
           e{" "}
@@ -409,8 +409,8 @@ function RobotPage() {
       ) : null}
 
       {connectionPending ? (
-        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-sm">
-          <p className="font-medium text-warning-foreground">
+        <div className="rounded-2xl border border-border bg-card p-5 text-sm text-foreground">
+          <p className="font-medium text-foreground">
             {loginFlow.phase === "reconnecting"
               ? "Reconectando automaticamente..."
               : "Conectando a BullEx..."}
@@ -422,8 +422,8 @@ function RobotPage() {
       ) : null}
 
       {!syncing && !connectionPending && accountDisconnected ? (
-        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5 text-sm">
-          <p className="font-medium text-warning-foreground">Conta BullEx desconectada</p>
+        <div className="rounded-2xl border border-border bg-card p-5 text-sm text-foreground">
+          <p className="font-medium text-foreground">Conta BullEx desconectada</p>
           <p className="mt-1 text-muted-foreground">
             Faça login na página BullEx antes de iniciar o robô.
           </p>
@@ -437,8 +437,8 @@ function RobotPage() {
       ) : null}
 
       {syncingTimedOut ? (
-        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm">
-          <p className="font-medium text-warning-foreground">
+        <div className="rounded-2xl border border-border bg-card p-4 text-sm text-foreground">
+          <p className="font-medium text-foreground">
             Sincronizando ha mais de 30 segundos.
           </p>
           <p className="mt-1 text-muted-foreground">
@@ -478,12 +478,6 @@ function RobotPage() {
             </div>
           </div>
         </div>
-
-        {settingsLocked ? (
-          <p className="mt-3 text-sm font-medium text-warning-foreground">
-            Pare o robô para alterar configurações.
-          </p>
-        ) : null}
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-6">
@@ -638,8 +632,8 @@ function RobotPage() {
         </div>
 
         {showResetCycle ? (
-          <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-4">
-            <p className="text-sm font-medium text-warning-foreground">
+          <div className="mt-4 rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-medium text-foreground">
               Stop atingido. Reinicie o ciclo para continuar.
             </p>
             <button
@@ -764,11 +758,6 @@ function RobotPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            {settingsLocked ? (
-              <p className="w-full text-sm font-medium text-warning-foreground">
-                Pare o robô para alterar configurações.
-              </p>
-            ) : null}
             <button
               type="button"
               onClick={handleSaveAiSettings}

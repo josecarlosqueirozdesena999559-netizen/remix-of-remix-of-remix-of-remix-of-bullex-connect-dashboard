@@ -99,7 +99,7 @@ function BullExPage() {
       </header>
 
       {!hasBackend ? (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
           <strong>Backend não configurado.</strong> Defina{" "}
           <code className="rounded bg-background/40 px-1 font-mono text-xs">VITE_API_BASE_URL</code>{" "}
           e{" "}
