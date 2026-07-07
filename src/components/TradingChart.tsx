@@ -239,6 +239,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         }}
       />
 
+      {false && (
       <div
         className="pointer-events-none absolute left-4 top-4 z-20 max-w-[calc(100%-2rem)] rounded-xl border px-4 py-3 text-xs shadow-lg backdrop-blur sm:left-8 sm:top-8 sm:max-w-[560px]"
         style={{
@@ -266,6 +267,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
           <OverlayRow label="WIN/LOSS" value={overlay?.result ?? "-"} />
         </div>
       </div>
+      )}
 
       {displayedCandle && (
         <div
