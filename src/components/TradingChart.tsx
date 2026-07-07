@@ -58,6 +58,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevSymbolRef = useRef("");
   const prevLengthRef = useRef(0);
+  const firstTimeRef = useRef<number | null>(null);
   const latestTimeRef = useRef<number | null>(null);
   const [hoveredCandle, setHoveredCandle] = useState<MarketCandle | null>(null);
 
@@ -163,7 +164,9 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
     if (!chart || !series) return;
 
     const symbolChanged = prevSymbolRef.current !== symbol;
+    const firstCandle = candles[0] ?? null;
     const latestCandle = candles[candles.length - 1] ?? null;
+    const firstTime = firstCandle ? Number(firstCandle.time) : null;
 
     if (symbolChanged) {
       console.log("[SYMBOL_CHANGED]", {
@@ -176,6 +179,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       resetChartForSymbolChange(chart, nextSeries, candles);
       prevSymbolRef.current = symbol;
       prevLengthRef.current = candles.length;
+      firstTimeRef.current = firstTime;
       latestTimeRef.current = latestCandle ? Number(latestCandle.time) : null;
       return;
     }
@@ -197,6 +201,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       console.log("[CHART_RESET]", { symbol, candles: 0 });
       console.log("[PRICE_SCALE_RESET]", { symbol, reason: "empty_data" });
       prevLengthRef.current = 0;
+      firstTimeRef.current = null;
       latestTimeRef.current = null;
       return;
     }
@@ -204,11 +209,14 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
     if (
       prevLengthRef.current === 0 ||
       candles.length < prevLengthRef.current ||
-      candles.length - prevLengthRef.current > 1
+      candles.length - prevLengthRef.current > 1 ||
+      (firstTimeRef.current != null && firstTime != null && firstTime !== firstTimeRef.current)
     ) {
       series.setData(candles);
       resetPriceScale(chart);
+      focusLatestCandles(chart, candles.length);
       console.log("[PRICE_SCALE_RESET]", { symbol, reason: "setData" });
+      firstTimeRef.current = firstTime;
       latestTimeRef.current = latestCandle ? Number(latestCandle.time) : null;
     } else if (latestCandle) {
       const nextTime = Number(latestCandle.time);
@@ -217,14 +225,36 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
       latestTimeRef.current = nextTime;
 
       if (previousTime == null || nextTime !== previousTime) {
+        focusLatestCandles(chart, candles.length);
         console.log("[TIMESCALE_FIXED]", { symbol, latest_time: latestCandle.time });
+      } else {
+        keepLatestCandleVisible(chart);
       }
     }
 
     prevLengthRef.current = candles.length;
   }, [candles, symbol, overlay?.currentPrice]);
 
-  const displayedCandle = hoveredCandle ?? candles[candles.length - 1] ?? null;
+  useEffect(() => {
+    const syncLatestPosition = () => {
+      const chart = chartRef.current;
+      if (!chart || candles.length === 0) return;
+      focusLatestCandles(chart, candles.length);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") syncLatestPosition();
+    };
+
+    window.addEventListener("focus", syncLatestPosition);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", syncLatestPosition);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [candles.length]);
+
+  const displayedCandle = hoveredCandle;
 
   return (
     <div className="relative min-h-[592px] p-4 md:min-h-[712px]">
@@ -373,6 +403,13 @@ function focusLatestCandles(chart: IChartApi, candleCount: number) {
     to: lastIndex + CHART_RIGHT_OFFSET,
   });
   console.log("[TIMESCALE_FIXED]", { visible_candles: candleCount });
+}
+
+function keepLatestCandleVisible(chart: IChartApi) {
+  chart.timeScale().applyOptions({
+    rightOffset: CHART_RIGHT_OFFSET,
+  });
+  chart.timeScale().scrollToPosition(CHART_RIGHT_OFFSET, false);
 }
 
 function resetPriceScale(chart: IChartApi) {
