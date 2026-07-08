@@ -17,17 +17,17 @@ const VISIBLE_CANDLE_COUNT = 32;
 const CHART_RIGHT_OFFSET = 4;
 const CHART_TIME_ZONE = "America/Fortaleza";
 const CHART_THEME = {
-  background: "#06101f",
-  text: "#ffffff",
-  grid: "rgba(255, 255, 255, 0.08)",
-  crosshair: "#ffffff",
-  candleUp: "#00C853",
-  candleDown: "#FF1744",
-  candleUpWick: "#00C853",
-  candleDownWick: "#FF1744",
-  priceLine: "#ffffff",
-  border: "#1d4f91",
-  overlayBg: "rgba(3, 12, 26, 0.92)",
+  background: "#03070a",
+  text: "#f4fbfc",
+  grid: "rgba(37, 219, 224, 0.08)",
+  crosshair: "#25dbe0",
+  candleUp: "#25dbe0",
+  candleDown: "#8fb0b8",
+  candleUpWick: "#25dbe0",
+  candleDownWick: "#8fb0b8",
+  priceLine: "#25dbe0",
+  border: "#12343b",
+  overlayBg: "rgba(8, 19, 27, 0.92)",
 } as const;
 
 type TradingChartOverlay = {
@@ -263,9 +263,9 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         className="h-[560px] w-full overflow-hidden rounded-xl border md:h-[680px]"
         style={{
           background:
-            "radial-gradient(circle at top, rgba(29,78,216,0.16), transparent 35%), linear-gradient(180deg, #07111f 0%, #030712 100%)",
+            "radial-gradient(circle at top, rgba(37,219,224,0.12), transparent 35%), linear-gradient(180deg, #08131b 0%, #03070a 100%)",
           borderColor: CHART_THEME.border,
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 44px rgba(2, 6, 23, 0.45)",
+          boxShadow: "inset 0 1px 0 rgba(37,219,224,0.08), 0 16px 44px rgba(0, 16, 20, 0.45)",
         }}
       />
 
@@ -274,7 +274,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
         className="pointer-events-none absolute left-4 top-4 z-20 max-w-[calc(100%-2rem)] rounded-xl border px-4 py-3 text-xs shadow-lg backdrop-blur sm:left-8 sm:top-8 sm:max-w-[560px]"
         style={{
           background: CHART_THEME.overlayBg,
-          borderColor: "rgba(255, 255, 255, 0.16)",
+          borderColor: "rgba(37, 219, 224, 0.18)",
         }}
       >
         <div className="grid grid-cols-2 gap-x-5 gap-y-2 sm:grid-cols-3">
@@ -304,7 +304,7 @@ export function TradingChart({ symbol, timeframe, candles, overlay }: TradingCha
           className="pointer-events-none absolute right-8 top-8 z-20 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur"
           style={{
             background: CHART_THEME.overlayBg,
-            borderColor: "rgba(255, 255, 255, 0.16)",
+            borderColor: "rgba(37, 219, 224, 0.18)",
           }}
         >
           <div className="font-semibold text-foreground">{formatTime(displayedCandle.time)}</div>

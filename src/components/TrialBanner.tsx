@@ -15,7 +15,7 @@ export function TrialBanner() {
   if (ms <= 0) return null;
 
   return (
-    <div className="mb-6 rounded-xl border border-[#050522] bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+    <div className="mb-6 rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0 text-primary-foreground">
           <Sparkles className="w-5 h-5" />

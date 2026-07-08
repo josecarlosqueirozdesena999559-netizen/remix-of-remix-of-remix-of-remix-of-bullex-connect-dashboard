@@ -158,9 +158,9 @@ function StatCard({
 }) {
   const toneClass =
     tone === "positive"
-      ? "text-emerald-400"
+      ? "text-primary"
       : tone === "negative"
-        ? "text-red-400"
+        ? "text-muted-foreground"
         : "text-foreground";
 
   return (
@@ -178,16 +178,16 @@ function StatCard({
 
 function HistoryRow({ item }: { item: RobotHistoryItem }) {
   const isWin = item.result === "WIN";
-  const resultClass = isWin ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400";
-  const directionClass = item.direction === "CALL" ? "text-emerald-400" : "text-red-400";
+  const resultClass = isWin ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground";
+  const directionClass = item.direction === "CALL" ? "text-primary" : "text-muted-foreground";
   const galeClass =
     item.badge === "NORMAL"
       ? "bg-muted text-muted-foreground"
-      : item.badge === "GALE WIN"
-        ? "bg-emerald-500/15 text-emerald-400"
+    : item.badge === "GALE WIN"
+        ? "bg-primary/15 text-primary"
         : item.badge === "GALE LOSS"
-          ? "bg-red-500/15 text-red-400"
-          : "bg-amber-500/15 text-amber-300";
+          ? "bg-muted text-muted-foreground"
+          : "bg-primary/10 text-primary";
   const accountLabel = item.accountMode ?? "-";
   const accountClass =
     item.accountMode === "REAL"
@@ -207,7 +207,7 @@ function HistoryRow({ item }: { item: RobotHistoryItem }) {
           {item.result}
         </span>
       </TableCell>
-      <TableCell className={`font-semibold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
+      <TableCell className={`font-semibold ${isWin ? "text-primary" : "text-muted-foreground"}`}>
         {formatMoney(item.profit)}
       </TableCell>
       <TableCell>

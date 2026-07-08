@@ -259,7 +259,7 @@ export function RobotOverlay({
         <video
           src="/robo-wink.webm"
           aria-label="Robô analisando o mercado"
-          className="pointer-events-none h-auto w-[110px] object-contain [filter:hue-rotate(175deg)_saturate(1.35)_brightness(1.02)_contrast(1.14)_drop-shadow(0_0_14px_rgba(37,99,235,0.45))_drop-shadow(0_0_6px_rgba(125,211,252,0.25))] sm:w-[170px]"
+          className="pointer-events-none h-auto w-[110px] object-contain [filter:hue-rotate(175deg)_saturate(1.35)_brightness(1.03)_contrast(1.12)_drop-shadow(0_0_14px_rgba(37,219,224,0.42))_drop-shadow(0_0_6px_rgba(143,176,184,0.24))] sm:w-[170px]"
           autoPlay
           loop
           muted
@@ -283,7 +283,7 @@ export function RobotOverlay({
           {content.title}
         </p>
         {content.details ? (
-          <div className="mt-1 text-[11px] font-semibold leading-tight text-cyan-100 sm:text-xs">
+          <div className="mt-1 text-[11px] font-semibold leading-tight text-primary sm:text-xs">
             {content.details}
           </div>
         ) : null}
@@ -297,7 +297,7 @@ export function RobotOverlay({
             <button
               type="button"
               onClick={adminModelControls.onAddWin}
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1.5 text-[10px] font-bold text-emerald-100 transition hover:bg-emerald-500/30 sm:text-xs"
+              className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/20 px-3 py-1.5 text-[10px] font-bold text-primary transition hover:bg-primary/30 sm:text-xs"
             >
               <Trophy className="h-3 w-3" />
               WIN +1
@@ -352,12 +352,12 @@ function getOverlayContent(
   const tone =
     presentation.kind === "result"
       ? isPositiveResult
-        ? "text-emerald-300"
-        : "text-red-300"
+        ? "text-primary"
+        : "text-muted-foreground"
       : presentation.kind === "operation"
-        ? "text-amber-200"
+        ? "text-primary"
         : presentation.kind === "rejected"
-          ? "text-red-300"
+          ? "text-muted-foreground"
           : "";
   const countdown = formatOfficialCountdown(robotState);
   const detailParts = getOperationDetails(presentation);
@@ -516,7 +516,7 @@ function RobotConfigMenu({
             checked={settings.martingaleEnabled}
             disabled={locked}
             onChange={(event) => onChange({ ...settings, martingaleEnabled: event.target.checked })}
-            className="h-4 w-4 accent-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-4 w-4 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
           />
         </label>
 
@@ -608,8 +608,8 @@ function Score({
 }) {
   const color =
     tone === "win"
-      ? "text-[#39ff88] [text-shadow:0_0_8px_#00ff66,0_2px_4px_#000]"
-      : "text-[#ff4d5f] [text-shadow:0_0_8px_#ff1935,0_2px_4px_#000]";
+      ? "text-primary [text-shadow:0_0_8px_#25dbe0,0_2px_4px_#03070a]"
+      : "text-muted-foreground [text-shadow:0_0_8px_#12343b,0_2px_4px_#03070a]";
 
   return (
     <div className={`text-center font-black ${color}`}>
