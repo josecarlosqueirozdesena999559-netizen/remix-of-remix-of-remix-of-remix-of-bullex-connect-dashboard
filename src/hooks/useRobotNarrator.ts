@@ -6,7 +6,10 @@ import { formatFriendlyRobotText } from "@/lib/robotPresentation";
 type NarrationEvent = {
   key: string;
   text: string;
+  audioSrc?: string;
 };
+
+const ROBOT_VOICEOVER_SRC = "/robot-voiceover.mp3";
 
 export function useRobotNarrator(
   robotState: RobotState | undefined,
@@ -17,12 +20,17 @@ export function useRobotNarrator(
   const [speaking, setSpeaking] = useState(false);
   const [speechCycle, setSpeechCycle] = useState(0);
   const previousStatusRef = useRef<string | null>(null);
+  const previousRobotEnabledRef = useRef<boolean | null>(null);
   const analysisSequenceRef = useRef(0);
+  const robotStartSequenceRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const supported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
     if (!supported) return;
     window.speechSynthesis.cancel();
+    audioRef.current?.pause();
+    audioRef.current = null;
     setSpeaking(false);
     if (enabled) {
       setSpeechCycle((cycle) => cycle + 1);
@@ -31,6 +39,10 @@ export function useRobotNarrator(
 
   useEffect(() => {
     if (!supported || !enabled || !robotState) return;
+    if (robotState.enabled && previousRobotEnabledRef.current !== true) {
+      robotStartSequenceRef.current += 1;
+    }
+    previousRobotEnabledRef.current = robotState.enabled;
     if (previousStatusRef.current !== robotState.status) {
       if (robotState.status === "ANALYZING") {
         analysisSequenceRef.current += 1;
@@ -47,6 +59,7 @@ export function useRobotNarrator(
       robotState,
       nextCycleSeconds,
       analysisSequenceRef.current,
+      robotStartSequenceRef.current,
     ).find((nextEvent) => !spokenKeysRef.current.has(nextEvent.key));
     if (!event || spokenKeysRef.current.has(event.key)) return;
 
@@ -57,6 +70,28 @@ export function useRobotNarrator(
         symbol: robotState.pending_signal?.symbol ?? null,
         direction: robotState.pending_signal?.direction ?? null,
       });
+    }
+
+    if (event.audioSrc) {
+      const audio = new Audio(event.audioSrc);
+      audioRef.current = audio;
+      audio.onplay = () => {
+        spokenKeysRef.current.add(event.key);
+        setSpeaking(true);
+      };
+      audio.onended = () => {
+        audioRef.current = null;
+        setSpeaking(false);
+        setSpeechCycle((cycle) => cycle + 1);
+      };
+      audio.onerror = () => {
+        spokenKeysRef.current.add(event.key);
+        audioRef.current = null;
+        setSpeaking(false);
+        setSpeechCycle((cycle) => cycle + 1);
+      };
+      void audio.play().catch(() => audio.onerror?.(new Event("error")));
+      return;
     }
 
     const utterance = new SpeechSynthesisUtterance(event.text);
@@ -90,6 +125,8 @@ export function useRobotNarrator(
   function silence() {
     if (!supported) return;
     window.speechSynthesis.cancel();
+    audioRef.current?.pause();
+    audioRef.current = null;
     setSpeaking(false);
   }
 
@@ -100,6 +137,7 @@ function getNarrationEvents(
   robotState: RobotState,
   nextCycleSeconds: number | null,
   analysisSequence: number,
+  robotStartSequence: number,
 ): NarrationEvent[] {
   const events: NarrationEvent[] = [];
   const status = robotState.status;
@@ -150,6 +188,12 @@ function getNarrationEvents(
     return events;
   }
 
+  events.push({
+    key: `ROBOT_STARTED_VOICEOVER|${robotStartSequence}`,
+    text: "Áudio de início do robô",
+    audioSrc: ROBOT_VOICEOVER_SRC,
+  });
+
   if (signal && (status === "SIGNAL_FOUND" || status === "WAITING_ENTRY_WINDOW")) {
     events.push({
       key: createSignalEventKey(signal),
@@ -184,6 +228,11 @@ function getNarrationEvents(
   }
 
   if (status === "ANALYZING" && !operationOpen) {
+    events.push({
+      key: `ANALYSIS_VOICEOVER|${analysisSequence}`,
+      text: "Áudio de análise do robô",
+      audioSrc: ROBOT_VOICEOVER_SRC,
+    });
     events.push({
       key: `ANALYSIS_STARTED|${analysisSequence}`,
       text: "O robô do Sérgio Trader está analisando o mercado. Aguarde a melhor oportunidade.",
@@ -251,6 +300,7 @@ function getNarrationEvents(
   }
 
   if (!galeCycleResult && isResultReceived(status, result) && result === "WIN") {
+    events.push(createResultVoiceoverEvent("WIN", robotState, trade));
     events.push({
       key: createResultKey("WIN", robotState, trade),
       text: `Resultado confirmado. WIN. Operação encerrada com lucro. Placar atualizado: ${robotState.wins} wins, e ${robotState.losses} losses. Lucro atual: ${formatProfit(robotState.profit)}.`,
@@ -258,6 +308,7 @@ function getNarrationEvents(
   }
 
   if (!galeCycleResult && isResultReceived(status, result) && result === "LOSS") {
+    events.push(createResultVoiceoverEvent("LOSS", robotState, trade));
     events.push({
       key: createResultKey("LOSS", robotState, trade),
       text: `Resultado confirmado. LOSS. Operação encerrada com perda. Placar atualizado: ${robotState.wins} wins, e ${robotState.losses} losses. Resultado atual: ${formatProfit(robotState.profit)}. Seguimos o gerenciamento com disciplina.`,
@@ -268,6 +319,7 @@ function getNarrationEvents(
     isGaleResultReceived(status, robotState.cycle_result) &&
     robotState.cycle_result === "GALE_WIN"
   ) {
+    events.push(createResultVoiceoverEvent("GALE_WIN", robotState, trade));
     events.push({
       key: createGaleEventKey(robotState, orderId),
       text: "Gale 1 encerrado com WIN. Recuperacao concluida com sucesso.",
@@ -278,6 +330,7 @@ function getNarrationEvents(
     isGaleResultReceived(status, robotState.cycle_result) &&
     robotState.cycle_result === "GALE_LOSS"
   ) {
+    events.push(createResultVoiceoverEvent("GALE_LOSS", robotState, trade));
     events.push({
       key: createGaleEventKey(robotState, orderId),
       text: "Gale 1 encerrado com LOSS. Ciclo finalizado. Mantenha o gerenciamento com disciplina.",
@@ -340,6 +393,18 @@ function createResultKey(result: "WIN" | "LOSS", robotState: RobotState, trade: 
     trade?.finished_at ?? robotState.result_display_until ?? "-",
     result,
   ].join("|");
+}
+
+function createResultVoiceoverEvent(
+  result: "WIN" | "LOSS" | "GALE_WIN" | "GALE_LOSS",
+  robotState: RobotState,
+  trade: RobotTrade | null,
+): NarrationEvent {
+  return {
+    key: `${createResultKey(result.includes("WIN") ? "WIN" : "LOSS", robotState, trade)}|VOICEOVER`,
+    text: "Áudio de encerramento da operação",
+    audioSrc: ROBOT_VOICEOVER_SRC,
+  };
 }
 
 function createGaleEventKey(robotState: RobotState, orderId: string) {
@@ -508,7 +573,7 @@ function formatEntryValue(value: number | null) {
   if (value == null) return "não informado";
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "USD",
+    currency: "BRL",
   }).format(value);
 }
 
@@ -543,7 +608,7 @@ function formatProfit(value: number | null | undefined) {
   const amount = Math.abs(value ?? 0);
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "USD",
+    currency: "BRL",
   }).format(amount);
 }
 
